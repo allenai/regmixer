@@ -1,7 +1,7 @@
 name: "example-mixing-experiment"
 description: "This is an example mixing experiment configuration file."
 budget: "ai2/oe-data"
-workspace: "ai2/oe-data-regmix"
+workspace: "ai2/OLMo-core"
 nodes: 1
 gpus: 4
 variants: 1024

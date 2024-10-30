@@ -72,8 +72,8 @@ def train(run_name, source):
         name, paths, ratio = item
         paths = paths.split(",")
         sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
-    config = build_config(run_name, [], sources)
-    run(config)
+
+    run(build_config(run_name, [], sources))
 
 
 def build_config(
