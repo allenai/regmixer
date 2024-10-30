@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 import yaml
 from olmo_core.launch.beaker import BeakerLaunchConfig
+from olmo_core.utils import prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.utils import mk_experiment_group, mk_launch_configs
@@ -35,6 +36,7 @@ def cli():
     help="Print the experiment configuration without launching.",
 )
 def launch(config: Path, dry_run: bool):
+    prepare_cli_environment()
     """Launch an experiment."""
     with open(config, "r") as f:
         data = yaml.safe_load(f)
