@@ -58,7 +58,7 @@ def cli():
     "-s",
     multiple=True,
     type=(str, str, str),
-    help="Source dataset with (name, paths, and ratio)",
+    help="Source datasets as 'name path,path,... ratio'",
 )
 @click.option(
     "--run-name",
