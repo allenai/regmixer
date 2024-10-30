@@ -10,7 +10,7 @@ max_tokens: 10_000_000
 clusters:
   - ai2/s2-cirrascale-l40
 sources:
-  - name: "STEM"
+  - name: "stem"
     paths:
       - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Science,_Math_n_Technology/*.npy"
   - name: "entertainment"

@@ -87,7 +87,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             ],
             setup_steps=[
                 # Clone repo.
-                'git clone "$REPO_URL" .',
+                "git clone https://git@github.com/allenai/regmixer.git .",
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
                 # Setup python environment.

@@ -5,8 +5,8 @@ from pydantic import BaseModel
 class SourceConfig(BaseModel):
     name: str
     paths: list[str]
-    # max_repetition_factor: float = 1
-    # max_source_ratio: float = 1.0
+    max_repetition_factor: float = 1.0
+    max_source_ratio: float = 1.0
 
 
 class SourceInstance(BaseModel):
