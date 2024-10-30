@@ -1,4 +1,6 @@
+from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
+from olmo_core.utils import generate_uuid
 
 from regmixer.aliases import (
     ExperimentConfig,
@@ -45,15 +47,19 @@ def mk_instance_cmd(instance: ExperimentInstance) -> list[str]:
     return [
         "python",
         "train.py",
-        f"--name={instance.name}",  # TODO: Add the rest of the arguments
+        f"--name={instance.name}",
+    ] + [
+        f"--source={source.name} {','.join(source.paths)} {source.ratio}"
+        for source in instance.sources
     ]
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
+    beaker_user = (Beaker.from_env().account.whoami().name).upper()
     """Build a beaker launch config from an experiment group."""
     return [
         BeakerLaunchConfig(
-            name=experiment.name,  # TODO: Check if we need a UUID here
+            name=f"{experiment.name}-{generate_uuid()[:8]}",  # TODO: Check if we need a UUID here
             description=group.config.description,
             task_name=experiment.name,
             cmd=mk_instance_cmd(experiment),
@@ -67,13 +73,14 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             budget=group.config.budget or "ai2/oe-data",
             workspace=group.config.workspace,
             preemptible=group.config.preemptible,
-            # TODO: Make this some global value for the workspace don't scope to user
             env_secrets=[
-                BeakerEnvSecret(name="BEAKER_TOKEN", secret="BEAKER_TOKEN"),
-                BeakerEnvSecret(name="WANDB_API_KEY", secret="WANDB_API_KEY"),
-                BeakerEnvSecret(name="COMET_API_KEY", secret="COMET_API_KEY"),
-                BeakerEnvSecret(name="AWS_CONFIG", secret="AWS_CONFIG"),
-                BeakerEnvSecret(name="AWS_CREDENTIALS", secret="AWS_CREDENTIALS"),
+                BeakerEnvSecret("AWS_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
+                BeakerEnvSecret("AWS_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
+                BeakerEnvSecret(name="BEAKER_TOKEN", secret=f"{beaker_user}_BEAKER_TOKEN"),
+                BeakerEnvSecret(name="WANDB_API_KEY", secret=f"{beaker_user}_WANDB_API_KEY"),
+                BeakerEnvSecret(name="COMET_API_KEY", secret=f"{beaker_user}_COMET_API_KEY"),
+                BeakerEnvSecret(name="AWS_CONFIG", secret=f"{beaker_user}_AWS_CONFIG"),
+                BeakerEnvSecret(name="AWS_CREDENTIALS", secret=f"{beaker_user}_AWS_CREDENTIALS"),
                 BeakerEnvSecret(name="R2_ENDPOINT_URL", secret="R2_ENDPOINT_URL"),
                 BeakerEnvSecret(name="WEKA_ENDPOINT_URL", secret="WEKA_ENDPOINT_URL"),
             ],

@@ -5,14 +5,14 @@ from pydantic import BaseModel
 class SourceConfig(BaseModel):
     name: str
     paths: list[str]
+    # max_repetition_factor: float = 1
+    # max_source_ratio: float = 1.0
 
 
 class SourceInstance(BaseModel):
     name: str
     paths: list[str]
     ratio: float
-    # max_repetition_factor: float = 1
-    # max_source_ratio: float = 1.0
 
 
 class ExperimentConfig(BaseModel):
@@ -23,6 +23,7 @@ class ExperimentConfig(BaseModel):
     variants: int
     nodes: int
     gpus: int
+    max_tokens: int
     clusters: list[str]
     sources: list[SourceConfig]
     preemptible: bool = True

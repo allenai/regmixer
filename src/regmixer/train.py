@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Any, Union
+from os import PathLike
 from dataclasses import dataclass
 from typing import List, cast
 
@@ -10,6 +13,8 @@ from olmo_core.data import (
     NumpyDatasetType,
     TokenizerConfig,
 )
+from olmo_core.data.source_mixture import SourceMixtureConfig, SourceMixtureDatasetConfig
+from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.distributed.parallel import DataParallelType
 from olmo_core.distributed.utils import init_hybrid_shard_mesh
 from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
@@ -36,6 +41,8 @@ from olmo_core.utils import get_default_device, seed_all
 
 from regmixer.aliases import SourceInstance
 
+path_type = Union[Path, PathLike[Any], str]
+
 
 @dataclass
 class ExperimentConfig(Config):
@@ -54,31 +61,70 @@ def cli():
 
 @cli.command()
 @click.option(
+    "--max-tokens",
+    "-t",
+    type=int,
+    help="Max tokens for the mixture dataset",
+    required=True,
+)
+@cli.command()
+@click.option(
     "--source",
     "-s",
     multiple=True,
     type=(str, str, str),
-    help="Source datasets as 'name path,path,... ratio'",
+    help="Source datasets in the form `name path,path,... ratio`",
 )
 @click.option(
     "--run-name",
     "-n",
     type=str,
     help="Name of the run",
+    required=True,
 )
-def train(run_name, source):
+def train(run_name, max_tokens, source):
     sources = []
     for item in source:
         name, paths, ratio = item
         paths = paths.split(",")
         sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
 
-    run(build_config(run_name, [], sources))
+    run(build_config(run_name, [], sources, max_tokens))
+
+
+def expand_globs(paths: List[str], fs: s3fs.S3FileSystem) -> List[path_type]:
+    expanded_paths: List[path_type] = []
+    for path in paths:
+        new = [Path(f"s3://{obj}") for obj in fs.glob(path)]
+        expanded_paths.extend(new)
+
+    return expanded_paths
+
+
+def build_source_mixtures(
+    source_instances: List[dict], fs: s3fs.S3FileSystem
+) -> List[SourceMixtureConfig]:
+    source_mixtures: List[SourceMixtureConfig] = []
+    for source_instance in source_instances:
+        # TODO: Match these keys so we aren't messing with them
+        name = source_instance["name"]
+        paths = source_instance["paths"]
+        ratio = source_instance["ratio"]
+        source_mixtures.append(
+            SourceMixtureConfig(source_name=name, paths=expand_globs(paths, fs), target_ratio=ratio)
+        )
+
+    return source_mixtures
 
 
 def build_config(
-    run_name: str, overrides: List[str], source_instances: List[dict]
+    run_name: str, overrides: List[str], source_instances: List[dict], max_tokens: int
 ) -> ExperimentConfig:
+    fs = s3fs.S3FileSystem()
+
+    # TODO: Pass these from the experiment config
+    sequence_length = 1024
+    seed = 42
     tokenizer_config = TokenizerConfig.gpt2()
 
     model_config = TransformerConfig.llama2_271M(
@@ -96,22 +142,27 @@ def build_config(
         ],
     )
 
-    s3 = s3fs.S3FileSystem()
-
-    # TODO: Build / prepare the source configs and dataset configs here
+    source_configs = build_source_mixtures(source_instances, fs)
+    source_mixture_config = SourceMixtureDatasetConfig(
+        max_tokens=max_tokens,
+        sequence_length=sequence_length,
+        source_configs=source_configs,
+        dtype=NumpyDatasetDType.uint16,
+        processes=1,
+        seed=seed,
+    )
 
     # TODO: Make this the mixture dataset
-    dataset_config = NumpyDatasetConfig.glob(
-        "/net/nfs/allennlp/llm-data/c4/en/c4-train.*.npy",  # can be globs
+    dataset_config = NumpyDatasetConfig(
+        source_mixture_config=source_mixture_config,
         name=NumpyDatasetType.fsl,
-        sequence_length=1024,
-        max_target_sequence_length=8192,
+        sequence_length=sequence_length,
         tokenizer=tokenizer_config,
         work_dir="/tmp/dataset-cache",
     )
 
     data_loader_config = NumpyDataLoaderConfig(
-        global_batch_size=256 * 1024,
+        global_batch_size=256 * sequence_length,
         seed=0,
         num_workers=4,
     )
@@ -119,7 +170,7 @@ def build_config(
     trainer_config = (
         TrainerConfig(
             save_folder=f"/tmp/{run_name}",
-            rank_microbatch_size=16 * 1024,
+            rank_microbatch_size=16 * sequence_length,
             save_overwrite=True,
             metrics_collect_interval=5,
             cancel_check_interval=5,
@@ -154,7 +205,7 @@ def build_config(
             WandBCallback(
                 name=run_name,
                 cancel_check_interval=10,
-                enabled=False,  # change to true to enable
+                enabled=True,  # change to true to enable
             ),
         )
         .with_callback("config_saver", ConfigSaverCallback())
@@ -167,7 +218,7 @@ def build_config(
                     paths=["/net/nfs/allennlp/llm-data/c4/en/c4-validation.00000-00008.npy"],
                     metadata=[{"label": "c4-validation"}],
                     name=NumpyDatasetType.padded_fsl,
-                    sequence_length=1024,
+                    sequence_length=sequence_length,
                     tokenizer=tokenizer_config,
                     work_dir="/tmp/dataset-cache",
                 ),
@@ -186,7 +237,6 @@ def build_config(
     ).merge(overrides)
 
 
-# TODO: Add args for the resulting mixture
 def run(config: ExperimentConfig):
     # Set RNG states on all devices.
     seed_all(config.init_seed)
