@@ -27,7 +27,13 @@ def cli():
     default=False,
     help="Follow the experiment logs.",
 )
-def launch(config: Path, follow: bool):
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print the experiment configuration without launching.",
+)
+def launch(config: Path, follow: bool, dry_run: bool):
     """Launch an experiment."""
     with open(config, "r") as f:
         data = yaml.safe_load(f)
@@ -39,7 +45,11 @@ def launch(config: Path, follow: bool):
     try:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [
-                executor.submit(experiment.launch, follow) for experiment in launch_group.instances
+                executor.submit(
+                    experiment.launch() if not dry_run else experiment.build_experiment_spec(),
+                    follow,
+                )
+                for experiment in launch_group.instances
             ]
         results = [future.result() for future in futures]
         print(results)
