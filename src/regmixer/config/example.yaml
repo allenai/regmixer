@@ -1,0 +1,19 @@
+name: "example-mixing-experiment"
+description: "This is an example mixing experiment configuration file."
+budget: "ai2/oe-data"
+workspace: "ai2/oe-data-regmix"
+nodes: 1
+gpus: 4
+variants: 1024
+preemptible: false
+clusters:
+  - ai2/mars
+  - ai2/mercury
+  - ai2/venus
+sources:
+  - name: "source1"
+    paths:
+      - "s3://path/to/source1*"
+  - name: "source2"
+    paths:
+      - "s3://path/to/source2/*"

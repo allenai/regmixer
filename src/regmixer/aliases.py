@@ -1,0 +1,45 @@
+from olmo_core.launch.beaker import BeakerLaunchConfig, BeakerWekaBucket
+from pydantic import BaseModel
+
+
+class SourceConfig(BaseModel):
+    name: str
+    paths: list[str]
+
+
+class SourceInstance(BaseModel):
+    name: str
+    paths: list[str]
+    ratio: float
+    # max_repetition_factor: float = 1
+    # max_source_ratio: float = 1.0
+
+
+class ExperimentConfig(BaseModel):
+    name: str
+    description: str
+    budget: str
+    workspace: str
+    variants: int
+    nodes: int
+    gpus: int
+    clusters: list[str]
+    sources: list[SourceConfig]
+    preemptible: bool = True
+    shared_filesystem: bool = False
+    nfs: bool = False
+    weka: list[BeakerWekaBucket] = []
+
+
+class ExperimentInstance(BaseModel):
+    name: str
+    sources: list[SourceInstance]
+
+
+class ExperimentGroup(BaseModel):
+    config: ExperimentConfig
+    instances: list[ExperimentInstance]
+
+
+class LaunchGroup(BaseModel):
+    instances: list[BeakerLaunchConfig]
