@@ -1,6 +1,6 @@
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
-from olmo_core.utils import generate_uuid
+from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import (
     ExperimentConfig,
@@ -55,6 +55,7 @@ def mk_instance_cmd(instance: ExperimentInstance) -> list[str]:
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
+    prepare_cli_environment()
     beaker_user = (Beaker.from_env().account.whoami().name).upper()
     """Build a beaker launch config from an experiment group."""
     return [
