@@ -52,7 +52,7 @@ def mk_instance_cmd(instance: ExperimentInstance) -> list[str]:
         for source in instance.sources
     ]
 
-    return ["python", "src/regmixer/train.py", f"--name={instance.name}", *sources]
+    return ["src/regmixer/train.py", f"--name={instance.name}", *sources]
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
@@ -83,18 +83,14 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 BeakerEnvSecret(name="AWS_CREDENTIALS", secret=f"{beaker_user}_AWS_CREDENTIALS"),
                 BeakerEnvSecret(name="R2_ENDPOINT_URL", secret="R2_ENDPOINT_URL"),
                 BeakerEnvSecret(name="WEKA_ENDPOINT_URL", secret="WEKA_ENDPOINT_URL"),
-                BeakerEnvSecret(name="GH_TOKEN", secret=f"{beaker_user}_GH_TOKEN"),
             ],
             setup_steps=[
-                # Install GitHub CLI for credential helper.
-                "conda shell.bash activate base",
-                "conda install -y gh --channel conda-forge",
-                "gh auth setup-git",
                 # Clone repo.
                 'gh repo clone "$REPO_URL" .',
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
                 # Setup python environment.
+                "conda shell.bash activate base",
                 "pip install -e '.[all]' && pip install git+https://github.com/allenai/OLMo-core.git@undfined/mixing-loader",
                 "pip freeze",
                 # Move AWS credentials from env to relevant files
