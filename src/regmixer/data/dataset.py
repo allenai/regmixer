@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import List, Any
 
 import s3fs
 from olmo_core.data.source_mixture import SourceMixtureConfig, SourceMixtureDatasetConfig
@@ -17,7 +17,7 @@ class MixtureBuilder:
     seed: int
     dtype: NumpyDatasetDType
     processes: int = 1
-    fs: s3fs.S3FileSystem = s3fs.S3FileSystem()
+    fs: s3fs.S3FileSystem = field(default_factory=lambda: s3fs.S3FileSystem())
 
     def expand_globs(self, paths: List[str]) -> List[PathType]:
         expanded_paths: List[PathType] = []
