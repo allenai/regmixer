@@ -30,6 +30,8 @@ class ExperimentConfig(BaseModel):
     nodes: int
     gpus: int
     max_tokens: int
+    sequence_length: int
+    seed: int
     clusters: list[str]
     sources: list[SourceConfig]
     preemptible: bool = True
