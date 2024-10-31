@@ -19,7 +19,7 @@ def dry_run(experiment: BeakerLaunchConfig):
 
 @click.group()
 def cli():
-    pass
+    prepare_cli_environment()
 
 
 @cli.command()
@@ -36,8 +36,8 @@ def cli():
     help="Print the experiment configuration without launching.",
 )
 def launch(config: Path, dry_run: bool):
-    prepare_cli_environment()
     """Launch an experiment."""
+
     with open(config, "r") as f:
         data = yaml.safe_load(f)
 

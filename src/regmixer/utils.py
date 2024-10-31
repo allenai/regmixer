@@ -1,3 +1,5 @@
+from typing import List
+
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
 from olmo_core.utils import generate_uuid, prepare_cli_environment
@@ -17,7 +19,7 @@ def mk_source_instances(sources: list[SourceConfig]) -> list[SourceInstance]:
         SourceInstance(
             name=source.name,
             paths=source.paths,
-            ratio=0.0,
+            ratio=1 / len(sources),
         )
         for source in sources
     ]
@@ -43,24 +45,22 @@ def mk_experiment_group(config: ExperimentConfig) -> ExperimentGroup:
 
 
 def mk_instance_cmd(instance: ExperimentInstance) -> list[str]:
-    """Build a command for an experiment instance."""
-    return [
-        "python",
-        "train.py",
-        f"--name={instance.name}",
-    ] + [
+    """Build a command for launching an experiment instance."""
+
+    sources = [
         f"--source={source.name} {','.join(source.paths)} {source.ratio}"
         for source in instance.sources
     ]
 
+    return ["python", "train.py", f"--name={instance.name}", *sources]
+
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
-    prepare_cli_environment()
     beaker_user = (Beaker.from_env().account.whoami().name).upper()
     """Build a beaker launch config from an experiment group."""
     return [
         BeakerLaunchConfig(
-            name=f"{experiment.name}-{generate_uuid()[:8]}",  # TODO: Check if we need a UUID here
+            name=f"{experiment.name}-{generate_uuid()[:8]}",
             description=group.config.description,
             task_name=experiment.name,
             cmd=mk_instance_cmd(experiment),

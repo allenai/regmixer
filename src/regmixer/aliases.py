@@ -1,5 +1,11 @@
+from os import PathLike
+from pathlib import Path
+from typing import Any, Union
 from olmo_core.launch.beaker import BeakerLaunchConfig, BeakerWekaBucket
 from pydantic import BaseModel
+
+
+PathType = Union[Path, PathLike[Any], str]
 
 
 class SourceConfig(BaseModel):
