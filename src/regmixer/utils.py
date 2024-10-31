@@ -89,6 +89,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             setup_steps=[
                 # Clone repo.
                 'git clone https://"$GH_USER":"$GH_TOKEN"@github.com/allenai/regmix.git .',
+                'echo "$GIT_REF"',
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
                 # Setup python environment.

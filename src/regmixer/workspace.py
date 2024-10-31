@@ -60,11 +60,11 @@ def prepare_from(source: str):
     required=True,
 )
 def set_gh(user: str, token: str):
-    user = beaker.account.whoami().name.upper()
+    beaker_user = beaker.account.whoami().name.upper()
     target_workspace = beaker.workspace.get("ai2/regmixer")
 
-    beaker.secret.write(f"{user}_GH_TOKEN", token, workspace=target_workspace)
-    beaker.secret.write(f"{user}_GH_USER", user, workspace=target_workspace)
+    beaker.secret.write(f"{beaker_user}_GH_TOKEN", token, workspace=target_workspace)
+    beaker.secret.write(f"{beaker_user}_GH_USER", user, workspace=target_workspace)
 
     print(f"copied github user/token to {beaker.workspace.get('ai2/regmixer').full_name}")
 
