@@ -52,7 +52,7 @@ def mk_instance_cmd(instance: ExperimentInstance) -> list[str]:
         for source in instance.sources
     ]
 
-    return ["python", "train.py", f"--name={instance.name}", *sources]
+    return ["python", "src/regmixer/train.py", f"--name={instance.name}", *sources]
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
