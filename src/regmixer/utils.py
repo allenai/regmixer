@@ -58,9 +58,10 @@ def mk_instance_cmd(instance: ExperimentInstance) -> list[str]:
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     beaker_user = (Beaker.from_env().account.whoami().name).upper()
     """Build a beaker launch config from an experiment group."""
+    group_uuid = generate_uuid()[:8]
     return [
         BeakerLaunchConfig(
-            name=f"{experiment.name}-{generate_uuid()[:8]}",
+            name=f"{experiment.name}-{group_uuid}",
             description=group.config.description,
             task_name=experiment.name,
             cmd=mk_instance_cmd(experiment),
