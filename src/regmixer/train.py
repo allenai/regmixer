@@ -31,7 +31,6 @@ def cli():
     help="Max tokens for the mixture dataset",
     required=True,
 )
-@cli.command()
 @click.option(
     "--source",
     "-s",
