@@ -57,7 +57,7 @@ def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> s
         + "-l {config.sequence_length}"
         + f"-t {config.max_tokens}"
         + f"-S {config.seed}"
-        + " ".join(*sources)
+        + " ".join(sources)
     )
 
 
