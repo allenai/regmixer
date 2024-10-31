@@ -83,11 +83,10 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 BeakerEnvSecret(name="AWS_CREDENTIALS", secret=f"{beaker_user}_AWS_CREDENTIALS"),
                 BeakerEnvSecret(name="R2_ENDPOINT_URL", secret="R2_ENDPOINT_URL"),
                 BeakerEnvSecret(name="WEKA_ENDPOINT_URL", secret="WEKA_ENDPOINT_URL"),
-                BeakerEnvSecret(name="GH_USER", secret=f"{beaker_user}_GH_USER"),
                 BeakerEnvSecret(name="GH_TOKEN", secret=f"{beaker_user}_GH_TOKEN"),
             ],
             setup_steps=[
-                # Install GitHub CLI.
+                # Install GitHub CLI for credential helper.
                 "conda shell.bash activate base",
                 "conda install -y gh --channel conda-forge",
                 "gh auth setup-git",
@@ -96,7 +95,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
                 # Setup python environment.
-                "pip install -e '.[all]'",
+                "pip install uv && uv pip install -e '.[all]' && uv pip install git+https://github.com/allenai/OLMo-core.git@undfined/mixing-loader",
                 "pip freeze",
                 # Move AWS credentials from env to relevant files
                 "mkdir -p ~/.aws",
