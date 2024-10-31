@@ -44,21 +44,21 @@ def mk_experiment_group(config: ExperimentConfig) -> ExperimentGroup:
     )
 
 
-def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> list[str]:
+def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> str:
     """Build a command for launching an experiment instance."""
 
     sources = [
         f"-s {source.name} {','.join(source.paths)} {source.ratio}" for source in instance.sources
     ]
 
-    return [
-        "src/regmixer/train.py",
-        f"-n {instance.name}",
-        f"-l {config.sequence_length}",
-        f"-t {config.max_tokens}",
-        f"-S {config.seed}",
-        *sources,
-    ]
+    return (
+        "src/regmixer/train.py"
+        + f"-n {instance.name}"
+        + "-l {config.sequence_length}"
+        + f"-t {config.max_tokens}"
+        + f"-S {config.seed}"
+        + " ".join(*sources)
+    )
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
@@ -70,7 +70,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             name=f"{experiment.name}-{group_uuid}",
             description=group.config.description,
             task_name=experiment.name,
-            cmd=mk_instance_cmd(experiment, group.config),
+            cmd=[mk_instance_cmd(experiment, group.config)],
             clusters=group.config.clusters,
             num_nodes=group.config.nodes,
             num_gpus=group.config.gpus,
