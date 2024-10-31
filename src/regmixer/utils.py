@@ -76,8 +76,6 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             preemptible=group.config.preemptible,
             beaker_image="ai2-tylerm/olmo-core-regmixer",
             env_secrets=[
-                BeakerEnvSecret("AWS_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
-                BeakerEnvSecret("AWS_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
                 BeakerEnvSecret(name="BEAKER_TOKEN", secret=f"{beaker_user}_BEAKER_TOKEN"),
                 BeakerEnvSecret(name="WANDB_API_KEY", secret=f"{beaker_user}_WANDB_API_KEY"),
                 BeakerEnvSecret(name="COMET_API_KEY", secret=f"{beaker_user}_COMET_API_KEY"),
