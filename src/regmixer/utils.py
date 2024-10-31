@@ -95,7 +95,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
                 # Setup python environment.
-                "pip install uv && uv pip install -e '.[all]' && uv pip install git+https://github.com/allenai/OLMo-core.git@undfined/mixing-loader",
+                "pip install -e '.[all]' && pip install git+https://github.com/allenai/OLMo-core.git@undfined/mixing-loader",
                 "pip freeze",
                 # Move AWS credentials from env to relevant files
                 "mkdir -p ~/.aws",
