@@ -86,7 +86,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             ],
             setup_steps=[
                 # Clone repo.
-                'gh repo clone "$REPO_URL" .',
+                'git clone "$REPO_URL" .',
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
                 # Setup python environment.
