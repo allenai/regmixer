@@ -92,7 +92,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 "conda install -y gh --channel conda-forge",
                 "gh auth setup-git",
                 # Clone repo.
-                'gh repo clone "$GIT_REPO" .',
+                'gh repo clone "$REPO_URL" .',
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
                 # Setup python environment.
