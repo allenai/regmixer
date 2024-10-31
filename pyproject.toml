@@ -31,9 +31,16 @@ beaker = [
     "beaker-py",
     "GitPython>=3.0,<4.0",
 ]
+wandb = [
+    "wandb",
+]
+all = [
+    "regmixer[dev,beaker,wandb]",
+]
 
 [project.scripts]
 rmc = "regmixer.cli:cli"
+workspace = "regmixer.workspace:cli"
 
 [tool.black]
 line-length = 100

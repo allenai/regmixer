@@ -1,4 +1,4 @@
-from typing import List, cast
+from typing import List, Tuple, cast
 
 import click
 from olmo_core.distributed.utils import init_hybrid_shard_mesh
@@ -50,14 +50,12 @@ def cli():
     "-l",
     type=int,
     help="Sequence length for the transformer",
-    default=1024,
 )
 @click.option(
     "--seed",
     "-s",
     type=int,
     help="Seed for the experiment",
-    default=42,
 )
 @click.option(
     "--override",
@@ -66,7 +64,14 @@ def cli():
     type=str,
     help="Overrides for the transformer config",
 )
-def train(run_name, max_tokens, source, override, sequence_length, seed):
+def train(
+    run_name: str,
+    max_tokens: int,
+    source: List[Tuple[str, str, str]],
+    override: List[str],
+    sequence_length: int,
+    seed: int,
+):
     sources: List[SourceInstance] = []
     for item in source:
         name, paths, ratio = item

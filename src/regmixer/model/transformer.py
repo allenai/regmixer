@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import List
 
-import s3fs
 from olmo_core.config import Config, DType
 from olmo_core.data import (
     NumpyDataLoaderConfig,
@@ -9,7 +8,6 @@ from olmo_core.data import (
     NumpyDatasetType,
     TokenizerConfig,
 )
-from olmo_core.data.source_mixture import SourceMixtureConfig, SourceMixtureDatasetConfig
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.distributed.parallel import DataParallelType
 from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
@@ -56,8 +54,9 @@ class TransformerConfigBuilder:
     tokenizer_config: TokenizerConfig = TokenizerConfig.gpt2()
 
     def build(self) -> ModelTrainConfig:
+        # TODO: Make this configurable?
         model_config = TransformerConfig.llama2_271M(
-            vocab_size=self.tokenizer_config.padded_vocab_size(),  # a little bigger than actual vocab size to make it a multiple of 128
+            vocab_size=self.tokenizer_config.padded_vocab_size(),
             compile=True,
             dp_config=TransformerDataParallelConfig(
                 name=DataParallelType.fsdp, param_dtype=DType.bfloat16, reduce_dtype=DType.float32
@@ -119,14 +118,6 @@ class TransformerConfigBuilder:
                     save_interval=1000,
                     ephemeral_save_interval=100,
                     save_async=True,
-                ),
-            )
-            .with_callback(
-                "comet",
-                CometCallback(
-                    name=self.run_name,
-                    cancel_check_interval=10,
-                    enabled=False,  # change to true to enable
                 ),
             )
             .with_callback(
