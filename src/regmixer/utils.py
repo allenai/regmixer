@@ -48,16 +48,15 @@ def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> l
     """Build a command for launching an experiment instance."""
 
     sources = [
-        f"--source={source.name} {','.join(source.paths)} {source.ratio}"
-        for source in instance.sources
+        f"-s {source.name} {','.join(source.paths)} {source.ratio}" for source in instance.sources
     ]
 
     return [
         "src/regmixer/train.py",
-        f"--run-name={instance.name}",
-        f"--sequence-length={config.sequence_length}",
-        f"--max-tokens={config.max_tokens}",
-        f"--seed={config.seed}",
+        f"-n {instance.name}",
+        f"-l {config.sequence_length}",
+        f"-t {config.max_tokens}",
+        f"-S {config.seed}",
         *sources,
     ]
 

@@ -53,7 +53,7 @@ def cli():
 )
 @click.option(
     "--seed",
-    "-s",
+    "-S",
     type=int,
     help="Seed for the experiment",
 )
