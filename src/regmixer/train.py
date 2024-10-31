@@ -6,6 +6,7 @@ from olmo_core.train import (
     prepare_training_environment,
     teardown_training_environment,
 )
+from olmo_core.data import TokenizerConfig
 from olmo_core.train.callbacks import (
     CometCallback,
     ConfigSaverCallback,
@@ -78,6 +79,8 @@ def train(
         paths = paths.split(",")
         sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
 
+    tokenizer = TokenizerConfig.dolma2()
+
     config = TransformerConfigBuilder(
         run_name=run_name,
         max_tokens=max_tokens,
@@ -85,6 +88,7 @@ def train(
         overrides=override,
         sequence_length=sequence_length,
         seed=seed,
+        tokenizer_config=tokenizer,
     ).build()
 
     seed_all(config.init_seed)

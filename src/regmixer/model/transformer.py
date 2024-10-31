@@ -18,7 +18,6 @@ from olmo_core.train import (
 )
 from olmo_core.train.callbacks import (
     CheckpointerCallback,
-    CometCallback,
     ConfigSaverCallback,
     GPUMemoryMonitorCallback,
     GradClipperCallback,
@@ -50,8 +49,8 @@ class TransformerConfigBuilder:
     sources: List[SourceInstance]
     sequence_length: int
     max_tokens: int
+    tokenizer_config: TokenizerConfig
     seed: int = 42
-    tokenizer_config: TokenizerConfig = TokenizerConfig.gpt2()
 
     def build(self) -> ModelTrainConfig:
         # TODO: Make this configurable?
