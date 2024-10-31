@@ -84,7 +84,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 BeakerEnvSecret(name="R2_ENDPOINT_URL", secret="R2_ENDPOINT_URL"),
                 BeakerEnvSecret(name="WEKA_ENDPOINT_URL", secret="WEKA_ENDPOINT_URL"),
                 BeakerEnvSecret(name="GH_USER", secret=f"{beaker_user}_GH_USER"),
-                BeakerEnvSecret(name="GITHUB_TOKEN", secret=f"{beaker_user}_GH_TOKEN"),
+                BeakerEnvSecret(name="GH_TOKEN", secret=f"{beaker_user}_GH_TOKEN"),
             ],
             setup_steps=[
                 # Install GitHub CLI.
