@@ -87,7 +87,6 @@ def train(
 ):
     sources: List[SourceInstance] = []
     for item in source:
-        print(type(item))
         name, paths, ratio = item
         paths = []
         sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
@@ -112,6 +111,7 @@ def train(
     )
     optim = config.optim.build(model)
     dataset = config.dataset.build()
+    dataset.prepare()
     data_loader = config.data_loader.build(dataset)
     trainer = config.trainer.build(model, optim, data_loader)
     config_dict = config.as_config_dict()
