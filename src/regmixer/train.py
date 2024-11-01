@@ -106,6 +106,9 @@ def train(
         seed=seed,
         tokenizer_config=tokenizer,
     ).build()
+    dataset = config.dataset.build()
+    dataset.prepare()
+    logger.info(f"BUILT: {dataset.num_tokens}")
 
     seed_all(config.init_seed)
     model = config.model.build(
@@ -114,9 +117,6 @@ def train(
         dp_mesh=init_hybrid_shard_mesh(num_replicas=2),
     )
     optim = config.optim.build(model)
-    dataset = config.dataset.build()
-    dataset.prepare()
-    logger.info(f"Dataset: {dataset.num_tokens}")
     data_loader = config.data_loader.build(dataset)
     trainer = config.trainer.build(model, optim, data_loader)
     config_dict = config.as_config_dict()
