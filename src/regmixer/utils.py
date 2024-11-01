@@ -47,6 +47,7 @@ def mk_experiment_group(config: ExperimentConfig) -> ExperimentGroup:
 def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> List[str]:
     """Build a command for launching an experiment instance."""
 
+    # TODO: Figure out how to handle a comma in the source path, escape it?
     sources = [
         f"-s {source.name} {','.join(source.paths)} {source.ratio}" for source in instance.sources
     ]
