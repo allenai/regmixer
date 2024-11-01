@@ -13,6 +13,7 @@ from olmo_core.train.callbacks import (
     WandBCallback,
 )
 from olmo_core.utils import get_default_device, seed_all
+from torch.distributed.elastic.multiprocessing.errors import record
 
 from regmixer.aliases import SourceInstance
 from regmixer.model.transformer import TransformerConfigBuilder
@@ -64,6 +65,7 @@ def cli():
     type=str,
     help="Overrides for the transformer config",
 )
+@record
 def train(
     run_name: str,
     max_tokens: int,
