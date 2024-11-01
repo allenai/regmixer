@@ -118,7 +118,6 @@ def train(
     data_loader = config.data_loader.build(dataset)
     trainer = config.trainer.build(model, optim, data_loader)
     config_dict = config.as_config_dict()
-    cast(CometCallback, trainer.callbacks["comet"]).config = config_dict
     cast(WandBCallback, trainer.callbacks["wandb"]).config = config_dict
     cast(ConfigSaverCallback, trainer.callbacks["config_saver"]).config = config_dict
 
