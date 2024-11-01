@@ -108,7 +108,6 @@ def train(
     ).build()
     dataset = config.dataset.build()
     dataset.prepare()
-    logger.info(f"BUILT: {dataset.num_tokens}")
 
     seed_all(config.init_seed)
     model = config.model.build(

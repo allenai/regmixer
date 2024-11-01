@@ -5,8 +5,10 @@ from pathlib import Path
 import click
 import yaml
 from olmo_core.utils import prepare_cli_environment
+from olmo_core.data import TokenizerConfig
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
+from regmixer.model.transformer import TransformerConfigBuilder
 from regmixer.utils import mk_experiment_group, mk_launch_configs
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,36 @@ def launch(config: Path, dry_run: bool):
     except KeyboardInterrupt:
         logger.warning("\nCancelling experiment group...")
         # TODO: Try to cancel the experiments in the group
+
+
+@cli.command()
+@click.option(
+    "-c",
+    "--config",
+    type=click.Path(exists=True),
+    required=True,
+    help="Relative path to the experiment configuration file.",
+)
+def validate(config: Path):
+    """Validate an experiment configuration."""
+    with open(config, "r") as f:
+        data = yaml.safe_load(f)
+
+    experiments = mk_experiment_group(ExperimentConfig(**data))
+    tokenizer = TokenizerConfig.dolma2()
+
+    for experiment in experiments.instances:
+        transformer = TransformerConfigBuilder(
+            run_name="validate",
+            max_tokens=experiments.config.max_tokens,
+            sources=experiment.sources,
+            overrides=[],
+            sequence_length=experiments.config.sequence_length,
+            seed=experiments.config.seed,
+            tokenizer_config=tokenizer,
+        ).build()
+        dataset = transformer.dataset.build()
+        dataset.prepare()
 
 
 @cli.command()
