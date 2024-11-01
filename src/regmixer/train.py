@@ -112,7 +112,7 @@ def train(
     model = config.model.build(
         init_device="meta",
         device=get_default_device(),
-        dp_mesh=init_hybrid_shard_mesh(num_replicas=2),
+        dp_mesh=init_hybrid_shard_mesh(),
     )
     optim = config.optim.build(model)
     data_loader = config.data_loader.build(dataset)

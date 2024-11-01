@@ -12,9 +12,9 @@ seed: 42
 clusters:
   - ai2/s2-cirrascale-l40
 sources:
-  # - name: health
-  #   paths:
-  #     - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Health/*.npy"
+  - name: health
+    paths:
+      - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Health/*.npy"
   - name: finance
     paths:
       - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Finance_n_Business/*.npy"
