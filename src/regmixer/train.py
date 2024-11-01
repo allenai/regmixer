@@ -1,3 +1,4 @@
+import ast
 from typing import List, Tuple, cast
 
 import click
@@ -19,6 +20,15 @@ from regmixer.aliases import SourceInstance
 from regmixer.model.transformer import TransformerConfigBuilder
 
 
+class PythonLiteralOption(click.Option):
+    def type_cast_value(self, ctx, value):
+        try:
+            parsed = [item.replace(" ", "").replace("'", "") for item in value]
+            return [ast.literal_eval(item) for item in parsed]
+        except:
+            raise click.BadParameter(value)
+
+
 @click.group()
 def cli():
     pass
@@ -36,8 +46,9 @@ def cli():
     "--source",
     "-s",
     multiple=True,
-    type=(str, str, str),
-    help="Source datasets in the form `name path,path,... ratio`",
+    type=str,
+    help="Source datasets in the form of `Tuple[str, List[str], float]`",
+    cls=PythonLiteralOption,
 )
 @click.option(
     "--run-name",
@@ -69,15 +80,16 @@ def cli():
 def train(
     run_name: str,
     max_tokens: int,
-    source: List[Tuple[str, str, str]],
+    source: List[Tuple[str, List[str], str]],
     override: List[str],
     sequence_length: int,
     seed: int,
 ):
     sources: List[SourceInstance] = []
     for item in source:
+        print(type(item))
         name, paths, ratio = item
-        paths = paths.split(",")
+        paths = []
         sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
 
     tokenizer = TokenizerConfig.dolma2()

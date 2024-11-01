@@ -153,4 +153,4 @@ class TransformerConfigBuilder:
             dataset=dataset_config,
             data_loader=data_loader_config,
             trainer=trainer_config,
-        ).merge(self.overrides)
+        )
