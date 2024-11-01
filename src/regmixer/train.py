@@ -92,7 +92,6 @@ def train(
     sources: List[SourceInstance] = []
     for item in source:
         name, paths, ratio = item
-        paths = []
         sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
 
     tokenizer = TokenizerConfig.dolma2()
