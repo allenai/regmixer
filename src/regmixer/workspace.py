@@ -46,27 +46,19 @@ def prepare_from(source: str):
 
 @cli.command()
 @click.option(
-    "--user",
-    "-u",
-    type=str,
-    help="Github user",
-    required=True,
-)
-@click.option(
     "--token",
     "-t",
     type=str,
     help="Github token",
     required=True,
 )
-def set_gh(user: str, token: str):
+def set_gh(token: str):
     beaker_user = beaker.account.whoami().name.upper()
     target_workspace = beaker.workspace.get("ai2/regmixer")
 
     beaker.secret.write(f"{beaker_user}_GH_TOKEN", token, workspace=target_workspace)
-    beaker.secret.write(f"{beaker_user}_GH_USER", user, workspace=target_workspace)
 
-    print(f"copied github user/token to {beaker.workspace.get('ai2/regmixer').full_name}")
+    print(f"copied github token to {beaker.workspace.get('ai2/regmixer').full_name}")
 
 
 if __name__ == "__main__":

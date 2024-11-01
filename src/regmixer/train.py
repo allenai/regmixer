@@ -1,4 +1,5 @@
 import ast
+import logging
 from typing import List, Tuple, cast
 
 import click
@@ -18,6 +19,9 @@ from torch.distributed.elastic.multiprocessing.errors import record
 
 from regmixer.aliases import SourceInstance
 from regmixer.model.transformer import TransformerConfigBuilder
+
+
+logger = logging.getLogger(__name__)
 
 
 class PythonLiteralOption(click.Option):
@@ -112,6 +116,7 @@ def train(
     optim = config.optim.build(model)
     dataset = config.dataset.build()
     dataset.prepare()
+    logger.info(f"Dataset: {dataset.num_tokens}")
     data_loader = config.data_loader.build(dataset)
     trainer = config.trainer.build(model, optim, data_loader)
     config_dict = config.as_config_dict()
