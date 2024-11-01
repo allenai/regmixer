@@ -51,7 +51,7 @@ def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> s
         f"-s {source.name} {','.join(source.paths)} {source.ratio}" for source in instance.sources
     ]
 
-    return f"src/regmixer/train.py -n {instance.name} -l {config.sequence_length} -t {config.max_tokens} -S {config.seed} {' '.join(sources)}"
+    return f"regmixer/src/regmixer/train.py -n {instance.name} -l {config.sequence_length} -t {config.max_tokens} -S {config.seed} {' '.join(sources)}"
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
