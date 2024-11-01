@@ -119,12 +119,13 @@ class TransformerConfigBuilder:
                     save_async=True,
                 ),
             )
+            # TODO: Add the correct WANDB config so that this works
             .with_callback(
                 "wandb",
                 WandBCallback(
                     name=self.run_name,
                     cancel_check_interval=10,
-                    enabled=True,  # change to true to enable
+                    enabled=False,  # change to true to enable
                 ),
             )
             .with_callback("config_saver", ConfigSaverCallback())
