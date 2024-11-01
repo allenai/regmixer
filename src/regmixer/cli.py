@@ -79,7 +79,7 @@ def validate(config: Path):
     for experiment in experiments.instances:
         logger.info(mk_instance_cmd(experiment, experiments.config))
         transformer = TransformerConfigBuilder(
-            run_name="validate",
+            run_name="validate-no-op",
             max_tokens=experiments.config.max_tokens,
             sources=experiment.sources,
             overrides=[],
