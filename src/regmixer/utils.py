@@ -47,11 +47,12 @@ def mk_experiment_group(config: ExperimentConfig) -> ExperimentGroup:
 def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> List[str]:
     """Build a command for launching an experiment instance."""
 
-    # NOTE: To get around some command line annoyances we handle the source options as python literal from a string
-    sources = [
-        f"-s ({source.name},[{', '.join(source.paths)}],{source.ratio})"
-        for source in instance.sources
-    ]
+    sources = []
+
+    for source in instance.sources:
+        paths = [f'"{path}",' for path in source.paths]
+        source_str = f'-s ("{source.name}",[{paths}],{source.ratio})'
+        sources.append(source_str)
 
     return [
         "src/regmixer/train.py",
