@@ -52,7 +52,7 @@ def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> L
     ]
 
     return [
-        "src/regmixer/train.py",
+        "train",
         f"-n {instance.name} -l {config.sequence_length} -t {config.max_tokens} -S {config.seed} {' '.join(sources)}",
     ]
 
@@ -93,6 +93,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 "git submodule update --init --recursive",
                 # Setup python environment.
                 "conda shell.bash activate base",
+                "cd regmixer",
                 "pip install -e '.[all]' && pip install git+https://github.com/allenai/OLMo-core.git@undfined/mixing-loader",
                 "pip freeze",
                 # Move AWS credentials from env to relevant files
