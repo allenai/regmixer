@@ -106,8 +106,8 @@ def train(
         tokenizer_config=tokenizer,
     ).build()
     dataset = config.dataset.build()
-    dataset.prepare()
 
+    logger.info("NUMTOKENS", dataset.num_tokens)
     seed_all(config.init_seed)
     model = config.model.build(
         init_device="meta",
