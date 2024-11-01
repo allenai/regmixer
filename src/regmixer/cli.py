@@ -9,7 +9,7 @@ from olmo_core.data import TokenizerConfig
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
-from regmixer.utils import mk_experiment_group, mk_launch_configs
+from regmixer.utils import mk_experiment_group, mk_launch_configs, mk_instance_cmd
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +77,7 @@ def validate(config: Path):
     tokenizer = TokenizerConfig.dolma2()
 
     for experiment in experiments.instances:
+        logger.info(mk_instance_cmd(experiment, experiments.config))
         transformer = TransformerConfigBuilder(
             run_name="validate",
             max_tokens=experiments.config.max_tokens,

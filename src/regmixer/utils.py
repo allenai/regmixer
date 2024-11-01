@@ -50,8 +50,8 @@ def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> L
     sources = []
 
     for source in instance.sources:
-        paths = [f'"{path}",' for path in source.paths]
-        source_str = f'-s ("{source.name}",[{paths}],{source.ratio})'
+        paths = [f'"{path}"' for path in source.paths]
+        source_str = f'-s ("{source.name}",[{",".join(paths)}],{source.ratio})'
         sources.append(source_str)
 
     return [
