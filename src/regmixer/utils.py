@@ -53,7 +53,11 @@ def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> L
 
     return [
         "src/regmixer/train.py",
-        f"train -n {instance.name}-l {config.sequence_length} -t {config.max_tokens} -S {config.seed} {' '.join(sources)}",
+        "train" f"-n {instance.name}",
+        f"-l {config.sequence_length}",
+        f"-t {config.max_tokens}",
+        f"-S {config.seed}",
+        *sources,
     ]
 
 
