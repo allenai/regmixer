@@ -134,7 +134,9 @@ class TransformerConfigBuilder:
                 "evaluator",
                 LMEvaluatorCallbackConfig(
                     eval_dataset=NumpyDatasetConfig(
-                        paths=["/net/nfs/allennlp/llm-data/c4/en/c4-validation.00000-00008.npy"],
+                        paths=[
+                            "s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/c4_en/val/part-0-00000.npy"
+                        ],
                         metadata=[{"label": "c4-validation"}],
                         name=NumpyDatasetType.padded_fsl,
                         sequence_length=self.sequence_length,
@@ -146,6 +148,31 @@ class TransformerConfigBuilder:
                 ),
             )
         )
+
+        # defaults?
+
+        #         c4_en-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/c4_en/val/part-0-00000.npy
+        # dolma_books-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_books/val/part-0-00000.npy
+        # dolma_common-crawl-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_common-crawl/val/part-0-00000.npy
+        # dolma_pes2o-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_pes2o/val/part-0-00000.npy
+        # dolma_reddit-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_reddit/val/part-0-00000.npy
+        # dolma_stack-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_stack/val/part-0-00000.npy
+        # dolma_wiki-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_wiki/val/part-0-00000.npy
+        # ice-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/ice/val/part-0-00000.npy
+        # m2d2_s2orc-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/m2d2_s2orc/val/part-0-00000.npy
+        # pile-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/pile/val/part-0-00000.npy
+        # wikitext_103-validation:
+        #   - s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/wikitext_103/val/part-0-00000.npy
 
         return ModelTrainConfig(
             model=model_config,
