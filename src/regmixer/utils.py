@@ -27,9 +27,10 @@ def mk_source_instances(sources: list[SourceConfig]) -> list[SourceInstance]:
 
 def mk_experiments(config: ExperimentConfig) -> list[ExperimentInstance]:
     """Generate source instances from a config."""
+    group_uuid = generate_uuid()[:8]
     return [
         ExperimentInstance(
-            name=f"{config.name}-{idx:04}",
+            name=f"{config.name}-{idx:04}-{group_uuid}",
             sources=mk_source_instances(config.sources),
         )
         for idx in range(config.variants)
@@ -68,10 +69,9 @@ def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> L
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     beaker_user = (Beaker.from_env().account.whoami().name).upper()
     """Build a beaker launch config from an experiment group."""
-    group_uuid = generate_uuid()[:8]
     return [
         BeakerLaunchConfig(
-            name=f"{experiment.name}-{group_uuid}",
+            name=f"{experiment.name}",
             description=group.config.description,
             task_name=experiment.name,
             cmd=mk_instance_cmd(experiment, group.config),
