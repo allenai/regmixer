@@ -116,7 +116,7 @@ class TransformerConfigBuilder:
                 CheckpointerCallback(
                     save_interval=1000,
                     ephemeral_save_interval=100,
-                    save_async=True,
+                    save_async=False,  # TODO: Figure out how to make this work, maybe hardware specific?
                 ),
             )
             # TODO: Add the correct WANDB config so that this works
