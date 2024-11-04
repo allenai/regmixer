@@ -119,7 +119,6 @@ class TransformerConfigBuilder:
                     save_async=False,  # TODO: Figure out how to make this work, maybe hardware specific?
                 ),
             )
-            # TODO: Add the correct WANDB config so that this works
             .with_callback(
                 "wandb",
                 WandBCallback(
@@ -127,7 +126,7 @@ class TransformerConfigBuilder:
                     entity="ai2-llm",
                     project="regmixer",
                     cancel_check_interval=10,
-                    enabled=True,  # change to true to enable
+                    enabled=True,
                 ),
             )
             .with_callback("config_saver", ConfigSaverCallback())
