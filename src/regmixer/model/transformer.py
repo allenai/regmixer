@@ -96,7 +96,7 @@ class TransformerConfigBuilder:
             TrainerConfig(
                 save_folder=f"/tmp/{self.run_name}",
                 rank_microbatch_size=16 * self.sequence_length,
-                save_overwrite=True,
+                save_overwrite=True,  # TODO: Is this correct?
                 metrics_collect_interval=5,
                 cancel_check_interval=5,
             )
@@ -116,7 +116,7 @@ class TransformerConfigBuilder:
                 CheckpointerCallback(
                     save_interval=1000,
                     ephemeral_save_interval=100,
-                    save_async=False,  # TODO: Figure out how to make this work, maybe hardware specific?
+                    save_async=True,
                 ),
             )
             .with_callback(
