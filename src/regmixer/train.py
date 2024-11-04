@@ -15,7 +15,6 @@ from olmo_core.train.callbacks import (
 )
 from olmo_core.utils import get_default_device, seed_all
 from torch.distributed.elastic.multiprocessing.errors import record
-import wandb
 
 from regmixer.aliases import SourceInstance
 from regmixer.model.transformer import TransformerConfigBuilder
@@ -80,6 +79,12 @@ def cli():
     type=str,
     help="Overrides for the transformer config",
 )
+@click.option(
+    "--group-id",
+    "-g",
+    type=str,
+    help="Group ID for the experiment",
+)
 @record
 def train(
     run_name: str,
@@ -88,6 +93,7 @@ def train(
     override: List[str],
     sequence_length: int,
     seed: int,
+    group_id: str,
 ):
     sources: List[SourceInstance] = []
     for item in source:
@@ -97,6 +103,7 @@ def train(
     tokenizer = TokenizerConfig.dolma2()
 
     config = TransformerConfigBuilder(
+        group_id=group_id,
         run_name=run_name,
         max_tokens=max_tokens,
         sources=sources,

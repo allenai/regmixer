@@ -50,6 +50,7 @@ class TransformerConfigBuilder:
     sequence_length: int
     max_tokens: int
     tokenizer_config: TokenizerConfig
+    group_id: str
     seed: int = 42
 
     def build(self) -> ModelTrainConfig:
@@ -124,6 +125,7 @@ class TransformerConfigBuilder:
                 WandBCallback(
                     name=self.run_name,
                     project="regmixer",
+                    group=self.group_id,
                     cancel_check_interval=10,
                     enabled=True,
                 ),
