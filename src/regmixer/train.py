@@ -124,8 +124,8 @@ def train(
 
 
 if __name__ == "__main__":
-    cli()
     try:
         prepare_training_environment()
+        cli()
     finally:
         teardown_training_environment()

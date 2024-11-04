@@ -58,7 +58,7 @@ class TransformerConfigBuilder:
             vocab_size=self.tokenizer_config.padded_vocab_size(),
             compile=True,
             dp_config=TransformerDataParallelConfig(
-                name=DataParallelType.ddp, param_dtype=DType.bfloat16, reduce_dtype=DType.float32
+                name=DataParallelType.fsdp, param_dtype=DType.bfloat16, reduce_dtype=DType.float32
             ),
         )
 
