@@ -123,7 +123,7 @@ class TransformerConfigBuilder:
                 "wandb",
                 WandBCallback(
                     name=self.run_name,
-                    entity="ai2-llm",
+                    entity="tylerm",
                     project="regmixer",
                     cancel_check_interval=10,
                     enabled=True,
