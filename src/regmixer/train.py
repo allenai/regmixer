@@ -125,7 +125,6 @@ def train(
     trainer = config.trainer.build(model, optim, data_loader)
     config_dict = config.as_config_dict()
     cast(WandBCallback, trainer.callbacks["wandb"]).config = config_dict
-    logger.info(f"Config: {config_dict}")
     cast(ConfigSaverCallback, trainer.callbacks["config_saver"]).config = config_dict
 
     trainer.fit()
