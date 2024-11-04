@@ -10,12 +10,12 @@ from olmo_core.train import (
 )
 from olmo_core.data import TokenizerConfig
 from olmo_core.train.callbacks import (
-    CometCallback,
     ConfigSaverCallback,
     WandBCallback,
 )
 from olmo_core.utils import get_default_device, seed_all
 from torch.distributed.elastic.multiprocessing.errors import record
+import wandb
 
 from regmixer.aliases import SourceInstance
 from regmixer.model.transformer import TransformerConfigBuilder
