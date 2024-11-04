@@ -47,6 +47,7 @@ class ExperimentInstance(BaseModel):
 
 class ExperimentGroup(BaseModel):
     config: ExperimentConfig
+    group_id: str
     instances: list[ExperimentInstance]
 
 

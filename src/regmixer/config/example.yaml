@@ -4,7 +4,7 @@ budget: "ai2/oe-data"
 workspace: "ai2/regmixer"
 nodes: 1
 gpus: 1
-variants: 1
+variants: 2
 preemptible: true
 max_tokens: 10_000_000
 sequence_length: 1024

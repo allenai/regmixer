@@ -10,7 +10,6 @@ from olmo_core.train import (
 )
 from olmo_core.data import TokenizerConfig
 from olmo_core.train.callbacks import (
-    CometCallback,
     ConfigSaverCallback,
     WandBCallback,
 )
@@ -80,6 +79,12 @@ def cli():
     type=str,
     help="Overrides for the transformer config",
 )
+@click.option(
+    "--group-id",
+    "-g",
+    type=str,
+    help="Group ID for the experiment",
+)
 @record
 def train(
     run_name: str,
@@ -88,6 +93,7 @@ def train(
     override: List[str],
     sequence_length: int,
     seed: int,
+    group_id: str,
 ):
     sources: List[SourceInstance] = []
     for item in source:
@@ -97,6 +103,7 @@ def train(
     tokenizer = TokenizerConfig.dolma2()
 
     config = TransformerConfigBuilder(
+        group_id=group_id,
         run_name=run_name,
         max_tokens=max_tokens,
         sources=sources,

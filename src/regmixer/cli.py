@@ -77,8 +77,9 @@ def validate(config: Path):
     tokenizer = TokenizerConfig.dolma2()
 
     for experiment in experiments.instances:
-        logger.info(mk_instance_cmd(experiment, experiments.config))
+        logger.info(mk_instance_cmd(experiment, experiments.config, experiments.group_id))
         transformer = TransformerConfigBuilder(
+            group_id="validate-no-op",
             run_name="validate-no-op",
             max_tokens=experiments.config.max_tokens,
             sources=experiment.sources,

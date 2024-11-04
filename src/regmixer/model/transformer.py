@@ -50,6 +50,7 @@ class TransformerConfigBuilder:
     sequence_length: int
     max_tokens: int
     tokenizer_config: TokenizerConfig
+    group_id: str
     seed: int = 42
 
     def build(self) -> ModelTrainConfig:
@@ -96,7 +97,7 @@ class TransformerConfigBuilder:
             TrainerConfig(
                 save_folder=f"/tmp/{self.run_name}",
                 rank_microbatch_size=16 * self.sequence_length,
-                save_overwrite=True,
+                save_overwrite=True,  # TODO: Is this correct?
                 metrics_collect_interval=5,
                 cancel_check_interval=5,
             )
@@ -116,16 +117,17 @@ class TransformerConfigBuilder:
                 CheckpointerCallback(
                     save_interval=1000,
                     ephemeral_save_interval=100,
-                    save_async=False,  # TODO: Figure out how to make this work, maybe hardware specific?
+                    save_async=True,
                 ),
             )
-            # TODO: Add the correct WANDB config so that this works
             .with_callback(
                 "wandb",
                 WandBCallback(
                     name=self.run_name,
+                    project="regmixer",
+                    group=self.group_id,
                     cancel_check_interval=10,
-                    enabled=False,  # change to true to enable
+                    enabled=True,
                 ),
             )
             .with_callback("config_saver", ConfigSaverCallback())
