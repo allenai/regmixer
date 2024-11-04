@@ -40,8 +40,6 @@ class ModelTrainConfig(Config):
     data_loader: NumpyDataLoaderConfig
     trainer: TrainerConfig
     init_seed: int = 12536
-    project: str = "regmixer"
-    entity: str = "ai2-llm"
 
 
 @dataclass
@@ -126,6 +124,8 @@ class TransformerConfigBuilder:
                 "wandb",
                 WandBCallback(
                     name=self.run_name,
+                    entity="ai2-llm",
+                    project="regmixer",
                     cancel_check_interval=10,
                     enabled=True,  # change to true to enable
                 ),
