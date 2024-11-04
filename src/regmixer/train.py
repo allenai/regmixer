@@ -117,7 +117,7 @@ def train(
     data_loader = config.data_loader.build(dataset)
     trainer = config.trainer.build(model, optim, data_loader)
     config_dict = config.as_config_dict()
-    cast(WandBCallback, trainer.callbacks["wandb"]).config = config_dict
+    cast(WandBCallback, trainer.callbacks["wandb"]).config = {**config_dict, "name": run_name}
     cast(ConfigSaverCallback, trainer.callbacks["config_saver"]).config = config_dict
 
     trainer.fit()
