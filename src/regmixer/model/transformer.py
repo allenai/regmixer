@@ -125,7 +125,7 @@ class TransformerConfigBuilder:
                 WandBCallback(
                     name=self.run_name,
                     cancel_check_interval=10,
-                    enabled=False,  # change to true to enable
+                    enabled=True,  # change to true to enable
                 ),
             )
             .with_callback("config_saver", ConfigSaverCallback())
