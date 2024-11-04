@@ -1,18 +1,24 @@
+from os import PathLike
+from pathlib import Path
+from typing import Any, Union
 from olmo_core.launch.beaker import BeakerLaunchConfig, BeakerWekaBucket
 from pydantic import BaseModel
+
+
+PathType = Union[Path, PathLike[Any], str]
 
 
 class SourceConfig(BaseModel):
     name: str
     paths: list[str]
+    max_repetition_factor: float = 1.0
+    max_source_ratio: float = 1.0
 
 
 class SourceInstance(BaseModel):
     name: str
     paths: list[str]
     ratio: float
-    # max_repetition_factor: float = 1
-    # max_source_ratio: float = 1.0
 
 
 class ExperimentConfig(BaseModel):
@@ -23,6 +29,9 @@ class ExperimentConfig(BaseModel):
     variants: int
     nodes: int
     gpus: int
+    max_tokens: int
+    sequence_length: int
+    seed: int
     clusters: list[str]
     sources: list[SourceConfig]
     preemptible: bool = True

@@ -1,19 +1,23 @@
 name: "example-mixing-experiment"
 description: "This is an example mixing experiment configuration file."
 budget: "ai2/oe-data"
-workspace: "ai2/OLMo-core"
+workspace: "ai2/regmixer"
 nodes: 1
-gpus: 4
-variants: 1024
-preemptible: false
+gpus: 1
+variants: 1
+preemptible: true
+max_tokens: 10_000_000
+sequence_length: 1024
+seed: 42
 clusters:
-  - ai2/mars
-  - ai2/mercury
-  - ai2/venus
+  - ai2/s2-cirrascale-l40
 sources:
-  - name: "source1"
+  - name: health
     paths:
-      - "s3://path/to/source1*"
-  - name: "source2"
+      - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Health/*.npy"
+  - name: finance
     paths:
-      - "s3://path/to/source2/*"
+      - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Finance_n_Business/*.npy"
+  - name: entertainment
+    paths:
+      - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Entertainment/*.npy"

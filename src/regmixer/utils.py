@@ -1,4 +1,8 @@
+from typing import List
+
+from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
+from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import (
     ExperimentConfig,
@@ -15,7 +19,7 @@ def mk_source_instances(sources: list[SourceConfig]) -> list[SourceInstance]:
         SourceInstance(
             name=source.name,
             paths=source.paths,
-            ratio=0.0,
+            ratio=1 / len(sources),
         )
         for source in sources
     ]
@@ -40,23 +44,37 @@ def mk_experiment_group(config: ExperimentConfig) -> ExperimentGroup:
     )
 
 
-def mk_instance_cmd(instance: ExperimentInstance) -> list[str]:
-    """Build a command for an experiment instance."""
+def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> List[str]:
+    """Build a command for launching an experiment instance."""
+
+    sources = []
+
+    for source in instance.sources:
+        paths = [f'"{path}"' for path in source.paths]
+        source_str = f'-s ("{source.name}",[{",".join(paths)}],{source.ratio})'
+        sources.append(source_str)
+
     return [
-        "python",
-        "train.py",
-        f"--name={instance.name}",  # TODO: Add the rest of the arguments
+        "src/regmixer/train.py",
+        "train",
+        f"-n {instance.name}",
+        f"-l {config.sequence_length}",
+        f"-t {config.max_tokens}",
+        f"-S {config.seed}",
+        *sources,
     ]
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
+    beaker_user = (Beaker.from_env().account.whoami().name).upper()
     """Build a beaker launch config from an experiment group."""
+    group_uuid = generate_uuid()[:8]
     return [
         BeakerLaunchConfig(
-            name=experiment.name,  # TODO: Check if we need a UUID here
+            name=f"{experiment.name}-{group_uuid}",
             description=group.config.description,
             task_name=experiment.name,
-            cmd=mk_instance_cmd(experiment),
+            cmd=mk_instance_cmd(experiment, group.config),
             clusters=group.config.clusters,
             num_nodes=group.config.nodes,
             num_gpus=group.config.gpus,
@@ -67,24 +85,22 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             budget=group.config.budget or "ai2/oe-data",
             workspace=group.config.workspace,
             preemptible=group.config.preemptible,
-            # TODO: Make this some global value for the workspace don't scope to user
+            beaker_image="ai2-tylerm/olmo-core-regmixer",
             env_secrets=[
-                BeakerEnvSecret(name="BEAKER_TOKEN", secret="BEAKER_TOKEN"),
-                BeakerEnvSecret(name="WANDB_API_KEY", secret="WANDB_API_KEY"),
-                BeakerEnvSecret(name="COMET_API_KEY", secret="COMET_API_KEY"),
-                BeakerEnvSecret(name="AWS_CONFIG", secret="AWS_CONFIG"),
-                BeakerEnvSecret(name="AWS_CREDENTIALS", secret="AWS_CREDENTIALS"),
+                BeakerEnvSecret(name="BEAKER_TOKEN", secret=f"{beaker_user}_BEAKER_TOKEN"),
+                BeakerEnvSecret(name="WANDB_API_KEY", secret=f"{beaker_user}_WANDB_API_KEY"),
+                BeakerEnvSecret(name="AWS_CONFIG", secret=f"{beaker_user}_AWS_CONFIG"),
+                BeakerEnvSecret(name="AWS_CREDENTIALS", secret=f"{beaker_user}_AWS_CREDENTIALS"),
                 BeakerEnvSecret(name="R2_ENDPOINT_URL", secret="R2_ENDPOINT_URL"),
                 BeakerEnvSecret(name="WEKA_ENDPOINT_URL", secret="WEKA_ENDPOINT_URL"),
             ],
             setup_steps=[
-                # Clone repo.
-                'git clone "$REPO_URL" .',
+                'git clone "$REPO_URL"',
+                "conda shell.bash activate base",
+                "cd regmixer",
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
-                # Setup python environment.
-                "conda shell.bash activate base",
-                "pip install -e '.[all]'",
+                "pip install -e '.[all]' && pip install git+https://github.com/allenai/OLMo-core.git@main",
                 "pip freeze",
                 # Move AWS credentials from env to relevant files
                 "mkdir -p ~/.aws",
