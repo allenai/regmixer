@@ -107,7 +107,6 @@ def train(
     ).build()
     dataset = config.dataset.build()
 
-    logger.info("NUMTOKENS", dataset.num_tokens)
     seed_all(config.init_seed)
     model = config.model.build(
         init_device="meta",
