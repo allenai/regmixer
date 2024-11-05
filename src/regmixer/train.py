@@ -100,8 +100,6 @@ def train(
         name, paths, ratio = item
         sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
 
-    tokenizer = TokenizerConfig.dolma2()
-
     config = TransformerConfigBuilder(
         group_id=group_id.strip(),
         run_name=run_name,
@@ -110,7 +108,6 @@ def train(
         overrides=override,
         sequence_length=sequence_length,
         seed=seed,
-        tokenizer_config=tokenizer,
     ).build()
     dataset = config.dataset.build()
 
