@@ -269,7 +269,7 @@ class TransformerConfigBuilder:
         trainer_config = (
             TrainerConfig(
                 save_folder=f"/tmp/{self.run_name}",
-                rank_microbatch_size=self._default_device_batch_size,
+                rank_microbatch_size=self._default_device_batch_size * self.sequence_length,
                 save_overwrite=True,
                 metrics_collect_interval=10,
                 cancel_check_interval=5,
