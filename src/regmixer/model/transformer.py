@@ -210,6 +210,7 @@ class TransformerConfigBuilder:
         global_batch_size = round(global_batch_size)
         global_batch_size *= self._default_batch_size_divisor
 
+        print(f"Global batch size: {global_batch_size}")
         return global_batch_size
 
     def build(self) -> ModelTrainConfig:
@@ -261,7 +262,7 @@ class TransformerConfigBuilder:
         )
 
         data_loader_config = NumpyDataLoaderConfig(
-            global_batch_size=self._default_global_batch_size,
+            global_batch_size=self._default_global_batch_size * self.sequence_length,
             seed=self.seed,
             num_workers=16,
         )
