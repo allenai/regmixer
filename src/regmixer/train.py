@@ -95,7 +95,6 @@ def train(
     seed: int,
     group_id: str,
 ):
-    logger.info(f"GROUP_ID:{group_id}")
     sources: List[SourceInstance] = []
     for item in source:
         name, paths, ratio = item
@@ -104,7 +103,7 @@ def train(
     tokenizer = TokenizerConfig.dolma2()
 
     config = TransformerConfigBuilder(
-        group_id=group_id,
+        group_id=group_id.strip(),
         run_name=run_name,
         max_tokens=max_tokens,
         sources=sources,
