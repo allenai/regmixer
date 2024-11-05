@@ -150,6 +150,7 @@ class TransformerConfigBuilder:
     sources: List[SourceInstance]
     sequence_length: int
     max_tokens: int
+    model_config: ModelConfig
     group_id: str
     seed: int = 42
     config: Optional[ModelConfig] = None
@@ -174,6 +175,7 @@ class TransformerConfigBuilder:
         self.seed = seed
         self.config = config
         self.overrides = overrides
+        self.model_config = DEFAULT_MODEL_CONFIG
 
         self._default_device_batch_size = 8
         self._default_betas = (0.9, 0.95)
@@ -185,7 +187,6 @@ class TransformerConfigBuilder:
         self._default_global_batch_size = self.get_batch_size()
         self._default_device_batch_size = 8
         self._default_dataparallel_type = DataParallelType.ddp
-        self.model_config = DEFAULT_MODEL_CONFIG
 
     def get_tokenizer_config(self) -> TokenizerConfig:
         return TokenizerConfig(
