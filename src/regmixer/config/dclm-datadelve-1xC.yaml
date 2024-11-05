@@ -1,0 +1,24 @@
+name: "dclm-datadelve-1xC"
+description: "Mixture of datadelve partitioned dclm sample @ 1xC scale"
+budget: "ai2/oe-data"
+workspace: "ai2/regmixer"
+nodes: 1
+gpus: 1
+variants: 2
+preemptible: true
+max_tokens: 3_800_000_000 # 190_000_000 * 20
+sequence_length: 2096
+seed: 42
+clusters:
+  - ai2/s2-cirrascale-l40
+sources:
+  # TODO: Update these once we have dclm sample tagged
+  - name: health
+    paths:
+      - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Health/*.npy"
+  - name: finance
+    paths:
+      - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Finance_n_Business/*.npy"
+  - name: entertainment
+    paths:
+      - "s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Entertainment/*.npy"
