@@ -86,7 +86,6 @@ def validate(config: Path):
             overrides=[],
             sequence_length=experiments.config.sequence_length,
             seed=experiments.config.seed,
-            tokenizer_config=tokenizer,
         ).build()
         dataset = transformer.dataset.build()
         dataset.prepare()

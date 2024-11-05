@@ -147,13 +147,13 @@ class TransformerConfigBuilder:
     """
 
     run_name: str
-    overrides: List[str]
     sources: List[SourceInstance]
     sequence_length: int
     max_tokens: int
     group_id: str
     seed: int = 42
     config: Optional[ModelConfig] = None
+    overrides: Optional[List[str]] = None
 
     def __init__(
         self,
@@ -164,6 +164,7 @@ class TransformerConfigBuilder:
         group_id: str,
         seed: int,
         config: Optional[ModelConfig] = None,
+        overrides: List[str] = [],
     ):
         self.run_name = run_name
         self.sources = sources
@@ -172,6 +173,7 @@ class TransformerConfigBuilder:
         self.group_id = group_id
         self.seed = seed
         self.config = config
+        self.overrides = overrides
 
         self._default_device_batch_size = 8
         self._default_betas = (0.9, 0.95)
