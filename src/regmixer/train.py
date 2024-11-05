@@ -95,6 +95,7 @@ def train(
     seed: int,
     group_id: str,
 ):
+    logger.info(f"GROUP_ID:{group_id}")
     sources: List[SourceInstance] = []
     for item in source:
         name, paths, ratio = item
