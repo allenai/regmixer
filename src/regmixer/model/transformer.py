@@ -147,13 +147,14 @@ class TransformerConfigBuilder:
     """
 
     run_name: str
-    overrides: List[str]
     sources: List[SourceInstance]
     sequence_length: int
     max_tokens: int
+    model_config: ModelConfig
     group_id: str
     seed: int = 42
     config: Optional[ModelConfig] = None
+    overrides: Optional[List[str]] = None
 
     def __init__(
         self,
@@ -164,6 +165,7 @@ class TransformerConfigBuilder:
         group_id: str,
         seed: int,
         config: Optional[ModelConfig] = None,
+        overrides: List[str] = [],
     ):
         self.run_name = run_name
         self.sources = sources
@@ -172,6 +174,8 @@ class TransformerConfigBuilder:
         self.group_id = group_id
         self.seed = seed
         self.config = config
+        self.overrides = overrides
+        self.model_config = DEFAULT_MODEL_CONFIG
 
         self._default_device_batch_size = 8
         self._default_betas = (0.9, 0.95)
@@ -183,43 +187,43 @@ class TransformerConfigBuilder:
         self._default_global_batch_size = self.get_batch_size()
         self._default_device_batch_size = 8
         self._default_dataparallel_type = DataParallelType.ddp
-        self.CONFIG = DEFAULT_MODEL_CONFIG
 
     def get_tokenizer_config(self) -> TokenizerConfig:
         return TokenizerConfig(
-            vocab_size=self.CONFIG.vocab_size,
-            eos_token_id=self.CONFIG.eos_token_id,
-            pad_token_id=self.CONFIG.pad_token_id,
+            vocab_size=self.model_config.vocab_size,
+            eos_token_id=self.model_config.eos_token_id,
+            pad_token_id=self.model_config.pad_token_id,
         )
 
     def get_warmup_steps(self) -> int:
         return round(
-            self.CONFIG.parameters
-            / (self._default_global_batch_size * self.CONFIG.max_sequence_length)
+            self.model_config.parameters
+            / (self._default_global_batch_size * self.model_config.max_sequence_length)
         )
 
     def get_batch_size(self):
         if self.sequence_length != 2048:
             raise NotImplementedError("Only sequence length 2048 is supported right now")
 
-        global_batch_size = 160 * (self.CONFIG.parameters / 108000000) ** (2 / 3)
+        global_batch_size = 160 * (self.model_config.parameters / 108000000) ** (2 / 3)
         global_batch_size /= self._default_batch_size_divisor
         global_batch_size = round(global_batch_size)
         global_batch_size *= self._default_batch_size_divisor
 
+        print(f"Global batch size: {global_batch_size}")
         return global_batch_size
 
     def build(self) -> ModelTrainConfig:
         tokenizer = self.get_tokenizer_config()
-        lr = 4.7e-3 * (self.CONFIG.parameters / self._default_vocab_size) ** (-1 / 3)
+        lr = 4.7e-3 * (self.model_config.parameters / self._default_vocab_size) ** (-1 / 3)
 
         if self.sequence_length == 4096:
             lr /= 4
 
         model_config = TransformerConfig.llama_like(
-            d_model=self.CONFIG.d_model,
-            n_layers=self.CONFIG.n_layers,
-            n_heads=self.CONFIG.n_heads,
+            d_model=self.model_config.d_model,
+            n_layers=self.model_config.n_layers,
+            n_heads=self.model_config.n_heads,
             vocab_size=tokenizer.padded_vocab_size(),
             compile=True,
             dp_config=TransformerDataParallelConfig(
@@ -258,7 +262,7 @@ class TransformerConfigBuilder:
         )
 
         data_loader_config = NumpyDataLoaderConfig(
-            global_batch_size=self._default_global_batch_size,
+            global_batch_size=self._default_global_batch_size * self.sequence_length,
             seed=self.seed,
             num_workers=16,
         )
@@ -266,7 +270,7 @@ class TransformerConfigBuilder:
         trainer_config = (
             TrainerConfig(
                 save_folder=f"/tmp/{self.run_name}",
-                rank_microbatch_size=16 * self.sequence_length,
+                rank_microbatch_size=self._default_device_batch_size * self.sequence_length,
                 save_overwrite=True,
                 metrics_collect_interval=10,
                 cancel_check_interval=5,
