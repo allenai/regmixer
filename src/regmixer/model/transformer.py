@@ -164,7 +164,7 @@ class TransformerConfigBuilder:
         max_tokens: int,
         group_id: str,
         seed: int,
-        config: Optional[ModelConfig] = None,
+        config: ModelConfig = DEFAULT_MODEL_CONFIG,
         overrides: List[str] = [],
     ):
         self.run_name = run_name
@@ -173,9 +173,8 @@ class TransformerConfigBuilder:
         self.max_tokens = max_tokens
         self.group_id = group_id
         self.seed = seed
-        self.config = config
         self.overrides = overrides
-        self.model_config = DEFAULT_MODEL_CONFIG
+        self.model_config = config
 
         self._default_device_batch_size = 8
         self._default_betas = (0.9, 0.95)
@@ -187,6 +186,7 @@ class TransformerConfigBuilder:
         self._default_global_batch_size = self.get_batch_size()
         self._default_device_batch_size = 8
         self._default_dataparallel_type = DataParallelType.ddp
+        self._default_dataset_dtype = NumpyDatasetDType.uint32
 
     def get_tokenizer_config(self) -> TokenizerConfig:
         return TokenizerConfig(
@@ -219,6 +219,7 @@ class TransformerConfigBuilder:
 
         if self.sequence_length == 4096:
             lr /= 4
+            raise NotImplementedError("Only sequence length 2048 is supported right now")
 
         model_config = TransformerConfig.llama_like(
             d_model=self.model_config.d_model,
@@ -250,7 +251,7 @@ class TransformerConfigBuilder:
             sequence_length=self.sequence_length,
             seed=self.seed,
             processes=1,
-            dtype=NumpyDatasetDType.uint16,
+            dtype=self._default_dataset_dtype,
         ).build()
 
         dataset_config = NumpyDatasetConfig(
@@ -279,12 +280,12 @@ class TransformerConfigBuilder:
                 "lr_scheduler",
                 SchedulerCallback(scheduler=CosWithWarmup(warmup_steps=self.get_warmup_steps())),
             )
-            .with_callback(
-                "seq_len_scheduler",
-                SequenceLengthSchedulerCallback(
-                    min_sequence_length=128, warmup_steps=100, enabled=False
-                ),
-            )
+            # .with_callback(
+            #     "seq_len_scheduler",
+            #     SequenceLengthSchedulerCallback(
+            #         min_sequence_length=128, warmup_steps=100, enabled=False
+            #     ),
+            # )
             .with_callback("gpu_monitor", GPUMemoryMonitorCallback())
             .with_callback("grad_clipper", GradClipperCallback(max_grad_norm=1.0))
             .with_callback(
