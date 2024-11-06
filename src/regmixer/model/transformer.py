@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -308,7 +309,7 @@ class TransformerConfigBuilder:
             max_tokens=self.max_tokens,
             sequence_length=self.sequence_length,
             seed=self.seed,
-            processes=1,
+            processes=min(os.cpu_count() or 1, 6),
             dtype=self._default_dataset_dtype,
         ).build()
 
