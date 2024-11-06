@@ -17,16 +17,23 @@ def cli():
     help="The source workspace to copy secrets from",
     required=True,
 )
-def prepare_from(source: str):
-    if source == "ai2/regmixer":
-        raise ValueError("source workspace cannot be ai2/regmixer")
+@click.option(
+    "--dest",
+    "-d",
+    type=str,
+    help="The destination workspace to copy secrets to",
+    default="ai2/dolma2",
+)
+def prepare_from(source: str, dest: str):
+    if source == dest:
+        raise ValueError("Dest workspace cannot be source workspace")
 
     if not source.startswith("ai2/"):
         raise ValueError("source workspace must be in the ai2 organization")
 
     user = beaker.account.whoami().name.upper()
     source_workspace = beaker.workspace.get(source)
-    target_workspace = beaker.workspace.get("ai2/regmixer")
+    target_workspace = beaker.workspace.get(dest)
 
     required = (
         f"{user}_BEAKER_TOKEN",
