@@ -73,19 +73,18 @@ def validate(config: Path):
     with open(config, "r") as f:
         data = yaml.safe_load(f)
 
-    experiments = mk_experiment_group(ExperimentConfig(**data))
-    tokenizer = TokenizerConfig.dolma2()
+    experiment_group = mk_experiment_group(ExperimentConfig(**data))
 
-    for experiment in experiments.instances:
-        logger.info(mk_instance_cmd(experiment, experiments.config, experiments.group_id))
+    for experiment in experiment_group.instances:
+        logger.info(mk_instance_cmd(experiment, experiment_group.config, experiment_group.group_id))
         transformer = TransformerConfigBuilder(
             group_id="validate-no-op",
             run_name="validate-no-op",
-            max_tokens=experiments.config.max_tokens,
+            max_tokens=experiment_group.config.max_tokens,
             sources=experiment.sources,
             overrides=[],
-            sequence_length=experiments.config.sequence_length,
-            seed=experiments.config.seed,
+            sequence_length=experiment_group.config.sequence_length,
+            seed=experiment_group.config.seed,
         ).build()
         dataset = transformer.dataset.build()
         dataset.prepare()
