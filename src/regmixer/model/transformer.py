@@ -192,8 +192,6 @@ class TransformerConfigBuilder:
 
         if "jupiter" in cluster and not s3:
             self.root_dir = "/weka/oe-training-default/ai2-llm"
-        elif "augusta" in cluster:
-            self.root_dir = "gs://ai2-llm"
 
         self._default_device_batch_size = 8
         self._default_betas = (0.9, 0.95)
