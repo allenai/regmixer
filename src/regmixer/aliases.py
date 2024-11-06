@@ -6,7 +6,6 @@ from beaker import Priority
 from olmo_core.launch.beaker import BeakerLaunchConfig, BeakerWekaBucket
 from pydantic import BaseModel
 
-
 PathType = Union[Path, PathLike[Any], str]
 
 

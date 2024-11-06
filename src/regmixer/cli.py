@@ -4,12 +4,12 @@ from pathlib import Path
 
 import click
 import yaml
-from olmo_core.utils import prepare_cli_environment
 from olmo_core.data import TokenizerConfig
+from olmo_core.utils import prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
-from regmixer.utils import mk_experiment_group, mk_launch_configs, mk_instance_cmd
+from regmixer.utils import mk_experiment_group, mk_instance_cmd, mk_launch_configs
 
 logger = logging.getLogger(__name__)
 

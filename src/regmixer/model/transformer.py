@@ -12,10 +12,7 @@ from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.distributed.parallel import DataParallelType
 from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
 from olmo_core.optim import AdamWConfig, CosWithWarmup, OptimGroupOverride
-from olmo_core.train import (
-    Duration,
-    TrainerConfig,
-)
+from olmo_core.train import Duration, TrainerConfig
 from olmo_core.train.callbacks import (
     CheckpointerCallback,
     ConfigSaverCallback,
@@ -28,8 +25,8 @@ from olmo_core.train.callbacks import (
     WandBCallback,
 )
 
-from regmixer.data.dataset import MixtureBuilder
 from regmixer.aliases import SourceInstance
+from regmixer.data.dataset import MixtureBuilder
 
 
 @dataclass

@@ -4,21 +4,13 @@ from typing import List, Tuple, cast
 
 import click
 from olmo_core.distributed.utils import get_num_nodes, init_hybrid_shard_mesh
-from olmo_core.train import (
-    prepare_training_environment,
-    teardown_training_environment,
-)
-from olmo_core.data import TokenizerConfig
-from olmo_core.train.callbacks import (
-    ConfigSaverCallback,
-    WandBCallback,
-)
+from olmo_core.train import prepare_training_environment, teardown_training_environment
+from olmo_core.train.callbacks import ConfigSaverCallback, WandBCallback
 from olmo_core.utils import get_default_device, seed_all
 from torch.distributed.elastic.multiprocessing.errors import record
 
 from regmixer.aliases import SourceInstance
 from regmixer.model.transformer import TransformerConfigBuilder
-
 
 logger = logging.getLogger(__name__)
 
