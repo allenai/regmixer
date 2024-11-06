@@ -211,11 +211,8 @@ class TransformerConfigBuilder:
         return ("s3://ai2-llm" if self.s3 else "/weka/oe-training-default/ai2-llm").rstrip("/")
 
     def get_tokenizer_config(self) -> TokenizerConfig:
-        return TokenizerConfig(
-            vocab_size=self.model_config.vocab_size,
-            eos_token_id=self.model_config.eos_token_id,
-            pad_token_id=self.model_config.pad_token_id,
-        )
+        # TODO: Decide whether to make this configurable
+        return TokenizerConfig.dolma2()
 
     def get_warmup_steps(self) -> int:
         return round(
