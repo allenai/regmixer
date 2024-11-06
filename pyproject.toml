@@ -13,7 +13,7 @@ authors = [
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 dependencies = [
-    # "ai2-olmo-core", # add back when mixing loader is merged
+    "ai2-olmo-core", # add back when mixing loader is merged
     "boto3",
     "click",
     "pydantic",

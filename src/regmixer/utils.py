@@ -3,7 +3,7 @@ from typing import List
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
 from olmo_core.utils import generate_uuid, prepare_cli_environment
-
+from regmixer.synthesize_mixture import get_mixes
 from regmixer.aliases import (
     ExperimentConfig,
     ExperimentGroup,
@@ -11,36 +11,45 @@ from regmixer.aliases import (
     SourceConfig,
     SourceInstance,
 )
+from pathlib import Path
+import yaml
 
+def mk_source_instances(sources: list[SourceConfig],mix_map) -> list[SourceInstance]:
 
-def mk_source_instances(sources: list[SourceConfig]) -> list[SourceInstance]:
-    # TODO: Implement the randomized mixing ratios here
     return [
         SourceInstance(
             name=source.name,
             paths=source.paths,
-            ratio=1 / len(sources),
+            ratio=mix_map[source.name],
         )
         for source in sources
     ]
 
 
-def mk_experiments(config: ExperimentConfig) -> list[ExperimentInstance]:
+def mk_experiments(config: ExperimentConfig,mixes) -> list[ExperimentInstance]:
     """Generate source instances from a config."""
     return [
         ExperimentInstance(
             name=f"{config.name}-{idx:04}",
-            sources=mk_source_instances(config.sources),
+            sources=mk_source_instances(config.sources,mix),
         )
-        for idx in range(config.variants)
+        for idx,mix in enumerate(mixes)
     ]
 
 
+def mk_mixes(config:ExperimentConfig):
+
+    return get_mixes(config.sources,config.variants)
+
 def mk_experiment_group(config: ExperimentConfig) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
+
+    mixes = mk_mixes(config.sources,config.variants)
+
+    experiments = mk_experiments(config,mixes)
     return ExperimentGroup(
         config=config,
-        instances=mk_experiments(config),
+        instances=experiments,
     )
 
 
@@ -115,3 +124,29 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
 def mk_launch_group(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     """Build a launch group from an experiment group."""
     return mk_launch_configs(group)
+
+
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Launch RegMixer experiments")
+    parser.add_argument(
+        "-c", "--config",
+        type=Path,
+        required=True,
+        help="Path to the experiment configuration file"
+    )
+  
+    args = parser.parse_args()
+    if not args.config.exists():
+        print(f"Configuration file not found: {args.config}")
+        return 1
+    with open(args.config, "r") as f:
+        data = yaml.safe_load(f)
+
+        mk_experiment_group(ExperimentConfig(**data))
+
+
+if __name__ == "__main__":
+    exit(main())

@@ -9,7 +9,7 @@ from olmo_core.data import TokenizerConfig
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
-from regmixer.utils import mk_experiment_group, mk_launch_configs, mk_instance_cmd
+from regmixer.utils import mk_experiment_group, mk_launch_configs, mk_instance_cmd,mk_mixes
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,32 @@ def launch(config: Path, dry_run: bool):
     except KeyboardInterrupt:
         logger.warning("\nCancelling experiment group...")
         # TODO: Try to cancel the experiments in the group
+
+
+
+
+
+
+
+
+@cli.command()
+@click.option(
+    "-c",
+    "--config",
+    type=click.Path(exists=True),
+    required=True,
+    help="Relative path to the experiment configuration file.",
+)
+def generate_mixes(config: Path):
+    """Prints mixes that would be generated based on the config"""
+    with open(config, "r") as f:
+        data = yaml.safe_load(f)
+
+    print(mk_mixes(ExperimentConfig(**data)))
+    
+
+
+
 
 
 @cli.command()
