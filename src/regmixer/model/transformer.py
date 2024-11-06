@@ -188,7 +188,7 @@ class TransformerConfigBuilder:
         self.profile = profile
         self.s3 = s3
         self.read_location = self.get_read_location()
-        self.root_dir: str = "weka://oe-training-default/ai2-llm"
+        self.root_dir: str = "s3://ai2-llm"
 
         if "jupiter" in cluster and not s3:
             self.root_dir = "/weka/oe-training-default/ai2-llm"
@@ -260,11 +260,7 @@ class TransformerConfigBuilder:
                     mix_base_dir=self.root_dir,
                     sequence_length=self.sequence_length,
                     tokenizer=self.get_tokenizer_config(),
-                    work_dir=(
-                        "./dataset-cache"
-                        if is_url(self.root_dir)
-                        else f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache"
-                    ),
+                    work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache",
                 ),
                 eval_interval=self._default_eval_interval,
             ),
