@@ -33,7 +33,7 @@ class ExperimentConfig(BaseModel):
     max_tokens: int
     sequence_length: int
     seed: int
-    clusters: list[str]
+    cluster: str
     priority: Priority
     sources: list[SourceConfig]
     preemptible: bool = True
