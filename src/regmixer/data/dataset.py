@@ -1,9 +1,12 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Any
+from typing import Any, List
 
 import s3fs
-from olmo_core.data.source_mixture import SourceMixtureConfig, SourceMixtureDatasetConfig
+from olmo_core.data.source_mixture import (
+    SourceMixtureConfig,
+    SourceMixtureDatasetConfig,
+)
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.io import is_url
 

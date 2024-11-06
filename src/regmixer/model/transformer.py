@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from olmo_core.config import Config, DType
 from olmo_core.data import (
+    DataMix,
     NumpyDataLoaderConfig,
     NumpyDatasetConfig,
     NumpyDatasetType,
@@ -10,26 +11,26 @@ from olmo_core.data import (
 )
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.distributed.parallel import DataParallelType
+from olmo_core.io import is_url
 from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
 from olmo_core.optim import AdamWConfig, CosWithWarmup, OptimGroupOverride
-from olmo_core.train import (
-    Duration,
-    TrainerConfig,
-)
+from olmo_core.train import Duration, TrainerConfig
 from olmo_core.train.callbacks import (
+    Callback,
     CheckpointerCallback,
     ConfigSaverCallback,
+    DownstreamEvaluatorCallbackConfig,
     GPUMemoryMonitorCallback,
     GradClipperCallback,
     LMEvaluatorCallbackConfig,
     ProfilerCallback,
     SchedulerCallback,
-    SequenceLengthSchedulerCallback,
     WandBCallback,
 )
 
-from regmixer.data.dataset import MixtureBuilder
 from regmixer.aliases import SourceInstance
+from regmixer.data.dataset import MixtureBuilder
+from regmixer.model.evaluators import DownstreamEvaluators
 
 
 @dataclass
@@ -152,9 +153,13 @@ class TransformerConfigBuilder:
     max_tokens: int
     model_config: ModelConfig
     group_id: str
-    seed: int = 42
+    cluster: str
+    beaker_user: str
+    s3: bool
+    seed: int
     config: Optional[ModelConfig] = None
     overrides: Optional[List[str]] = None
+    profile: bool = False
 
     def __init__(
         self,
@@ -163,9 +168,13 @@ class TransformerConfigBuilder:
         sequence_length: int,
         max_tokens: int,
         group_id: str,
-        seed: int,
-        config: Optional[ModelConfig] = None,
+        cluster: str,
+        beaker_user: str,
+        seed: int = 42,
+        s3: bool = True,
+        config: ModelConfig = DEFAULT_MODEL_CONFIG,
         overrides: List[str] = [],
+        profile: bool = False,
     ):
         self.run_name = run_name
         self.sources = sources
@@ -173,27 +182,37 @@ class TransformerConfigBuilder:
         self.max_tokens = max_tokens
         self.group_id = group_id
         self.seed = seed
-        self.config = config
         self.overrides = overrides
-        self.model_config = DEFAULT_MODEL_CONFIG
+        self.model_config = config
+        self.beaker_user = beaker_user
+        self.profile = profile
+        self.s3 = s3
+        self.read_location = self.get_read_location()
+        self.root_dir: str = "s3://ai2-llm"
+
+        if "jupiter" in cluster and not s3:
+            self.root_dir = "/weka/oe-training-default/ai2-llm"
 
         self._default_device_batch_size = 8
         self._default_betas = (0.9, 0.95)
         self._default_weight_decay = 0.1
         self._default_eps = 1e-8
+        self._default_max_grad_norm = 1.0
         self._default_decay_embeddings = False
         self._default_vocab_size = 100278
         self._default_batch_size_divisor = 32
         self._default_global_batch_size = self.get_batch_size()
         self._default_device_batch_size = 8
         self._default_dataparallel_type = DataParallelType.ddp
+        self._default_dataset_dtype = NumpyDatasetDType.uint32
+        self._default_eval_interval = 1000
+
+    def get_read_location(self) -> str:
+        return ("s3://ai2-llm" if self.s3 else "/weka/oe-training-default/ai2-llm").rstrip("/")
 
     def get_tokenizer_config(self) -> TokenizerConfig:
-        return TokenizerConfig(
-            vocab_size=self.model_config.vocab_size,
-            eos_token_id=self.model_config.eos_token_id,
-            pad_token_id=self.model_config.pad_token_id,
-        )
+        # TODO: Decide whether to make this configurable
+        return TokenizerConfig.dolma2()
 
     def get_warmup_steps(self) -> int:
         return round(
@@ -213,12 +232,52 @@ class TransformerConfigBuilder:
         print(f"Global batch size: {global_batch_size}")
         return global_batch_size
 
+    def build_callbacks(self) -> Dict[str, Callback]:
+        return {
+            "lr_scheduler": SchedulerCallback(
+                scheduler=CosWithWarmup(warmup_steps=self.get_warmup_steps())
+            ),
+            "gpu_monitor": GPUMemoryMonitorCallback(),
+            "grad_clipper": GradClipperCallback(max_grad_norm=self._default_max_grad_norm),
+            "config_saver": ConfigSaverCallback(),
+            "profiler": ProfilerCallback(enabled=self.profile),
+            "checkpointer": CheckpointerCallback(
+                save_interval=1000,
+                ephemeral_save_interval=100,
+                save_async=True,
+            ),
+            "wandb": WandBCallback(
+                name=self.run_name,
+                project="regmixer",
+                group=self.group_id,
+                cancel_check_interval=10,
+                enabled=True,
+            ),
+            "lm_evaluator": LMEvaluatorCallbackConfig(
+                eval_dataset=NumpyDatasetConfig.from_data_mix(
+                    DataMix.v3_small_ppl_validation,
+                    name=NumpyDatasetType.padded_fsl,
+                    mix_base_dir=self.root_dir,
+                    sequence_length=self.sequence_length,
+                    tokenizer=self.get_tokenizer_config(),
+                    work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache",
+                ),
+                eval_interval=self._default_eval_interval,
+            ),
+            "downstream_evaluator": DownstreamEvaluatorCallbackConfig(
+                tasks=[task.value for task in DownstreamEvaluators],
+                tokenizer=self.get_tokenizer_config(),
+                eval_interval=self._default_eval_interval,
+            ),
+        }
+
     def build(self) -> ModelTrainConfig:
         tokenizer = self.get_tokenizer_config()
         lr = 4.7e-3 * (self.model_config.parameters / self._default_vocab_size) ** (-1 / 3)
 
         if self.sequence_length == 4096:
             lr /= 4
+            raise NotImplementedError("Only sequence length 2048 is supported right now")
 
         model_config = TransformerConfig.llama_like(
             d_model=self.model_config.d_model,
@@ -250,7 +309,7 @@ class TransformerConfigBuilder:
             sequence_length=self.sequence_length,
             seed=self.seed,
             processes=1,
-            dtype=NumpyDatasetDType.uint16,
+            dtype=self._default_dataset_dtype,
         ).build()
 
         dataset_config = NumpyDatasetConfig(
@@ -267,65 +326,16 @@ class TransformerConfigBuilder:
             num_workers=16,
         )
 
-        trainer_config = (
-            TrainerConfig(
-                save_folder=f"/tmp/{self.run_name}",
-                rank_microbatch_size=self._default_device_batch_size * self.sequence_length,
-                save_overwrite=True,
-                metrics_collect_interval=10,
-                cancel_check_interval=5,
-            )
-            .with_callback(
-                "lr_scheduler",
-                SchedulerCallback(scheduler=CosWithWarmup(warmup_steps=self.get_warmup_steps())),
-            )
-            .with_callback(
-                "seq_len_scheduler",
-                SequenceLengthSchedulerCallback(
-                    min_sequence_length=128, warmup_steps=100, enabled=False
-                ),
-            )
-            .with_callback("gpu_monitor", GPUMemoryMonitorCallback())
-            .with_callback("grad_clipper", GradClipperCallback(max_grad_norm=1.0))
-            .with_callback(
-                "checkpointer",
-                CheckpointerCallback(
-                    save_interval=1000,
-                    ephemeral_save_interval=100,
-                    save_async=True,
-                ),
-            )
-            .with_callback(
-                "wandb",
-                WandBCallback(
-                    name=self.run_name,
-                    project="regmixer",
-                    group=self.group_id,
-                    cancel_check_interval=10,
-                    enabled=True,
-                ),
-            )
-            .with_callback("config_saver", ConfigSaverCallback())
-            .with_callback("profiler", ProfilerCallback(enabled=False))
-            # TODO: Add the right evaluators here
-            .with_callback(
-                "evaluator",
-                LMEvaluatorCallbackConfig(
-                    eval_dataset=NumpyDatasetConfig(
-                        paths=[
-                            "s3://ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/c4_en/val/part-0-00000.npy"
-                        ],
-                        metadata=[{"label": "c4-validation"}],
-                        name=NumpyDatasetType.padded_fsl,
-                        sequence_length=self.sequence_length,
-                        tokenizer=tokenizer,
-                        work_dir="/tmp/dataset-cache",
-                    ),
-                    eval_interval=250,
-                    eval_duration=Duration.steps(10),
-                ),
-            )
+        trainer_config = TrainerConfig(
+            save_folder=f"/tmp/{self.run_name}",
+            rank_microbatch_size=self._default_device_batch_size * self.sequence_length,
+            save_overwrite=True,
+            metrics_collect_interval=10,
+            cancel_check_interval=5,
         )
+
+        for callback_name, callback in self.build_callbacks().items():
+            trainer_config.callbacks[callback_name] = callback
 
         return ModelTrainConfig(
             model=model_config,

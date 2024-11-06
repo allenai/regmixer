@@ -2,7 +2,7 @@ from typing import List
 
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
-from olmo_core.utils import generate_uuid, prepare_cli_environment
+from olmo_core.utils import generate_uuid
 
 from regmixer.aliases import (
     ExperimentConfig,
@@ -51,6 +51,7 @@ def mk_instance_cmd(
 ) -> List[str]:
     """Build a command for launching an experiment instance."""
 
+    beaker_user = (Beaker.from_env().account.whoami().name).lower()
     sources = []
 
     for source in instance.sources:
@@ -66,20 +67,23 @@ def mk_instance_cmd(
         f"-l {config.sequence_length}",
         f"-t {config.max_tokens}",
         f"-S {config.seed}",
+        f"-c {config.cluster}",
+        f"-u {beaker_user}",
         *sources,
     ]
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
-    beaker_user = (Beaker.from_env().account.whoami().name).upper()
     """Build a beaker launch config from an experiment group."""
+
+    beaker_user = (Beaker.from_env().account.whoami().name).upper()
     return [
         BeakerLaunchConfig(
             name=f"{experiment.name}",
             description=group.config.description,
             task_name=experiment.name,
             cmd=mk_instance_cmd(experiment, group.config, group.group_id),
-            clusters=group.config.clusters,
+            clusters=[group.config.cluster],
             num_nodes=group.config.nodes,
             num_gpus=group.config.gpus,
             shared_filesystem=group.config.shared_filesystem,
@@ -90,6 +94,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             workspace=group.config.workspace,
             preemptible=group.config.preemptible,
             beaker_image="ai2-tylerm/olmo-core-regmixer",
+            priority=group.config.priority,
             env_secrets=[
                 BeakerEnvSecret(name="BEAKER_TOKEN", secret=f"{beaker_user}_BEAKER_TOKEN"),
                 BeakerEnvSecret(name="WANDB_API_KEY", secret=f"{beaker_user}_WANDB_API_KEY"),

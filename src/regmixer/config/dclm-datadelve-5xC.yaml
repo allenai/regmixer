@@ -1,15 +1,15 @@
 name: "dclm-datadelve-1xC"
-description: "Mixture of datadelve partitioned dclm sample @ 1xC scale"
+description: "Mixture of datadelve partitioned dclm sample @ 5xC scale"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 1
 variants: 2
 preemptible: true
-max_tokens: 3_800_000_000 # 190_000_000 * 20
+max_tokens: 19_000_000_000 # 190_000_000 * 100
 sequence_length: 2048
 seed: 42
-priority: normal
+priority: high
 cluster: ai2/s2-cirrascale-l40
 sources:
   # TODO: Update these once we have dclm sample tagged

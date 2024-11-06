@@ -1,9 +1,10 @@
 from os import PathLike
 from pathlib import Path
 from typing import Any, Union
+
+from beaker import Priority
 from olmo_core.launch.beaker import BeakerLaunchConfig, BeakerWekaBucket
 from pydantic import BaseModel
-
 
 PathType = Union[Path, PathLike[Any], str]
 
@@ -32,7 +33,8 @@ class ExperimentConfig(BaseModel):
     max_tokens: int
     sequence_length: int
     seed: int
-    clusters: list[str]
+    cluster: str
+    priority: Priority
     sources: list[SourceConfig]
     preemptible: bool = True
     shared_filesystem: bool = False
