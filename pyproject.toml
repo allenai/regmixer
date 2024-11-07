@@ -10,7 +10,7 @@ description = ""
 authors = [
     { name = "Allen Institute for Artificial Intelligence", email = "oe-data-engineering@allenai.org" }
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dependencies = [
     "ai2-olmo-core", # add back when mixing loader is merged

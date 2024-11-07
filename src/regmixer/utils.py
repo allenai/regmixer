@@ -41,10 +41,9 @@ def mk_mixes(config:ExperimentConfig):
 
     return get_mixes(config.sources,config.variants)
 
-def mk_experiment_group(config: ExperimentConfig) -> ExperimentGroup:
+def mk_experiment_group(config: ExperimentConfig, mixes) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
 
-    mixes = mk_mixes(config.sources,config.variants)
 
     experiments = mk_experiments(config,mixes)
     return ExperimentGroup(

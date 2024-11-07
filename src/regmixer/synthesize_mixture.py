@@ -100,11 +100,6 @@ def generate_weights_dirichlet(prior_dist,
         prior_dist = prior_dist ** TEMP
         prior_dist = prior_dist / np.sum(prior_dist)
 
-    print("\n\nThe domain usage bound (maximum domain weight): ")
-    # print the bound for each group
-    for i in range(len(prior_dist)):
-        print(f"{train_groups[i]}: {number_bound[i][1]}")
-
     # combine reject sampling with dirichlet distribution
     for i in range(num_samples * SAMPLE_MULTIPLIER):
         if MIN_STRENGH == MAX_STRENGH:
@@ -136,14 +131,8 @@ def generate_weights_dirichlet(prior_dist,
         # add the samples to the final_samples
         final_samples.append(samples[0])
 
-    # remove the samples with the nearly same values
-    print("\nThe number of avaiable samples: ", len(final_samples))
-    # deduplicate the samples
     final_samples = sort_and_deduplicate(np.array(final_samples))
-    # remove the samples with the nearly same values
-    print("The number of deduplicated samples: ", len(final_samples))
     selected_samples = random.sample(final_samples, num_samples)
-    print("The number of selected samples: ", len(selected_samples))
     selected_samples = np.stack(selected_samples, axis=0)
     return selected_samples
 

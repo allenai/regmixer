@@ -4,8 +4,11 @@ from pathlib import Path
 
 import click
 import yaml
+import json
+
 from olmo_core.utils import prepare_cli_environment
 from olmo_core.data import TokenizerConfig
+from typing import Optional
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
@@ -28,19 +31,45 @@ def cli():
     help="Relative path to the experiment configuration file.",
 )
 @click.option(
+    "-m",
+    "--mixture-file",
+    type=click.Path(exists=True),
+    required=False
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
     help="Print the experiment group configurations without launching.",
 )
-def launch(config: Path, dry_run: bool):
+def launch(config: Path, mixture_file: Path, dry_run: bool):
     """Launch an experiment."""
 
     with open(config, "r") as f:
         data = yaml.safe_load(f)
 
     experiment_config = ExperimentConfig(**data)
-    launch_group = LaunchGroup(instances=mk_launch_configs(mk_experiment_group(experiment_config)))
+
+    if mixture_file:
+        with open(mixture_file, "r") as f:
+            predefined_mixes = json.load(f)
+        launch_group = LaunchGroup(instances=mk_launch_configs(
+            mk_experiment_group(experiment_config, mixes=predefined_mixes)
+        ))
+    else:
+        output_path = "generated_mix.json"
+        logger.info(f"Mixture definition file not provided. Generating one now at {output_path}:")
+        mixes = _generate_mixes(config,Path(output_path))
+    
+        if click.confirm("Launch experiment with this set of mixtures?",default=False):
+            launch_group = LaunchGroup(instances=mk_launch_configs(
+                mk_experiment_group(experiment_config, mixes=mixes)
+            ))
+    
+        else:
+            logger.info("Launch cancelled")
+            return
+
 
     logger.info("Launching experiment group...")
     try:
@@ -60,10 +89,26 @@ def launch(config: Path, dry_run: bool):
         # TODO: Try to cancel the experiments in the group
 
 
+def prettify_mixes(mixes):
+    mixes = {"mixes":mixes}
+    return json.dumps(mixes,indent=2)
 
 
 
 
+def _generate_mixes(config: Path, output:Optional[Path]=None):
+    with open(config, "r") as f:
+        data = yaml.safe_load(f)
+
+    mixes = mk_mixes(ExperimentConfig(**data))
+    mix_string = prettify_mixes(mixes)
+  
+    if output:
+        with open(output, "w") as f:
+            f.write(mix_string)
+        print(f"Mixes saved to {output}:")
+    print(mix_string)
+    return mixes
 
 
 @cli.command()
@@ -74,17 +119,17 @@ def launch(config: Path, dry_run: bool):
     required=True,
     help="Relative path to the experiment configuration file.",
 )
-def generate_mixes(config: Path):
-    """Prints mixes that would be generated based on the config"""
-    with open(config, "r") as f:
-        data = yaml.safe_load(f)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    help="Output file path for the generated mixes (defaults to stdout if not specified)",
+)
+def generate_mixes(config: Path, output: Optional[Path] = None):
+    return _generate_mixes(config, output)
 
-    print(mk_mixes(ExperimentConfig(**data)))
-    
 
-
-
-
+  
 
 @cli.command()
 @click.option(
