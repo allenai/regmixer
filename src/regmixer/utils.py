@@ -2,8 +2,10 @@ from typing import List
 
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
-from olmo_core.utils import generate_uuid, prepare_cli_environment
+from olmo_core.utils import generate_uuid
+
 from regmixer.synthesize_mixture import get_mixes
+
 from regmixer.aliases import (
     ExperimentConfig,
     ExperimentGroup,
@@ -26,12 +28,12 @@ def mk_source_instances(sources: list[SourceConfig],mix_map) -> list[SourceInsta
     ]
 
 
-def mk_experiments(config: ExperimentConfig,mixes) -> list[ExperimentInstance]:
+def mk_experiments(config: ExperimentConfig, mixes, group_uuid: str) -> list[ExperimentInstance]:
     """Generate source instances from a config."""
     return [
         ExperimentInstance(
-            name=f"{config.name}-{idx:04}",
-            sources=mk_source_instances(config.sources,mix),
+            name=f"{config.name}-{idx:04}-{group_uuid}",
+            sources=mk_source_instances(config.sources, mix),
         )
         for idx,mix in enumerate(mixes)
     ]
@@ -44,17 +46,21 @@ def mk_mixes(config:ExperimentConfig):
 def mk_experiment_group(config: ExperimentConfig, mixes) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
 
+    group_uuid = generate_uuid()[:8]
 
-    experiments = mk_experiments(config,mixes["mixes"])
     return ExperimentGroup(
         config=config,
-        instances=experiments,
+        group_id=group_uuid,
+        instances= mk_experiments(config,mixes["mixes"],group_uuid),
     )
 
 
-def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> List[str]:
+def mk_instance_cmd(
+    instance: ExperimentInstance, config: ExperimentConfig, group_id: str
+) -> List[str]:
     """Build a command for launching an experiment instance."""
 
+    beaker_user = (Beaker.from_env().account.whoami().name).lower()
     sources = []
 
     for source in instance.sources:
@@ -66,24 +72,27 @@ def mk_instance_cmd(instance: ExperimentInstance, config: ExperimentConfig) -> L
         "src/regmixer/train.py",
         "train",
         f"-n {instance.name}",
+        f"-g {group_id}",
         f"-l {config.sequence_length}",
         f"-t {config.max_tokens}",
         f"-S {config.seed}",
+        f"-c {config.cluster}",
+        f"-u {beaker_user}",
         *sources,
     ]
 
 
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
-    beaker_user = (Beaker.from_env().account.whoami().name).upper()
     """Build a beaker launch config from an experiment group."""
-    group_uuid = generate_uuid()[:8]
+
+    beaker_user = (Beaker.from_env().account.whoami().name).upper()
     return [
         BeakerLaunchConfig(
-            name=f"{experiment.name}-{group_uuid}",
+            name=f"{experiment.name}",
             description=group.config.description,
             task_name=experiment.name,
-            cmd=mk_instance_cmd(experiment, group.config),
-            clusters=group.config.clusters,
+            cmd=mk_instance_cmd(experiment, group.config, group.group_id),
+            clusters=[group.config.cluster],
             num_nodes=group.config.nodes,
             num_gpus=group.config.gpus,
             shared_filesystem=group.config.shared_filesystem,
@@ -94,6 +103,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             workspace=group.config.workspace,
             preemptible=group.config.preemptible,
             beaker_image="ai2-tylerm/olmo-core-regmixer",
+            priority=group.config.priority,
             env_secrets=[
                 BeakerEnvSecret(name="BEAKER_TOKEN", secret=f"{beaker_user}_BEAKER_TOKEN"),
                 BeakerEnvSecret(name="WANDB_API_KEY", secret=f"{beaker_user}_WANDB_API_KEY"),

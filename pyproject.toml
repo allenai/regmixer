@@ -42,6 +42,7 @@ all = [
 rmc = "regmixer.cli:cli"
 workspace = "regmixer.workspace:cli"
 train = "regmixer.train:cli"
+data = "regmixer.data.utils:cli"
 
 [tool.black]
 line-length = 100

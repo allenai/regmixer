@@ -4,22 +4,13 @@ from typing import List, Tuple, cast
 
 import click
 from olmo_core.distributed.utils import get_num_nodes, init_hybrid_shard_mesh
-from olmo_core.train import (
-    prepare_training_environment,
-    teardown_training_environment,
-)
-from olmo_core.data import TokenizerConfig
-from olmo_core.train.callbacks import (
-    CometCallback,
-    ConfigSaverCallback,
-    WandBCallback,
-)
+from olmo_core.train import prepare_training_environment, teardown_training_environment
+from olmo_core.train.callbacks import ConfigSaverCallback, WandBCallback
 from olmo_core.utils import get_default_device, seed_all
 from torch.distributed.elastic.multiprocessing.errors import record
 
 from regmixer.aliases import SourceInstance
 from regmixer.model.transformer import TransformerConfigBuilder
-
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +71,24 @@ def cli():
     type=str,
     help="Overrides for the transformer config",
 )
+@click.option(
+    "--group-id",
+    "-g",
+    type=str,
+    help="Group ID for the experiment",
+)
+@click.option(
+    "--beaker-user",
+    "-u",
+    type=str,
+    help="Beaker user",
+)
+@click.option(
+    "--cluster",
+    "-c",
+    type=str,
+    help="Cluster running the experiment",
+)
 @record
 def train(
     run_name: str,
@@ -88,22 +97,25 @@ def train(
     override: List[str],
     sequence_length: int,
     seed: int,
+    group_id: str,
+    beaker_user: str,
+    cluster: str,
 ):
     sources: List[SourceInstance] = []
     for item in source:
         name, paths, ratio = item
         sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
 
-    tokenizer = TokenizerConfig.dolma2()
-
     config = TransformerConfigBuilder(
+        beaker_user=beaker_user,
+        cluster=cluster,
+        group_id=group_id.strip(),
         run_name=run_name,
         max_tokens=max_tokens,
         sources=sources,
         overrides=override,
         sequence_length=sequence_length,
         seed=seed,
-        tokenizer_config=tokenizer,
     ).build()
     dataset = config.dataset.build()
 
