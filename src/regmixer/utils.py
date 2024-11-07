@@ -45,7 +45,7 @@ def mk_experiment_group(config: ExperimentConfig, mixes) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
 
 
-    experiments = mk_experiments(config,mixes)
+    experiments = mk_experiments(config,mixes["mixes"])
     return ExperimentGroup(
         config=config,
         instances=experiments,
@@ -123,29 +123,3 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
 def mk_launch_group(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     """Build a launch group from an experiment group."""
     return mk_launch_configs(group)
-
-
-
-def main():
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Launch RegMixer experiments")
-    parser.add_argument(
-        "-c", "--config",
-        type=Path,
-        required=True,
-        help="Path to the experiment configuration file"
-    )
-  
-    args = parser.parse_args()
-    if not args.config.exists():
-        print(f"Configuration file not found: {args.config}")
-        return 1
-    with open(args.config, "r") as f:
-        data = yaml.safe_load(f)
-
-        mk_experiment_group(ExperimentConfig(**data))
-
-
-if __name__ == "__main__":
-    exit(main())

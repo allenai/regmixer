@@ -33,6 +33,7 @@ def cli():
 @click.option(
     "-m",
     "--mixture-file",
+    help="(Optional) Relative path to a mixture configuration file.",
     type=click.Path(exists=True),
     required=False
 )
@@ -106,8 +107,8 @@ def _generate_mixes(config: Path, output:Optional[Path]=None):
     if output:
         with open(output, "w") as f:
             f.write(mix_string)
-        print(f"Mixes saved to {output}:")
-    print(mix_string)
+        logger.info(f"Mixes saved to {output}:")
+    logger.info(mix_string)
     return mixes
 
 
@@ -123,11 +124,13 @@ def _generate_mixes(config: Path, output:Optional[Path]=None):
     "-o",
     "--output",
     type=click.Path(),
-    help="Output file path for the generated mixes (defaults to stdout if not specified)",
+    help="Output file path for the generated mixes (defaults to generated_mix.json if not specified)",
 )
-def generate_mixes(config: Path, output: Optional[Path] = None):
-    return _generate_mixes(config, output)
+def generate_mixes(config: Path, output: Optional[Path] = Path("generated_mix.json")):
+    """Generate a set of mixtures based on a provided config"""
 
+    _generate_mixes(config, output)
+    logger.info(f"\nMixtures saved to {output}")
 
   
 
