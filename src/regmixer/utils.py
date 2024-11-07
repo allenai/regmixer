@@ -109,7 +109,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 "cd regmixer",
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
-                "pip install -e '.[all]' && pip install git+https://github.com/allenai/OLMo-core.git@main",
+                "pip install -e '.[all]'",
                 "pip freeze",
                 # Move AWS credentials from env to relevant files
                 "mkdir -p ~/.aws",
