@@ -9,8 +9,8 @@ preemptible: true
 max_tokens: 10_000_000
 sequence_length: 1024
 seed: 42
-clusters:
-  - ai2/s2-cirrascale-l40
+priority: low
+cluster: ai2/s2-cirrascale-l40
 sources:
   - name: health
     paths:
