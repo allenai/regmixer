@@ -10,7 +10,8 @@ max_tokens: 3_800_000_000 # 190_000_000 * 20
 sequence_length: 2048
 seed: 42
 priority: normal
-cluster: ai2/s2-cirrascale-l40
+# cluster: ai2/s2-cirrascale-l40
+cluster: ai2/saturn-cirrascale
 sources:
   # TODO: Update these once we have dclm sample tagged
   - name: health
