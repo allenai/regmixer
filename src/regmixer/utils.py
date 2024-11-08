@@ -1,10 +1,10 @@
+from pathlib import Path
 from typing import List
 
+import yaml
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
 from olmo_core.utils import generate_uuid
-
-from regmixer.synthesize_mixture import get_mixes
 
 from regmixer.aliases import (
     ExperimentConfig,
@@ -13,11 +13,12 @@ from regmixer.aliases import (
     SourceConfig,
     SourceInstance,
 )
-from pathlib import Path
-import yaml
+from regmixer.synthesize_mixture import get_mixes
 
-def mk_source_instances(sources: list[SourceConfig],mix_map) -> list[SourceInstance]:
 
+def mk_source_instances(
+    sources: list[SourceConfig], mix_map: dict[str, float]
+) -> list[SourceInstance]:
     return [
         SourceInstance(
             name=source.name,
@@ -28,22 +29,24 @@ def mk_source_instances(sources: list[SourceConfig],mix_map) -> list[SourceInsta
     ]
 
 
-def mk_experiments(config: ExperimentConfig, mixes, group_uuid: str) -> list[ExperimentInstance]:
+def mk_experiments(
+    config: ExperimentConfig, mixes: list[dict[str, float]], group_uuid: str
+) -> list[ExperimentInstance]:
     """Generate source instances from a config."""
     return [
         ExperimentInstance(
             name=f"{config.name}-{idx:04}-{group_uuid}",
             sources=mk_source_instances(config.sources, mix),
         )
-        for idx,mix in enumerate(mixes)
+        for idx, mix in enumerate(mixes)
     ]
 
 
-def mk_mixes(config:ExperimentConfig):
+def mk_mixes(config: ExperimentConfig):
+    return get_mixes(config.sources, config.variants)
 
-    return get_mixes(config.sources,config.variants)
 
-def mk_experiment_group(config: ExperimentConfig, mixes) -> ExperimentGroup:
+def mk_experiment_group(config: ExperimentConfig, mixes: list[dict[str, float]]) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
 
     group_uuid = generate_uuid()[:8]
@@ -51,7 +54,7 @@ def mk_experiment_group(config: ExperimentConfig, mixes) -> ExperimentGroup:
     return ExperimentGroup(
         config=config,
         group_id=group_uuid,
-        instances= mk_experiments(config,mixes["mixes"],group_uuid),
+        instances=mk_experiments(config, mixes, group_uuid),
     )
 
 

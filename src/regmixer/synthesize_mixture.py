@@ -1,9 +1,21 @@
-import numpy as np
-import random
-import yaml
 import argparse
+import logging
 import os
+import random
+from collections import defaultdict
+from urllib.parse import urlparse
+
+import boto3
+import numpy as np
 import s3fs
+import torch
+import yaml
+from olmo_core.aliases import PathOrStr
+from olmo_core.data.types import NumpyDatasetDType
+from olmo_core.io import get_file_size
+
+logger = logging.getLogger(__name__)
+
 
 from regmixer.aliases import (
     ExperimentConfig,
@@ -12,7 +24,6 @@ from regmixer.aliases import (
     SourceConfig,
     SourceInstance,
 )
-
 
 SEED = 42
 random.seed(SEED)
@@ -30,12 +41,12 @@ MAX_STRENGH = 5.0
 SAMPLE_MULTIPLIER = 100
 
 # How many epochs are allowed for each domain for the large-scale model training. This hyper-parameter
-#   is used because the natura trade off between the reweighting v.s. the number of avaiable tokens in each domain.
+#   is used because the natural trade off between the reweighting v.s. the number of avaiable tokens in each domain.
 #   Usually we think repeating 4 epochs is okay for language model pre-training, and here we set it as 15
 #   because the avaiable token of The Pile is much larger than the token amount for training Chinchilla-Optimal 1B models (i.e., 25B tokens).
 #   However, if you want to train the large-scale model with all avaiable tokens, you can use less than 4 epochs also in the proxy
 #   model training.
-MAXIMUM_USAGE = 15
+MAXIMUM_USAGE = 2
 
 # Assume that we have 1B (512,000 examples, and 2048 tokens per example) tokens
 #   for the proxy model training, the minimum sampling rate 2e-4 indicates that
@@ -44,7 +55,8 @@ MAXIMUM_USAGE = 15
 # If you use less tokens for training the proxy models, you may increase the minimum sampling rate
 #   to ensure the statistical significance of the domain. I personally recommend using at least 1e-5
 #   if you have 1B tokens for training the proxy models.
-MINIMUM = 2e-4  
+MINIMUM = 2e-4
+
 
 def generate_train_group(groups, weights, precision=5):
     """
@@ -61,43 +73,32 @@ def generate_train_group(groups, weights, precision=5):
     str: Formatted string of groups and weights.
     """
     assert len(groups) == len(weights), "Length of groups and weights must be equal"
-    
+
     def format_weight(weight):
-        return f"{weight:.{precision}f}".rstrip('0').rstrip('.')
-    
-    output_group = [f"  {group}: {format_weight(num)}" 
-                    for group, num in zip(groups, weights)]
-    
-    return "\n".join(output_group)
+        return f"{weight:.{precision}f}".rstrip("0").rstrip(".")
 
-def generate_valid_group(groups):
-    weights = [1.0] * len(groups)
-    output_group = [f"  {group}: {num}" for group, num in zip(groups, weights)]
+    output_group = [f"  {group}: {format_weight(num)}" for group, num in zip(groups, weights)]
+
     return "\n".join(output_group)
 
 
-def generate_weights_dirichlet(prior_dist,
-                               train_groups,
-                               minimum_number,
-                               num_samples=128, 
-                               enable_bound=True,
-                               temperature=1.0):
-
+def generate_weights_dirichlet(
+    prior_dist, train_groups, minimum_number, num_samples=128, enable_bound=True, temperature=1.0
+):
     final_samples = []
-    
+
     if enable_bound:
         # generate the bound for reject sampling
         number_bound = []
         for i in range(len(prior_dist)):
             # the token cannot be used more than 4 times
-            number_bound.append([0.0,
-                                 min(prior_dist[i] * MAXIMUM_USAGE, 1.0)])
+            number_bound.append([0.0, min(prior_dist[i] * MAXIMUM_USAGE, 1.0)])
     else:
         number_bound = None
-        
+
     # apply temperature
     if temperature < 1.0:
-        prior_dist = prior_dist ** TEMP
+        prior_dist = prior_dist**TEMP
         prior_dist = prior_dist / np.sum(prior_dist)
 
     # combine reject sampling with dirichlet distribution
@@ -124,7 +125,7 @@ def generate_weights_dirichlet(prior_dist,
         if ensure_flag is False:
             continue
         # post normalization, set zero for the number less than minimum_number
-        samples = np.where(samples < minimum_number, 0.0, samples)
+        samples = np.where(samples < minimum_number, 0, samples)
         # round samples into the same scale of minimum_number
         samples = samples / np.sum(samples, axis=1).reshape(-1, 1)
         samples = np.round(samples / minimum_number) * minimum_number
@@ -137,10 +138,9 @@ def generate_weights_dirichlet(prior_dist,
     return selected_samples
 
 
-
 def generate_distributions_from_prior(num_samples, prior_config):
     # read the yaml file and get the prior distribution
-    train_config = prior_config["train"]
+    train_config = prior_config
     train_groups, prior_dist = [], []
     for k, v in train_config.items():
         train_groups.append(k)
@@ -148,159 +148,93 @@ def generate_distributions_from_prior(num_samples, prior_config):
 
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
-    valid_config = prior_config["valid"]
-    valid_groups = list(valid_config.keys())
-    
-    train_weights = generate_weights_dirichlet(prior_dist, 
-                                               train_groups,
-                                               MINIMUM,
-                                               num_samples,
-                                               temperature=TEMP)
-    
+
+    train_weights = generate_weights_dirichlet(
+        prior_dist, train_groups, MINIMUM, num_samples, temperature=TEMP
+    )
+
     weight_maps = []
     for weights in train_weights:
         weight_map = {}
-        c = 0 
-        for key in train_groups:
-            weight_map[key.replace("valid_","")] = weights[c]
-            c+=1 
+        c = 0
+        for key in prior_config.keys():
+            weight_map[key] = weights[c]
+            c += 1
         weight_maps.append(weight_map)
 
-    return weight_maps   
-    
+    return weight_maps
 
 
-
-def generate_config_from_prior(output_paths, prior_config):
-    number_of_samples = len(output_paths)
-    # read the yaml file and get the prior distribution
-    train_config = prior_config["train"]
-    train_groups, prior_dist = [], []
-    for k, v in train_config.items():
-        train_groups.append(k)
-        prior_dist.append(v)
-
-    # renormalize the prior distribution
-    prior_dist = prior_dist / np.sum(prior_dist)
-    valid_config = prior_config["valid"]
-    valid_groups = list(valid_config.keys())
-    
-    train_weights = generate_weights_dirichlet(prior_dist, 
-                                               train_groups,
-                                               MINIMUM,
-                                               number_of_samples,
-                                               temperature=TEMP)
-    
-    return train_weights   
-    
-def calculate_priors(source_configs:list[SourceConfig]):
+def _bytes_to_tokens(num_bytes: int, dtype: NumpyDatasetDType) -> int:
+    """
+    Convert bytes to tokens based on the dtype.
+    """
+    npdtype = dtype.as_np_dtype()
+    return num_bytes // npdtype(int(0)).itemsize
 
 
+def _count_tokens_for_file(path: PathOrStr) -> int:
+    return _bytes_to_tokens(get_file_size(path), NumpyDatasetDType.uint8)
+
+
+def calculate_priors(source_configs: list[SourceConfig]):
     fs = s3fs.S3FileSystem(anon=False)
-    import boto3
-    from collections import defaultdict
-    from urllib.parse import urlparse
-    
-    s3 = boto3.client('s3')
-    file_counts = defaultdict(int)
-    
-    def parse_s3_path(s3_path):
-        """Parse s3://bucket/prefix format into bucket and prefix."""
-        if not s3_path.startswith('s3://'):
-            raise ValueError(f"Invalid S3 path format: {s3_path}. Must start with 's3://'")
-        
-        parsed = urlparse(s3_path)
-        bucket = parsed.netloc
-        # Remove leading slash and ensure trailing slash for prefix
-        prefix = parsed.path.lstrip('/')
-        if prefix and not prefix.endswith('/'):
-            prefix += '/'
-            
-        return bucket, prefix
-    
-    # Count files in each folder
+
+    token_counts = defaultdict(int)
+
+    # Count tokens in each folder
     for source_config in source_configs:
-        try:           
-            files = []
+        try:
+            token_count = 0
             for path in source_config.paths:
                 matches = fs.glob(path)
-                files.extend([f for f in matches if fs.isfile(f)])
+                for match in matches:
+                    token_count += _count_tokens_for_file(f"s3://{match}")
 
-            file_counts[source_config.name] = len(files)
-                
+                # files.extend([f for f in matches if fs.isfile(f)])
+
+            token_counts[source_config.name] = token_count
+
         except Exception as e:
-            print(f"Error processing {source_config.name}: {str(e)}")
-            file_counts[source_config.name] = 0
-    
+            logger.info(f"Error processing {source_config.name}: {str(e)}")
+            token_counts[source_config.name] = 0
+
     # Calculate relative sizes
-    total_files = sum(file_counts.values())
-    if total_files == 0:
-        return {path: 0 for path in folder_paths}
-    
-    relative_sizes = {
-        path: count / total_files 
-        for path, count in file_counts.items()
-    }
-    train = {f"valid_{key}":value for key,value in relative_sizes.items()}
+    total_tokens = sum(token_counts.values())
+    logger.info(f"Total tokens for config: {total_tokens:,}")
+    if total_tokens == 0:
+        logger.info(f"Error processing config, no tokens found")
+        return {}
 
-    
-    valid = {f"valid_{key}":1.0 for key in relative_sizes.keys()}
+    relative_sizes = {path: count / total_tokens for path, count in token_counts.items()}
 
-    return {"train": train, "valid": valid}
+    return relative_sizes
 
 
-
-def get_mixes(sources:list[SourceConfig],num_samples: int):
+def get_mixes(sources: list[SourceConfig], num_samples: int):
     output_folder = "config_1m"
     output_paths = []
     for i in range(1, num_samples + 1):
         output_paths.append(f"{output_folder}/n{i}.yaml")
 
     prior_configs = calculate_priors(sources)
-    return generate_distributions_from_prior(num_samples,prior_config=prior_configs)
+    logger.info("Prior Distribution:")
+    logger.info("\n".join([f"{key} : {value}" for key, value in prior_configs.items()]))
+    return generate_distributions_from_prior(num_samples, prior_config=prior_configs)
 
 
 def sort_and_deduplicate(data, threshold=1e-5):
     """
-    Remove identify configs to avoid duplicated training.
+    Remove identical configs to avoid duplicated training.
     """
     arr = np.array(data)
     sorted_indices = np.lexsort(arr.T)
     sorted_arr = arr[sorted_indices]
     result = [sorted_arr[0]]
-    
+
     for i in range(1, len(sorted_arr)):
         diff = np.sum(np.abs(sorted_arr[i] - result[-1]))
         if diff > threshold:
             result.append(sorted_arr[i])
-    
+
     return result
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-
-
-    
-    parser.add_argument("--output_folder", type=str, default="config_1m")
-    parser.add_argument("--num_configs", type=int, default=512)
-    
-    args = parser.parse_args()
-    output_folder = args.output_folder
-    num_samples = args.num_configs
-    
-    # if not exist, create the folder
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-    
-    output_paths = []
-    for i in range(1, num_samples + 1):
-        output_paths.append(f"{output_folder}/n{i}.yaml")
-
-    keys = ["finance","health","entertainment"]
-
-    domain_info= {"health":"s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Health/*.npy",
-    "finance":"s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Finance_n_Business/*.npy",
-    "entertainment":"s3://ai2-llm/pretraining-data/sources/ds-olmo-data/dclm_partitioned_v0.2/high0/domains_v3.8_tokens/Entertainment/*.npy"}
-    generate_config_from_prior(output_paths,
-                               prior_config=calculate_priors(domain_info))
-    
