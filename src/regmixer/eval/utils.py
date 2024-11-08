@@ -12,12 +12,11 @@ from scipy.stats import spearmanr
 from regmixer.eval.constants import Metrics
 
 DEFAULT_WORKSPACE = "ai2-llm/regmixer"
-HP = {
+HYPERPARAMETERS = {
     "task": "train",
     "boosting_type": "gbdt",
     "objective": "regression",
     "metric": ["l1", "l2"],
-    "num_iterations": 1000,
     "seed": 42,
     "learning_rate": 1e-2,
     "verbosity": -1,
@@ -87,7 +86,7 @@ def fit(group: str):
         target = Y_train[:, i]
         test_target = Y_test[:, i]
 
-        gbm = lgb.LGBMRegressor(**HP)
+        gbm = lgb.LGBMRegressor(**HYPERPARAMETERS)
 
         regression = gbm.fit(
             X_train,
@@ -106,6 +105,13 @@ def fit(group: str):
 
     metric_index = 0
     _build_plot(Y_test, X_test, metric_index, predictor)
+    # TODO: Grab the global distribution somehow here
+    _simulate(
+        index=metric_index,
+        predictor=predictor,
+        df_config=config,
+        prior_distributions=config[config.columns[2:]].head(1).values[0],
+    )
 
 
 def _build_plot(
@@ -166,6 +172,94 @@ def _build_run_metrics(history) -> dict[str, float]:
         metrics[metric.name] = random.uniform(3, 8)
 
     return metrics
+
+
+def _simulate(
+    index: int,
+    predictor: list[lgb.LGBMRegressor],
+    prior_distributions: list[float],
+    df_config: pd.DataFrame,
+    n_samples: int = 100000,
+):
+    np.random.seed(42)
+    print(prior_distributions)
+
+    samples = np.random.dirichlet(prior_distributions * 1, n_samples)
+    simulation = predictor[index].predict(samples)
+
+    plt.hist(simulation, bins=32)
+
+    plt.xlabel("Pred Loss")
+    plt.ylabel("Frequency")
+
+    k = 128
+    top_k_samples = samples[np.argsort(simulation)[0:k]]
+    top_k_samples.shape
+
+    optimal_data_mixture = np.mean(top_k_samples, axis=0)
+    print(optimal_data_mixture)
+
+    columns = df_config.columns[2:]
+
+    df = pd.DataFrame(
+        data=np.concatenate([np.array([prior_distributions]), top_k_samples], axis=0),
+        columns=columns,
+    )
+    df = pd.melt(df)
+    df["type"] = (["Original"] + ["Optimal"] * top_k_samples.shape[0]) * len(columns)
+    df.info()
+
+    plt.rc("axes", unicode_minus=False)
+
+    plt.rcParams.update(
+        {
+            "text.usetex": False,
+            "font.family": "serif",
+            "mathtext.fontset": "cm",
+            "axes.labelsize": 18,
+        }
+    )
+
+    _, ax = plt.subplots(figsize=(12, 10), layout="compressed")
+
+    ax.ticklabel_format(useMathText=True)
+    ax.xaxis.set_tick_params(labelsize=14)
+    ax.tick_params(axis="x", labelrotation=45)
+
+    pal = {
+        "Original": "#105257",
+        "Optimal": "#F0529C",
+    }
+    sns.barplot(data=df, x="variable", y="value", hue="type", palette=pal)
+
+    ax.legend(
+        edgecolor="black",
+        fancybox=False,
+        prop={
+            "size": 18,
+        },
+        handlelength=0.5,
+        ncol=2,
+    )
+
+    ax.grid(True)
+
+    ax.set_ylim(0, 1.1)
+
+    ax.set_xlabel(
+        "Domain",
+        fontdict={
+            "size": 32,
+        },
+    )
+    ax.set_ylabel(
+        "Weight",
+        fontdict={
+            "size": 32,
+        },
+    )
+
+    plt.savefig("optimal.pdf", bbox_inches="tight", pad_inches=0.1)
 
 
 if __name__ == "main":
