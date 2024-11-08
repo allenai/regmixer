@@ -191,8 +191,6 @@ def calculate_priors(source_configs: list[SourceConfig]):
                 for match in matches:
                     token_count += _count_tokens_for_file(f"s3://{match}")
 
-                # files.extend([f for f in matches if fs.isfile(f)])
-
             token_counts[source_config.name] = token_count
 
         except Exception as e:
