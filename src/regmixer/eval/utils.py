@@ -9,7 +9,6 @@ import numpy as np
 import seaborn as sns
 from scipy.stats import spearmanr
 
-# from regmixer.eval.regression import Regression
 from regmixer.eval.constants import Metrics
 
 DEFAULT_WORKSPACE = "ai2-llm/regmixer"
