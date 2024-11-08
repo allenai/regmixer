@@ -140,13 +140,13 @@ def _build_plot(
         edgecolor="black",
         fancybox=False,
         prop={
-            "size": 32,
+            "size": 24,
         },
         handlelength=-0.5,
     )
 
-    graph.ax_joint.set_ylabel("True Loss", fontdict={"size": 48})
-    graph.ax_joint.set_xlabel("Pred Loss", fontdict={"size": 48})
+    graph.ax_joint.set_ylabel("True Loss", fontdict={"size": 32})
+    graph.ax_joint.set_xlabel("Pred Loss", fontdict={"size": 32})
 
     graph.ax_marg_x.remove()
     graph.ax_marg_y.remove()
