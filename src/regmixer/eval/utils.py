@@ -161,6 +161,7 @@ def _build_run_metrics(history) -> dict[str, float]:
     df = pd.DataFrame(history)
     metrics = {}
     for metric in Metrics:
+        # TODO: Fix this once we have real metrics
         # metrics[metric.name] = df.loc[:, metric.value].tail(1).values[0]
         metrics[metric.name] = random.uniform(3, 8)
 
