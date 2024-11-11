@@ -67,7 +67,6 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
             launch_group = LaunchGroup(
                 instances=mk_launch_configs(mk_experiment_group(experiment_config, mixes=mixes))
             )
-
         else:
             logger.info("Launch cancelled")
             return

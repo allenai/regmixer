@@ -119,8 +119,13 @@ def mk_mixtures(config: ExperimentConfig):
     sources = config.sources
     prior_config = calculate_priors(sources)
 
+    random.seed(config.seed)
+    np.random.seed(config.seed)
+
     logger.info("Prior Distribution:")
     logger.info("\n".join([f"{key} : {value}" for key, value in prior_config.items()]))
+
+    logger.info(f"Using seed: {config.seed}")
 
     train_groups, prior_dist = [], []
     for k, v in prior_config.items():
