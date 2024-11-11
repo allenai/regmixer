@@ -260,9 +260,9 @@ class TransformerConfigBuilder:
                 save_async=True,
             ),
             "wandb": WandBCallback(
-                name=self.run_name,
+                name=self.run_name.strip(),
                 project="regmixer",
-                group=self.group_id,
+                group=self.group_id.strip(),
                 cancel_check_interval=10,
                 enabled=True,
             ),
