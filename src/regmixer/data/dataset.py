@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, List
+from urllib.parse import urlparse
 
 import s3fs
 from olmo_core.data.source_mixture import (
@@ -27,8 +28,6 @@ class MixtureBuilder:
         results = []
         for path in paths:
             if is_url(path):
-                from urllib.parse import urlparse
-
                 parsed = urlparse(str(path))
                 if parsed.scheme in ("s3", "r2", "weka"):
                     results.extend([f"s3://{obj}" for obj in self.fs.glob(path)])
