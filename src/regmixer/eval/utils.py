@@ -93,6 +93,7 @@ def fit(group: str):
 
     filtered = list(filtered.values())
     logger.info(f"Found {len(filtered)} runs for group {group} to fit regression...")
+
     for run in filtered:
         logger.info(f"Sampled run: {run[0]} with shape: {run[1].shape}")
 

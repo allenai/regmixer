@@ -4,7 +4,7 @@ budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 1
-variants: 2
+variants: 5
 preemptible: true
 max_tokens: 19_000_000_000 # 190_000_000 * 100
 sequence_length: 2048
