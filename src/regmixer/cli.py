@@ -12,12 +12,8 @@ from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
-from regmixer.utils import (
-    mk_experiment_group,
-    mk_instance_cmd,
-    mk_launch_configs,
-    mk_mixes,
-)
+from regmixer.synthesize_mixture import mk_mixtures
+from regmixer.utils import mk_experiment_group, mk_instance_cmd, mk_launch_configs
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +100,7 @@ def _generate_mixes(config: Path, output: Optional[Path] = None):
         data = yaml.safe_load(f)
 
     config = ExperimentConfig(**data)
-    mixes = mk_mixes(config)
+    mixes = mk_mixtures(config)
     mix_string = prettify_mixes(mixes)
 
     if not output:
@@ -136,9 +132,7 @@ def _generate_mixes(config: Path, output: Optional[Path] = None):
 )
 def generate_mixes(config: Path, output: Optional[Path] = None):
     """Generate a set of mixtures based on a provided config"""
-
     _generate_mixes(config, output)
-    logger.info(f"\nMixtures saved to {output}")
 
 
 @cli.command()

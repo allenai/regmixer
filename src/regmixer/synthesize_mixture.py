@@ -58,30 +58,6 @@ MAXIMUM_USAGE = 2
 MINIMUM = 2e-4
 
 
-def generate_train_group(groups, weights, precision=5):
-    """
-    Generate a formatted string of groups and their corresponding weights.
-
-    Args:
-    groups (list): List of group names.
-    weights (list): List of corresponding weights.
-    sample_folder (str, optional): If provided, will be included in the group name.
-    prefix (str, optional): Prefix to add before each group name. Defaults to 'train'.
-    precision (int, optional): Number of decimal places for rounding weights. Defaults to 4.
-
-    Returns:
-    str: Formatted string of groups and weights.
-    """
-    assert len(groups) == len(weights), "Length of groups and weights must be equal"
-
-    def format_weight(weight):
-        return f"{weight:.{precision}f}".rstrip("0").rstrip(".")
-
-    output_group = [f"  {group}: {format_weight(num)}" for group, num in zip(groups, weights)]
-
-    return "\n".join(output_group)
-
-
 def generate_weights_dirichlet(
     prior_dist, train_groups, minimum_number, num_samples=128, enable_bound=True, temperature=1.0
 ):
@@ -138,11 +114,16 @@ def generate_weights_dirichlet(
     return selected_samples
 
 
-def generate_distributions_from_prior(num_samples, prior_config):
-    # read the yaml file and get the prior distribution
-    train_config = prior_config
+def mk_mixtures(config: ExperimentConfig):
+    num_samples = config.variants
+    sources = config.sources
+    prior_config = calculate_priors(sources)
+
+    logger.info("Prior Distribution:")
+    logger.info("\n".join([f"{key} : {value}" for key, value in prior_config.items()]))
+
     train_groups, prior_dist = [], []
-    for k, v in train_config.items():
+    for k, v in prior_config.items():
         train_groups.append(k)
         prior_dist.append(v)
 
@@ -156,10 +137,8 @@ def generate_distributions_from_prior(num_samples, prior_config):
     weight_maps = []
     for weights in train_weights:
         weight_map = {}
-        c = 0
-        for key in prior_config.keys():
-            weight_map[key] = weights[c]
-            c += 1
+        for key, value in zip(prior_config.keys(), weights):
+            weight_map[key] = value
         weight_maps.append(weight_map)
 
     return weight_maps
@@ -207,18 +186,6 @@ def calculate_priors(source_configs: list[SourceConfig]):
     relative_sizes = {path: count / total_tokens for path, count in token_counts.items()}
 
     return relative_sizes
-
-
-def get_mixes(sources: list[SourceConfig], num_samples: int):
-    output_folder = "config_1m"
-    output_paths = []
-    for i in range(1, num_samples + 1):
-        output_paths.append(f"{output_folder}/n{i}.yaml")
-
-    prior_configs = calculate_priors(sources)
-    logger.info("Prior Distribution:")
-    logger.info("\n".join([f"{key} : {value}" for key, value in prior_configs.items()]))
-    return generate_distributions_from_prior(num_samples, prior_config=prior_configs)
 
 
 def sort_and_deduplicate(data, threshold=1e-5):

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, List
+from urllib.parse import urlparse
 
 import s3fs
 from olmo_core.data.source_mixture import (

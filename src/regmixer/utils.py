@@ -13,7 +13,6 @@ from regmixer.aliases import (
     SourceConfig,
     SourceInstance,
 )
-from regmixer.synthesize_mixture import get_mixes
 
 
 def mk_source_instances(
@@ -40,10 +39,6 @@ def mk_experiments(
         )
         for idx, mix in enumerate(mixes)
     ]
-
-
-def mk_mixes(config: ExperimentConfig):
-    return get_mixes(config.sources, config.variants)
 
 
 def mk_experiment_group(config: ExperimentConfig, mixes: list[dict[str, float]]) -> ExperimentGroup:
