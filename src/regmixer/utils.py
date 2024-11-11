@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import List
 
+import yaml
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
 from olmo_core.utils import generate_uuid
@@ -13,36 +15,41 @@ from regmixer.aliases import (
 )
 
 
-def mk_source_instances(sources: list[SourceConfig]) -> list[SourceInstance]:
-    # TODO: Implement the randomized mixing ratios here
+def mk_source_instances(
+    sources: list[SourceConfig], mix_map: dict[str, float]
+) -> list[SourceInstance]:
     return [
         SourceInstance(
             name=source.name,
             paths=source.paths,
-            ratio=1 / len(sources),
+            ratio=mix_map[source.name],
         )
         for source in sources
     ]
 
 
-def mk_experiments(config: ExperimentConfig, group_uuid: str) -> list[ExperimentInstance]:
+def mk_experiments(
+    config: ExperimentConfig, mixes: list[dict[str, float]], group_uuid: str
+) -> list[ExperimentInstance]:
     """Generate source instances from a config."""
     return [
         ExperimentInstance(
             name=f"{config.name}-{idx:04}-{group_uuid}",
-            sources=mk_source_instances(config.sources),
+            sources=mk_source_instances(config.sources, mix),
         )
-        for idx in range(config.variants)
+        for idx, mix in enumerate(mixes)
     ]
 
 
-def mk_experiment_group(config: ExperimentConfig) -> ExperimentGroup:
+def mk_experiment_group(config: ExperimentConfig, mixes: list[dict[str, float]]) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
+
     group_uuid = generate_uuid()[:8]
+
     return ExperimentGroup(
         config=config,
         group_id=group_uuid,
-        instances=mk_experiments(config, group_uuid),
+        instances=mk_experiments(config, mixes, group_uuid),
     )
 
 
