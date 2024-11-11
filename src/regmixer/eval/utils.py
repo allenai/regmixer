@@ -55,7 +55,7 @@ def fit(group: str):
             run_id = run.display_name
             if group_id == group:
                 existing = filtered.get(run_id)
-                if existing and existing[1].shape[0] < 10:
+                if existing and existing[1].shape[0] < 1:
                     filtered[run_id] = (
                         run_id,
                         run.history(
@@ -71,7 +71,7 @@ def fit(group: str):
                 new_run = (
                     run_id,
                     run.history(
-                        samples=10, pandas=(True), keys=[metric.value for metric in Metrics]
+                        samples=1, pandas=(True), keys=[metric.value for metric in Metrics]
                     ),
                 )
                 if new_run[1].shape[0] > 0:
@@ -198,7 +198,12 @@ def _build_run_metrics(history) -> dict[str, float]:
     df = pd.DataFrame(history)
     metrics = {}
     for metric in Metrics:
-        metrics[metric.name] = df.loc[:, metric.value].tail(1).values[0]
+        try:
+            logger.info(df.loc[:, metric.value])
+            metrics[metric.name] = df.loc[:, metric.value].tail(1).values[0]
+        except KeyError:
+            logger.warning(f"Metric {metric.value} not found in history, skipping...")
+            continue
 
     return metrics
 
