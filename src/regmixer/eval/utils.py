@@ -1,4 +1,5 @@
 import logging
+import pathlib
 
 import click
 import lightgbm as lgb
@@ -10,14 +11,13 @@ import wandb
 from olmo_core.utils import prepare_cli_environment
 from scipy.stats import spearmanr
 
-from regmixer.eval.constants import Metrics
+from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics
 
 logger = logging.getLogger(__name__)
 
-# TODO: Move these to a config file
-OUTPUT_DIR = "output"
+OUTPUT_DIR = "output/"
 DEFAULT_WORKSPACE = "ai2-llm/regmixer"
-HYPERPARAMETERS = {
+LGBM_HPS = {
     "task": "train",
     "boosting_type": "gbdt",
     "objective": "regression",
@@ -30,6 +30,11 @@ HYPERPARAMETERS = {
 
 @click.group()
 def cli():
+    try:
+        pathlib.Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    except FileExistsError:
+        logger.warning(f"Directory {OUTPUT_DIR} already exists, skipping creation...")
+
     prepare_cli_environment()
 
 
@@ -55,12 +60,12 @@ def fit(group: str):
             run_id = run.display_name
             if group_id == group:
                 existing = filtered.get(run_id)
+                # If we have a run with no samples, we need to update metrics for the run.
                 if existing and existing[1].shape[0] < 1:
                     filtered[run_id] = (
                         run_id,
                         run.history(
-                            samples=10,
-                            pandas=(True),  # keys=[metric.value for metric in Metrics]
+                            samples=1, pandas=(True), keys=[metric.value for metric in WandbMetrics]
                         ),
                     )
                     logger.info(
@@ -71,15 +76,17 @@ def fit(group: str):
                 new_run = (
                     run_id,
                     run.history(
-                        samples=1, pandas=(True), keys=[metric.value for metric in Metrics]
+                        samples=1, pandas=(True), keys=[metric.value for metric in WandbMetrics]
                     ),
                 )
                 if new_run[1].shape[0] > 0:
                     filtered[run_id] = new_run
                     logger.info(
-                        f"Found new run '{run_id}' for group, added {filtered[run_id][1].shape} samples..."
+                        f"Found newer run instance for '{run_id}' for group {group}, added {filtered[run_id][1].shape} samples..."
                     )
                     continue
+                else:
+                    logger.warning(f"Run instance '{run_id}:{run.id}' has no samples, skipping...")
 
         except KeyError:
             raise KeyError("'{group}' experiment group not found!")
@@ -102,23 +109,25 @@ def fit(group: str):
         for idx, run in enumerate(filtered)
     ]
 
+    logger.info(run_metrics)
     config = pd.DataFrame(run_ratios)
     metrics = pd.DataFrame(run_metrics)
 
     X_train = config[config.columns[2:]].values
     Y_train = metrics[metrics.columns[2:]].values
-
     X_test = config[config.columns[2:]].values
     Y_test = metrics[metrics.columns[2:]].values
 
     np.random.seed(42)
     predictor = []
 
-    for i, metric in enumerate(Metrics):
+    indexed_metrics = list(enumerate(GroupedWandbMetrics.mmlu_bpb.value))
+
+    for i, metric in indexed_metrics:
         target = Y_train[:, i]
         test_target = Y_test[:, i]
 
-        gbm = lgb.LGBMRegressor(**HYPERPARAMETERS)
+        gbm = lgb.LGBMRegressor(**LGBM_HPS)
 
         regression = gbm.fit(
             X_train,
@@ -135,26 +144,32 @@ def fit(group: str):
 
         predictor.append(regression)
 
-    metric_index = 0
-    _build_plot(Y_test, X_test, metric_index, predictor)
-    _simulate(
-        index=metric_index,
-        predictor=predictor,
-        df_config=config,
-        # TODO: Grab the global distribution somehow here maybe from the config that was generated
-        # right now this uses the first distributions as the base prior
-        prior_distributions=config[config.columns[2:]].head(1).values[0],
-    )
+    for i, metric in indexed_metrics:
+        _build_plot(Y_test, X_test, i, predictor, metric_name=metric.name)
+        _simulate(
+            index=i,
+            predictor=predictor,
+            df_config=config,
+            # TODO: Grab the global distribution somehow here maybe from the config that was generated
+            # right now this uses the first distributions as the base prior
+            prior_distributions=config[config.columns[2:]].head(1).values[0],
+            metric_name=metric.name,
+        )
 
 
 def _build_plot(
-    Y_test: np.ndarray, X_test: np.ndarray, index: int, predictor: list[lgb.LGBMRegressor]
+    Y_test: np.ndarray,
+    X_test: np.ndarray,
+    index: int,
+    predictor: list[lgb.LGBMRegressor],
+    metric_name: str,
 ):
-    data = {"True Loss": Y_test[:, index], "Pred Loss": predictor[index].predict(X_test)}
+    keys = {"pred": "Pred Loss", "true": "True Loss"}
+    data = {keys["true"]: Y_test[:, index], keys["pred"]: predictor[index].predict(X_test)}
     graph = sns.jointplot(
         data,
-        x="Pred Loss",
-        y="True Loss",
+        x=keys["pred"],
+        y=keys["true"],
         kind="reg",
         height=10,
         scatter_kws={"s": 128, "color": "#5969CB"},
@@ -168,12 +183,12 @@ def _build_plot(
         marginal_kws={"line_kws": {"color": "#5969CB", "linewidth": 6}},
     )
 
-    r, _ = spearmanr(data["Pred Loss"], data["True Loss"])
+    r, _ = spearmanr(data[keys["pred"]], data[keys["true"]])
     (phantom,) = graph.ax_joint.plot([], [], linestyle="", alpha=0)
 
     graph.ax_joint.legend(
         [phantom],
-        [f"Correlation: {np.round(r * 100, decimals=2)}"],  # noqa
+        [f"{metric_name} correlation: {np.round(r * 100, decimals=2)}"],  # noqa
         edgecolor="black",
         fancybox=False,
         prop={
@@ -182,22 +197,20 @@ def _build_plot(
         handlelength=-0.5,
     )
 
-    graph.ax_joint.set_ylabel("True Loss", fontdict={"size": 32})
-    graph.ax_joint.set_xlabel("Pred Loss", fontdict={"size": 32})
-
+    graph.ax_joint.set_ylabel(keys["true"], fontdict={"size": 32})
+    graph.ax_joint.set_xlabel(keys["pred"], fontdict={"size": 32})
     graph.ax_marg_x.remove()
     graph.ax_marg_y.remove()
-
     graph.ax_joint.grid(True, ls="dashed")
     graph.ax_joint.spines[["right", "top"]].set_visible(True)
 
-    plt.savefig("fit.png", bbox_inches="tight")
+    plt.savefig(f"{OUTPUT_DIR}{metric_name}_fit.png", bbox_inches="tight")
 
 
 def _build_run_metrics(history) -> dict[str, float]:
     df = pd.DataFrame(history)
     metrics = {}
-    for metric in Metrics:
+    for metric in WandbMetrics:
         try:
             logger.info(df.loc[:, metric.value])
             metrics[metric.name] = df.loc[:, metric.value].tail(1).values[0]
@@ -213,10 +226,10 @@ def _simulate(
     predictor: list[lgb.LGBMRegressor],
     prior_distributions: list[float],
     df_config: pd.DataFrame,
+    metric_name: str,
     n_samples: int = 100000,
 ):
     np.random.seed(42)
-    logger.info(prior_distributions)
 
     samples = np.random.dirichlet(prior_distributions * 1, n_samples)
     simulation = predictor[index].predict(samples)
@@ -230,9 +243,7 @@ def _simulate(
     top_k_samples = samples[np.argsort(simulation)[0:k]]
     top_k_samples.shape
 
-    optimal_data_mixture = np.mean(top_k_samples, axis=0)
-    logger.info(optimal_data_mixture)
-
+    optimal_source_weights = np.mean(top_k_samples, axis=0)
     columns = df_config.columns[2:]
 
     df = pd.DataFrame(
@@ -242,6 +253,12 @@ def _simulate(
     df = pd.melt(df)
     df["type"] = (["Original"] + ["Optimal"] * top_k_samples.shape[0]) * len(columns)
     df.info()
+
+    logger.info("Original: ")
+    logger.info(prior_distributions)
+    print()
+    logger.info("Optimal: ")
+    logger.info(optimal_source_weights)
 
     plt.rc("axes", unicode_minus=False)
     plt.rcParams.update(
@@ -290,7 +307,7 @@ def _simulate(
         },
     )
 
-    plt.savefig("optimal.png", bbox_inches="tight", pad_inches=0.1)
+    plt.savefig(f"{OUTPUT_DIR}{metric_name}_optimal.png", bbox_inches="tight", pad_inches=0.1)
 
 
 if __name__ == "main":
