@@ -1,15 +1,10 @@
-import argparse
+import concurrent.futures
 import logging
-import os
 import random
 from collections import defaultdict
-from urllib.parse import urlparse
 
-import boto3
 import numpy as np
 import s3fs
-import torch
-import yaml
 from olmo_core.aliases import PathOrStr
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.io import get_file_size
@@ -19,10 +14,7 @@ logger = logging.getLogger(__name__)
 
 from regmixer.aliases import (
     ExperimentConfig,
-    ExperimentGroup,
-    ExperimentInstance,
     SourceConfig,
-    SourceInstance,
 )
 
 SEED = 42
@@ -59,7 +51,7 @@ MINIMUM = 2e-4
 
 
 def generate_weights_dirichlet(
-    prior_dist, train_groups, minimum_number, num_samples=128, enable_bound=True, temperature=1.0
+    prior_dist, minimum_number, num_samples=128, enable_bound=True, temperature=1.0
 ):
     final_samples = []
 
@@ -117,7 +109,7 @@ def generate_weights_dirichlet(
 def mk_mixtures(config: ExperimentConfig):
     num_samples = config.variants
     sources = config.sources
-    prior_config = calculate_priors(sources)
+    prior_config = calculate_priors(sources, config.dtype)
 
     random.seed(config.seed)
     np.random.seed(config.seed)
@@ -127,17 +119,13 @@ def mk_mixtures(config: ExperimentConfig):
 
     logger.info(f"Using seed: {config.seed}")
 
-    train_groups, prior_dist = [], []
-    for k, v in prior_config.items():
-        train_groups.append(k)
+    prior_dist = []
+    for _, v in prior_config.items():
         prior_dist.append(v)
 
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
-
-    train_weights = generate_weights_dirichlet(
-        prior_dist, train_groups, MINIMUM, num_samples, temperature=TEMP
-    )
+    train_weights = generate_weights_dirichlet(prior_dist, MINIMUM, num_samples, temperature=TEMP)
 
     weight_maps = []
     for weights in train_weights:
@@ -157,11 +145,13 @@ def _bytes_to_tokens(num_bytes: int, dtype: NumpyDatasetDType) -> int:
     return num_bytes // npdtype(int(0)).itemsize
 
 
-def _count_tokens_for_file(path: PathOrStr) -> int:
-    return _bytes_to_tokens(get_file_size(path), NumpyDatasetDType.uint8)
+def _count_tokens_for_file(path: PathOrStr, dtype: NumpyDatasetDType) -> int:
+    return _bytes_to_tokens(get_file_size(path), dtype)
 
 
-def calculate_priors(source_configs: list[SourceConfig]):
+def calculate_priors(
+    source_configs: list[SourceConfig], dtype: NumpyDatasetDType
+) -> dict[str, float]:
     fs = s3fs.S3FileSystem(anon=False)
 
     token_counts = defaultdict(int)
@@ -169,11 +159,25 @@ def calculate_priors(source_configs: list[SourceConfig]):
     # Count tokens in each folder
     for source_config in source_configs:
         try:
-            token_count = 0
-            for path in source_config.paths:
+
+            def count_tokens_for_path(path):
                 matches = fs.glob(path)
+                token_count = 0
                 for match in matches:
-                    token_count += _count_tokens_for_file(f"s3://{match}")
+                    token_count += _count_tokens_for_file(f"s3://{match}", dtype)
+                return token_count
+
+            token_count = 0
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                futures = {
+                    executor.submit(count_tokens_for_path, path): path
+                    for path in source_config.paths
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        token_count += future.result()
+                    except Exception as e:
+                        logger.info(f"Error processing path {futures[future]}: {str(e)}")
 
             token_counts[source_config.name] = token_count
 
