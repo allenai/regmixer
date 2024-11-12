@@ -242,8 +242,13 @@ class TransformerConfigBuilder:
         global_batch_size = round(global_batch_size)
         global_batch_size *= self._default_batch_size_divisor
 
+        global_batch_size = self.next_power_of_2(global_batch_size)
         print(f"Global batch size: {global_batch_size}")
+
         return global_batch_size
+
+    def next_power_of_2(self, x: int) -> int:
+        return 1 if x == 0 else 2 ** (x - 1).bit_length()
 
     def build_callbacks(self) -> Dict[str, Callback]:
         return {

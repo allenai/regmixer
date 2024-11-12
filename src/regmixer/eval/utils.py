@@ -97,7 +97,7 @@ def fit(group: str):
     for run in filtered:
         logger.info(f"Sampled run: {run[0]} with shape: {run[1].shape}")
 
-    # TODO: Get rid of this once we have real random configs
+    # TODO: Get rid of this once we have real random config
     ratios = np.random.uniform(size=len(filtered))
     run_ratios = []
     for idx, run in enumerate(filtered):
