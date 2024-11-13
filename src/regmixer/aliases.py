@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Union
 
 from beaker import Priority
+from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.launch.beaker import BeakerLaunchConfig, BeakerWekaBucket
 from pydantic import BaseModel
 
@@ -34,8 +35,10 @@ class ExperimentConfig(BaseModel):
     sequence_length: int
     seed: int
     cluster: str
+    dtype: NumpyDatasetDType = NumpyDatasetDType.uint32
     priority: Priority
     sources: list[SourceConfig]
+    temperature: float = 1.0
     preemptible: bool = True
     shared_filesystem: bool = False
     nfs: bool = False

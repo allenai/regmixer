@@ -7,7 +7,6 @@ from typing import Optional
 
 import click
 import yaml
-from olmo_core.data import TokenizerConfig
 from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
@@ -51,13 +50,16 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
         data = yaml.safe_load(f)
 
     experiment_config = ExperimentConfig(**data)
+    group_uuid = generate_uuid()[:8]
 
     if mixture_file:
         with open(mixture_file, "r") as f:
             predefined_mixes = json.load(f)
         launch_group = LaunchGroup(
             instances=mk_launch_configs(
-                mk_experiment_group(experiment_config, mixes=predefined_mixes["mixes"])
+                mk_experiment_group(
+                    experiment_config, mixes=predefined_mixes["mixes"], group_uuid=group_uuid
+                )
             )
         )
     else:
@@ -65,13 +67,16 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
 
         if click.confirm("Launch experiment with this set of mixtures?", default=False):
             launch_group = LaunchGroup(
-                instances=mk_launch_configs(mk_experiment_group(experiment_config, mixes=mixes))
+                instances=mk_launch_configs(
+                    mk_experiment_group(experiment_config, mixes=mixes, group_uuid=group_uuid)
+                )
             )
         else:
             logger.info("Launch cancelled")
             return
 
     logger.info("Launching experiment group...")
+
     try:
         if dry_run:
             logger.info("Dry run mode enabled. Printing experiment configurations...")
@@ -81,21 +86,23 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [executor.submit(experiment.launch) for experiment in launch_group.instances]
+
         results = [future.result() for future in futures]
         logger.info(results)
-        logger.info("Experiment group launched successfully!")
+        logger.info(f"Experiment group '{group_uuid}' launched successfully!")
     except KeyboardInterrupt:
-        logger.warning("\nCancelling experiment group...")
-        # TODO: Try to cancel the experiments in the group
+        logger.warning(
+            "\nAborting experiment group launch! You may need to manually stop the launched experiments."
+        )
 
 
 def prettify_mixes(mixes: list[dict[str, float]]):
-    mixes = {"mixes": mixes}
-    return json.dumps(mixes, indent=2)
+    result = {"mixes": mixes}
+    return json.dumps(result, indent=2)
 
 
-def _generate_mixes(config: Path, output: Optional[Path] = None):
-    with open(config, "r") as f:
+def _generate_mixes(config_file: Path, output: Optional[Path] = None):
+    with open(config_file, "r") as f:
         data = yaml.safe_load(f)
 
     config = ExperimentConfig(**data)
@@ -103,7 +110,7 @@ def _generate_mixes(config: Path, output: Optional[Path] = None):
     mix_string = prettify_mixes(mixes)
 
     if not output:
-        output = f"/tmp/regmixer/{config.name}_{generate_uuid()[:6]}.json"
+        output = Path(f"/tmp/regmixer/{config.name}_{generate_uuid()[:6]}.json")
 
     if output:
         os.makedirs(os.path.dirname(output), exist_ok=True)
@@ -112,6 +119,7 @@ def _generate_mixes(config: Path, output: Optional[Path] = None):
             f.write(mix_string)
         logger.info(f"Mixes saved to {output}:")
     logger.info(mix_string)
+
     return mixes
 
 
@@ -147,11 +155,14 @@ def validate(config: Path):
     with open(config, "r") as f:
         data = yaml.safe_load(f)
 
-    experiment_group = mk_experiment_group(ExperimentConfig(**data))
+    mixes = _generate_mixes(config)
+    experiment_group = mk_experiment_group(ExperimentConfig(**data), mixes, generate_uuid()[:8])
 
     for experiment in experiment_group.instances:
         logger.info(mk_instance_cmd(experiment, experiment_group.config, experiment_group.group_id))
         transformer = TransformerConfigBuilder(
+            cluster=experiment_group.config.cluster,
+            beaker_user="validate-no-op",
             group_id="validate-no-op",
             run_name="validate-no-op",
             max_tokens=experiment_group.config.max_tokens,

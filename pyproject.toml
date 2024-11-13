@@ -34,15 +34,21 @@ beaker = [
 wandb = [
     "wandb",
 ]
+eval = [
+    "lightgbm",
+    "pandas",
+    "scipy",
+    "seaborn",
+]
 all = [
-    "regmixer[dev,beaker,wandb]",
+    "regmixer[dev,beaker,wandb,eval]",
 ]
 
 [project.scripts]
 rmc = "regmixer.cli:cli"
-workspace = "regmixer.workspace:cli"
-train = "regmixer.train:cli"
-data = "regmixer.data.utils:cli"
+rmc-workspace = "regmixer.workspace:cli"
+rmc-train = "regmixer.train:cli"
+rmc-eval = "regmixer.eval.utils:cli"
 
 [tool.black]
 line-length = 100

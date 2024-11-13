@@ -34,17 +34,17 @@ def mk_experiments(
     """Generate source instances from a config."""
     return [
         ExperimentInstance(
-            name=f"{config.name}-{idx:04}-{group_uuid}",
+            name=f"{config.name}-{group_uuid}-{idx:04}",
             sources=mk_source_instances(config.sources, mix),
         )
         for idx, mix in enumerate(mixes)
     ]
 
 
-def mk_experiment_group(config: ExperimentConfig, mixes: list[dict[str, float]]) -> ExperimentGroup:
+def mk_experiment_group(
+    config: ExperimentConfig, mixes: list[dict[str, float]], group_uuid: str
+) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
-
-    group_uuid = generate_uuid()[:8]
 
     return ExperimentGroup(
         config=config,
@@ -116,7 +116,7 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
                 "cd regmixer",
                 'git checkout "$GIT_REF"',
                 "git submodule update --init --recursive",
-                "pip install -e '.[all]' && pip install git+https://github.com/allenai/OLMo-core.git@main",
+                "pip install -e '.[all]'",
                 "pip freeze",
                 # Move AWS credentials from env to relevant files
                 "mkdir -p ~/.aws",

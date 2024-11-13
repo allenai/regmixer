@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class PythonLiteralOption(click.Option):
+    """
+    Custom click option to parse python literals.
+    """
+
     def type_cast_value(self, ctx, value):
         try:
             parsed = [item.replace(" ", "").replace("'", "") for item in value]
@@ -101,6 +105,9 @@ def train(
     beaker_user: str,
     cluster: str,
 ):
+    """
+    Launch a training run with the given parameters.
+    """
     sources: List[SourceInstance] = []
     for item in source:
         name, paths, ratio = item

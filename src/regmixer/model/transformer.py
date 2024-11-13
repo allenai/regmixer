@@ -123,17 +123,25 @@ class TransformerConfigBuilder:
 
     Attributes:
         run_name (str): The name of the run.
-        overrides (List[str]): A list of override strings.
         sources (List[SourceInstance]): A list of source instances.
         sequence_length (int): The sequence length for the model.
         max_tokens (int): The maximum number of tokens.
+        model_config (ModelConfig): The model configuration.
         group_id (str): The group ID for the run.
+        cluster (str): The cluster name.
+        beaker_user (str): The Beaker user name.
+        s3 (bool): Whether to use S3 for storage.
         seed (int): The random seed for reproducibility. Default is 42.
         config (Optional[ModelConfig]): An optional model configuration. Default is None.
+        overrides (Optional[List[str]]): A list of override strings. Default is an empty list.
+        profile (bool): Whether to enable profiling. Default is False.
 
     Methods:
-        __init__(run_name, sources, sequence_length, max_tokens, group_id, seed, config):
+        __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user, seed, s3, config, overrides, profile):
             Initializes the TransformerConfigBuilder with the provided parameters.
+
+        get_read_location() -> str:
+            Returns the read location based on whether S3 is used.
 
         get_tokenizer_config() -> TokenizerConfig:
             Returns the tokenizer configuration.
@@ -143,6 +151,9 @@ class TransformerConfigBuilder:
 
         get_batch_size():
             Returns the global batch size based on the sequence length and model parameters.
+
+        build_callbacks() -> Dict[str, Callback]:
+            Builds and returns a dictionary of callbacks for the trainer.
 
         build() -> ModelTrainConfig:
             Builds and returns the model training configuration.
@@ -206,7 +217,8 @@ class TransformerConfigBuilder:
         self._default_device_batch_size = 8
         self._default_dataparallel_type = DataParallelType.ddp
         self._default_dataset_dtype = NumpyDatasetDType.uint32
-        self._default_eval_interval = 1000
+        self._default_save_interval = 1000
+        self._default_eval_interval = 200
 
     def get_read_location(self) -> str:
         return ("s3://ai2-llm" if self.s3 else "/weka/oe-training-default/ai2-llm").rstrip("/")
@@ -230,8 +242,13 @@ class TransformerConfigBuilder:
         global_batch_size = round(global_batch_size)
         global_batch_size *= self._default_batch_size_divisor
 
+        global_batch_size = self.next_power_of_2(global_batch_size)
         print(f"Global batch size: {global_batch_size}")
+
         return global_batch_size
+
+    def next_power_of_2(self, x: int) -> int:
+        return 1 if x == 0 else 2 ** (x - 1).bit_length()
 
     def build_callbacks(self) -> Dict[str, Callback]:
         return {
@@ -243,14 +260,14 @@ class TransformerConfigBuilder:
             "config_saver": ConfigSaverCallback(),
             "profiler": ProfilerCallback(enabled=self.profile),
             "checkpointer": CheckpointerCallback(
-                save_interval=1000,
+                save_interval=self._default_save_interval,
                 ephemeral_save_interval=100,
                 save_async=True,
             ),
             "wandb": WandBCallback(
-                name=self.run_name,
+                name=self.run_name.strip(),
                 project="regmixer",
-                group=self.group_id,
+                group=self.group_id.strip(),
                 cancel_check_interval=10,
                 enabled=True,
             ),
