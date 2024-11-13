@@ -41,10 +41,10 @@ def mk_experiments(
     ]
 
 
-def mk_experiment_group(config: ExperimentConfig, mixes: list[dict[str, float]]) -> ExperimentGroup:
+def mk_experiment_group(
+    config: ExperimentConfig, mixes: list[dict[str, float]], group_uuid: str
+) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
-
-    group_uuid = generate_uuid()[:8]
 
     return ExperimentGroup(
         config=config,

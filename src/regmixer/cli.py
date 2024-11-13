@@ -7,7 +7,6 @@ from typing import Optional
 
 import click
 import yaml
-from olmo_core.data import TokenizerConfig
 from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
@@ -51,13 +50,16 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
         data = yaml.safe_load(f)
 
     experiment_config = ExperimentConfig(**data)
+    group_uuid = generate_uuid()[:8]
 
     if mixture_file:
         with open(mixture_file, "r") as f:
             predefined_mixes = json.load(f)
         launch_group = LaunchGroup(
             instances=mk_launch_configs(
-                mk_experiment_group(experiment_config, mixes=predefined_mixes["mixes"])
+                mk_experiment_group(
+                    experiment_config, mixes=predefined_mixes["mixes"], group_uuid=group_uuid
+                )
             )
         )
     else:
@@ -65,25 +67,29 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
 
         if click.confirm("Launch experiment with this set of mixtures?", default=False):
             launch_group = LaunchGroup(
-                instances=mk_launch_configs(mk_experiment_group(experiment_config, mixes=mixes))
+                instances=mk_launch_configs(
+                    mk_experiment_group(experiment_config, mixes=mixes, group_uuid=group_uuid)
+                )
             )
         else:
             logger.info("Launch cancelled")
             return
 
     logger.info("Launching experiment group...")
+
     try:
         if dry_run:
             logger.info("Dry run mode enabled. Printing experiment configurations...")
             for experiment in launch_group.instances:
                 logger.info(experiment.build_experiment_spec())
+
             return
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [executor.submit(experiment.launch) for experiment in launch_group.instances]
         results = [future.result() for future in futures]
         logger.info(results)
-        logger.info("Experiment group launched successfully!")
+        logger.info(f"Experiment group '{group_uuid}' launched successfully!")
     except KeyboardInterrupt:
         logger.warning("\nCancelling experiment group...")
         # TODO: Try to cancel the experiments in the group
