@@ -1,10 +1,7 @@
-from pathlib import Path
 from typing import List
 
-import yaml
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
-from olmo_core.utils import generate_uuid
 
 from regmixer.aliases import (
     ExperimentConfig,
@@ -18,13 +15,15 @@ from regmixer.aliases import (
 def mk_source_instances(
     sources: list[SourceConfig], mix_map: dict[str, float]
 ) -> list[SourceInstance]:
+    # Note: We filter out any sources that have a weight of 0
+    filtered_sources = [source for source in sources if mix_map[source.name] > 0]
     return [
         SourceInstance(
             name=source.name,
             paths=source.paths,
             ratio=mix_map[source.name],
         )
-        for source in sources
+        for source in filtered_sources
     ]
 
 

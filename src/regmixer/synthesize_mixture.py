@@ -94,9 +94,12 @@ def generate_weights_dirichlet(
         candidates = np.where(candidates < minimum_weight, 0, candidates)
         candidates = candidates / np.sum(candidates).reshape(-1, 1)
         candidates = np.round(candidates / minimum_weight) * minimum_weight
+        candidates = candidates / np.sum(candidates)
 
-        # Pick one good candidate per iteration
-        collected_samples.append(candidates[0])
+        # This is a temporary fix, we should probably update the olmo-core check to be np.allclose()
+        if np.sum(candidates) == 1.0:
+            # Pick one good candidate per iteration
+            collected_samples.append(candidates[0])
 
     collected_samples = sort_and_deduplicate(np.array(collected_samples))
     if len(collected_samples) < num_samples_out:
