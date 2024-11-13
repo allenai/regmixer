@@ -21,8 +21,8 @@ from regmixer.aliases import ExperimentConfig, SourceConfig
 class ConfigDefaults:
     seed: int = 42
     temp: float = 1.0
-    min_strength: float = 0.5
-    max_strength: float = 0.9
+    min_strength: float = 0.1
+    max_strength: float = 5.0
     sample_multiplier: int = 10
     maximum_repetition: int = 1
     minimum_weight: float = 2e-4  # 0.0002
