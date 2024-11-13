@@ -90,12 +90,12 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
 
 
 def prettify_mixes(mixes: list[dict[str, float]]):
-    mixes = {"mixes": mixes}
-    return json.dumps(mixes, indent=2)
+    result = {"mixes": mixes}
+    return json.dumps(result, indent=2)
 
 
-def _generate_mixes(config: Path, output: Optional[Path] = None):
-    with open(config, "r") as f:
+def _generate_mixes(config_file: Path, output: Optional[Path] = None):
+    with open(config_file, "r") as f:
         data = yaml.safe_load(f)
 
     config = ExperimentConfig(**data)
@@ -103,7 +103,7 @@ def _generate_mixes(config: Path, output: Optional[Path] = None):
     mix_string = prettify_mixes(mixes)
 
     if not output:
-        output = f"/tmp/regmixer/{config.name}_{generate_uuid()[:6]}.json"
+        output = Path(f"/tmp/regmixer/{config.name}_{generate_uuid()[:6]}.json")
 
     if output:
         os.makedirs(os.path.dirname(output), exist_ok=True)
@@ -112,6 +112,7 @@ def _generate_mixes(config: Path, output: Optional[Path] = None):
             f.write(mix_string)
         logger.info(f"Mixes saved to {output}:")
     logger.info(mix_string)
+
     return mixes
 
 
@@ -147,11 +148,14 @@ def validate(config: Path):
     with open(config, "r") as f:
         data = yaml.safe_load(f)
 
-    experiment_group = mk_experiment_group(ExperimentConfig(**data))
+    mixes = _generate_mixes(config)
+    experiment_group = mk_experiment_group(ExperimentConfig(**data), mixes)
 
     for experiment in experiment_group.instances:
         logger.info(mk_instance_cmd(experiment, experiment_group.config, experiment_group.group_id))
         transformer = TransformerConfigBuilder(
+            cluster=experiment_group.config.cluster,
+            beaker_user="validate-no-op",
             group_id="validate-no-op",
             run_name="validate-no-op",
             max_tokens=experiment_group.config.max_tokens,
