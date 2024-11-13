@@ -25,7 +25,7 @@ class ConfigDefaults:
     max_strength: float = 0.9
     sample_multiplier: int = 10
     maximum_repetition: int = 1
-    minimum_weight: float = 1e-5  # 0.00001
+    minimum_weight: float = 2e-4  # 0.0002
 
 
 random.seed(ConfigDefaults.seed)
@@ -117,8 +117,6 @@ def mk_mixtures(config: ExperimentConfig):
     num_samples = config.variants
     sources = config.sources
     source_dist, source_total = calculate_priors(sources, config.dtype)
-
-    random.seed(config.seed)
 
     logger.info(f"Using seed: {config.seed}")
     logger.info("Source distribution:")
