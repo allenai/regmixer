@@ -11,7 +11,7 @@ import wandb
 from olmo_core.utils import prepare_cli_environment
 from scipy.stats import spearmanr
 
-from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics
+from regmixer.eval.constants import GroupedWandbMetrics, WandbMetrics
 
 logger = logging.getLogger(__name__)
 

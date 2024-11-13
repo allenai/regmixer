@@ -2,6 +2,7 @@ import concurrent.futures
 import logging
 import random
 from collections import defaultdict
+from typing import Tuple
 
 import numpy as np
 import s3fs
@@ -11,23 +12,24 @@ from olmo_core.io import get_file_size
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
+logging.getLogger("botocore").setLevel(logging.WARNING)
 
 
-from regmixer.aliases import (
-    ExperimentConfig,
-    SourceConfig,
-)
+from regmixer.aliases import ExperimentConfig, SourceConfig
 
-SEED = 42
-random.seed(SEED)
-np.random.seed(SEED)
 
-TEMP = 1.0
-MIN_STRENGH = 0.99
-MAX_STRENGH = 0.99
-SAMPLE_MULTIPLIER = 500
-MAXIMUM_REPETITION = 1
-MINIMUM_WEIGHT = 1e-5  # 0.00001
+class ConfigDefaults:
+    seed: int = 42
+    temp: float = 1.0
+    min_strength: float = 0.5
+    max_strength: float = 0.9
+    sample_multiplier: int = 10
+    maximum_repetition: int = 1
+    minimum_weight: float = 1e-5  # 0.00001
+
+
+random.seed(ConfigDefaults.seed)
+np.random.seed(ConfigDefaults.seed)
 
 
 def generate_weights_dirichlet(
@@ -36,77 +38,77 @@ def generate_weights_dirichlet(
     minimum_weight: float,
     num_samples_out: int,
     temperature: float,
+    token_scale: float,
     enable_bound: bool = True,
 ):
     """
-    Generate weights for each domain group using the dirichlet distribution.
+    Generate weights for each domain group using a dirichlet distribution.
     """
 
-    final_samples = []
+    logger.info(f"Source token population is {token_scale:.2f}:1 target population.")
+
+    collected_samples = []
+    weight_bounds = None
 
     if enable_bound:
-        weight_bounds = []
-        for i in range(len(prior_dist)):
-            weight_bounds.append([0.0, min(prior_dist[i] * MAXIMUM_REPETITION, 1.0)])
-    else:
-        weight_bounds = None
-
-    if temperature < 1.0:
-        prior_dist = prior_dist**TEMP
-        prior_dist = prior_dist / np.sum(prior_dist)
-
-    logger.info("The domain usage bounds (maximum domain weight):")
-    if weight_bounds is not None:
-        grouped_bounds = {train_groups[i]: weight_bounds[i] for i in range(len(train_groups))}
+        logger.info("Weight bounds enabled...")
+        # TODO: Figure out how to introduce repitition factor into the weight outputs.
+        weight_bounds = [
+            (0.0, min(prior_dist[idx] * token_scale, 1.0)) for idx in range(len(prior_dist))
+        ]
+        grouped_bounds = {
+            train_group: weight_bounds[idx] for idx, train_group in enumerate(train_groups)
+        }
+        logger.info("Weight bounds:")
         logger.info(grouped_bounds)
 
-    for i in range(num_samples_out * SAMPLE_MULTIPLIER):
-        if MIN_STRENGH == MAX_STRENGH:
-            samples = np.random.dirichlet(prior_dist * MIN_STRENGH, 1)
+    if temperature < 1.0:
+        prior_dist = prior_dist**temperature
+        prior_dist = prior_dist / np.sum(prior_dist)
+
+    for _ in range(num_samples_out * ConfigDefaults.sample_multiplier):
+        candidates = []
+        if ConfigDefaults.min_strength == ConfigDefaults.max_strength:
+            candidates.append(np.random.dirichlet(prior_dist * ConfigDefaults.min_strength, 1))
         else:
-            samples = []
-            min_strength_log = np.log10(MIN_STRENGH)
-            max_strength_log = np.log10(MAX_STRENGH)
+            min_strength_log = np.log10(ConfigDefaults.min_strength)
+            max_strength_log = np.log10(ConfigDefaults.max_strength)
 
             for strength in np.logspace(min_strength_log, max_strength_log, 15):
                 samples_per_strength = np.random.dirichlet(prior_dist * strength, 1)
-                samples.append(samples_per_strength)
+                candidates.append(samples_per_strength)
 
-            valid_samples = []
-            if weight_bounds is not None:
-                # Filter samples to those that are within the bounds
-                for sample in samples:
-                    for idx, _ in enumerate(sample[0]):
-                        lower = weight_bounds[idx][0]
-                        upper = weight_bounds[idx][1]
-                        if not (lower <= sample[0][idx] <= upper):
-                            logger.info(
-                                f"Sample {sample[0][idx]} is outside of bounds for index {idx}: "
-                                f"({weight_bounds[idx][0]}, {weight_bounds[idx][1]}), rejecting sample."
-                            )
-                            break
-                    else:
-                        valid_samples.append(sample)
-            else:
-                valid_samples = samples
+        filtered_candidates = []
+        if weight_bounds is not None:
+            # Check each domain in the sample is within bounds otherwise discard
+            filtered_candidates = [
+                sample
+                for sample in candidates
+                if all(
+                    lower <= sample[0][idx] <= upper
+                    for idx, (lower, upper) in enumerate(weight_bounds)
+                )
+            ]
+        else:
+            filtered_candidates = candidates
 
-            if not valid_samples:
-                raise ValueError("No valid samples found for bounds!")
+        if not filtered_candidates:
+            continue
 
-            samples = random.choice(valid_samples)
+        candidates = random.choice(filtered_candidates)
+        candidates = np.where(candidates < minimum_weight, 0, candidates)
+        candidates = candidates / np.sum(candidates).reshape(-1, 1)
+        candidates = np.round(candidates / minimum_weight) * minimum_weight
 
-        samples = np.where(samples < minimum_weight, 0, samples)
-        samples = samples / np.sum(samples, axis=1).reshape(-1, 1)
-        samples = np.round(samples / minimum_weight) * minimum_weight
-        final_samples.append(samples[0])
+        # Pick one good candidate per iteration
+        collected_samples.append(candidates[0])
 
-    if len(final_samples) < num_samples_out:
+    collected_samples = sort_and_deduplicate(np.array(collected_samples))
+    if len(collected_samples) < num_samples_out:
         raise ValueError(
-            f"The number of samples '{len(final_samples)}' is less than the required number of samples '{num_samples_out}'!"
+            f"The number of collected samples '{len(collected_samples)}' is less than the required number of samples '{num_samples_out}'!"
         )
-
-    final_samples = sort_and_deduplicate(np.array(final_samples))
-    selected_samples = np.stack(random.sample(final_samples, num_samples_out), axis=0)
+    selected_samples = np.stack(random.sample(collected_samples, num_samples_out), axis=0)
 
     return selected_samples
 
@@ -114,33 +116,31 @@ def generate_weights_dirichlet(
 def mk_mixtures(config: ExperimentConfig):
     num_samples = config.variants
     sources = config.sources
-    prior_config = calculate_priors(sources, config.dtype)
+    source_dist, source_total = calculate_priors(sources, config.dtype)
 
     random.seed(config.seed)
-    np.random.seed(config.seed)
 
     logger.info(f"Using seed: {config.seed}")
     logger.info("Source distribution:")
-    logger.info(prior_config)
+    logger.info(source_dist)
 
-    prior_dist = []
-    for _, v in prior_config.items():
-        prior_dist.append(v)
+    prior_dist = [v for _, v in source_dist.items()]
 
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
     train_weights = generate_weights_dirichlet(
-        train_groups=list(prior_config.keys()),
+        train_groups=list(source_dist.keys()),
         prior_dist=prior_dist,
-        minimum_weight=MINIMUM_WEIGHT,
+        minimum_weight=ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
-        temperature=TEMP,
+        temperature=ConfigDefaults.temp,
+        token_scale=source_total / config.max_tokens,
     )
 
     weight_maps = []
     for weights in train_weights:
         weight_map = {}
-        for key, value in zip(prior_config.keys(), weights):
+        for key, value in zip(source_dist.keys(), weights):
             weight_map[key] = value
         weight_maps.append(weight_map)
 
@@ -161,12 +161,12 @@ def _count_tokens_for_file(path: PathOrStr, dtype: NumpyDatasetDType) -> int:
 
 def calculate_priors(
     source_configs: list[SourceConfig], dtype: NumpyDatasetDType
-) -> dict[str, float]:
+) -> Tuple[dict[str, float], int]:
     fs = s3fs.S3FileSystem(anon=False)
 
     token_counts = defaultdict(int)
     # Count tokens in each source directory
-    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
         future_to_source = {
             executor.submit(
                 lambda sc: {
@@ -208,7 +208,7 @@ def calculate_priors(
 
     relative_sizes = {path: count / total_tokens for path, count in token_counts.items()}
 
-    return relative_sizes
+    return (relative_sizes, total_tokens)
 
 
 def sort_and_deduplicate(data, threshold=1e-5):
