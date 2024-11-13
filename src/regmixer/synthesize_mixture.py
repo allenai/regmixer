@@ -22,43 +22,44 @@ SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)
 
-# Temperature for the prior distribution, if your distribution is too skewed, you can use a temperature to smooth it
-TEMP = 0.7
-
-# The minimum and maximum strength for the dirichlet distribution.
-# With a small value, the distribution will be more concentrated, and with a large value, the distribution will be more uniform.
-MIN_STRENGH = 0.1
-MAX_STRENGH = 5.0
-
-# We first sample num_samples * SAMPLE_MULTIPLIER times, then randomly select some of them
+TEMP = 1.0
+MIN_STRENGH = 0.99
+MAX_STRENGH = 0.99
 SAMPLE_MULTIPLIER = 500
-MAXIMUM_USAGE = 1
-MINIMUM_WEIGHT = 2e-4
+MAXIMUM_REPETITION = 1
+MINIMUM_WEIGHT = 1e-5  # 0.00001
 
 
 def generate_weights_dirichlet(
-    prior_dist,
+    train_groups: list[str],
+    prior_dist: np.ndarray,
     minimum_weight: float,
     num_samples_out: int,
     temperature: float,
-    enable_bound: bool = False,
+    enable_bound: bool = True,
 ):
+    """
+    Generate weights for each domain group using the dirichlet distribution.
+    """
+
     final_samples = []
 
     if enable_bound:
-        # generate the bound for reject sampling
-        weight_bound = []
+        weight_bounds = []
         for i in range(len(prior_dist)):
-            weight_bound.append([0.0, min(prior_dist[i] * MAXIMUM_USAGE, 1.0)])
+            weight_bounds.append([0.0, min(prior_dist[i] * MAXIMUM_REPETITION, 1.0)])
     else:
-        weight_bound = None
+        weight_bounds = None
 
-    # apply temperature
     if temperature < 1.0:
         prior_dist = prior_dist**TEMP
         prior_dist = prior_dist / np.sum(prior_dist)
 
-    # combine reject sampling with dirichlet distribution
+    logger.info("The domain usage bounds (maximum domain weight):")
+    if weight_bounds is not None:
+        grouped_bounds = {train_groups[i]: weight_bounds[i] for i in range(len(train_groups))}
+        logger.info(grouped_bounds)
+
     for i in range(num_samples_out * SAMPLE_MULTIPLIER):
         if MIN_STRENGH == MAX_STRENGH:
             samples = np.random.dirichlet(prior_dist * MIN_STRENGH, 1)
@@ -67,20 +68,21 @@ def generate_weights_dirichlet(
             min_strength_log = np.log10(MIN_STRENGH)
             max_strength_log = np.log10(MAX_STRENGH)
 
-            for strength in np.logspace(min_strength_log, max_strength_log, 1000):
-                # add noise to the strength
+            for strength in np.logspace(min_strength_log, max_strength_log, 15):
                 samples_per_strength = np.random.dirichlet(prior_dist * strength, 1)
                 samples.append(samples_per_strength)
 
             valid_samples = []
-            if weight_bound is not None:
+            if weight_bounds is not None:
                 # Filter samples to those that are within the bounds
                 for sample in samples:
-                    for j in range(len(sample[0])):
-                        if not (weight_bound[j][0] <= sample[0][j] <= weight_bound[j][1]):
+                    for idx, _ in enumerate(sample[0]):
+                        lower = weight_bounds[idx][0]
+                        upper = weight_bounds[idx][1]
+                        if not (lower <= sample[0][idx] <= upper):
                             logger.info(
-                                f"Sample {sample[0][j]} is outside of bounds for index {j}: "
-                                f"({weight_bound[j][0]}, {weight_bound[j][1]})"
+                                f"Sample {sample[0][idx]} is outside of bounds for index {idx}: "
+                                f"({weight_bounds[idx][0]}, {weight_bounds[idx][1]}), rejecting sample."
                             )
                             break
                     else:
@@ -93,23 +95,18 @@ def generate_weights_dirichlet(
 
             samples = random.choice(valid_samples)
 
-        # post normalization, set zero for any value less than minimum_number
         samples = np.where(samples < minimum_weight, 0, samples)
-        # round samples into the same scale of minimum_number
         samples = samples / np.sum(samples, axis=1).reshape(-1, 1)
         samples = np.round(samples / minimum_weight) * minimum_weight
-        # add the samples to the final_samples
         final_samples.append(samples[0])
 
     if len(final_samples) < num_samples_out:
         raise ValueError(
-            f"The number of samples '{len(final_samples)}' is less than the required number of samples '{num_samples_out: int}'!"
+            f"The number of samples '{len(final_samples)}' is less than the required number of samples '{num_samples_out}'!"
         )
 
     final_samples = sort_and_deduplicate(np.array(final_samples))
-
-    selected_samples = random.sample(final_samples, num_samples_out)
-    selected_samples = np.stack(selected_samples, axis=0)
+    selected_samples = np.stack(random.sample(final_samples, num_samples_out), axis=0)
 
     return selected_samples
 
@@ -133,6 +130,7 @@ def mk_mixtures(config: ExperimentConfig):
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
     train_weights = generate_weights_dirichlet(
+        train_groups=list(prior_config.keys()),
         prior_dist=prior_dist,
         minimum_weight=MINIMUM_WEIGHT,
         num_samples_out=num_samples,
@@ -204,9 +202,9 @@ def calculate_priors(
     # Calculate relative sizes
     total_tokens = sum(token_counts.values())
     logger.info(f"Total tokens for config: {total_tokens:,}")
+
     if total_tokens == 0:
-        logger.info(f"Error processing config, no tokens found")
-        return {}
+        raise Exception(f"Error processing config, no tokens found!")
 
     relative_sizes = {path: count / total_tokens for path, count in token_counts.items()}
 
