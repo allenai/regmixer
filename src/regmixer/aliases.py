@@ -38,6 +38,7 @@ class ExperimentConfig(BaseModel):
     dtype: NumpyDatasetDType = NumpyDatasetDType.uint32
     priority: Priority
     sources: list[SourceConfig]
+    temperature: float = 1.0
     preemptible: bool = True
     shared_filesystem: bool = False
     nfs: bool = False

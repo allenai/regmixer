@@ -19,17 +19,12 @@ from regmixer.aliases import ExperimentConfig, SourceConfig
 
 
 class ConfigDefaults:
-    seed: int = 42
     temp: float = 1.0
     min_strength: float = 0.1
     max_strength: float = 5.0
     sample_multiplier: int = 10
     maximum_repetition: int = 1
     minimum_weight: float = 2e-4  # 0.0002
-
-
-random.seed(ConfigDefaults.seed)
-np.random.seed(ConfigDefaults.seed)
 
 
 def generate_weights_dirichlet(
@@ -114,6 +109,9 @@ def generate_weights_dirichlet(
 
 
 def mk_mixtures(config: ExperimentConfig):
+    random.seed(config.seed)
+    np.random.seed(config.seed)
+
     num_samples = config.variants
     sources = config.sources
     source_dist, source_total = calculate_priors(sources, config.dtype)
@@ -131,7 +129,7 @@ def mk_mixtures(config: ExperimentConfig):
         prior_dist=prior_dist,
         minimum_weight=ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
-        temperature=ConfigDefaults.temp,
+        temperature=config.temperature,
         token_scale=source_total / config.max_tokens,
     )
 
