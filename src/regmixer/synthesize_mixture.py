@@ -8,6 +8,7 @@ import s3fs
 from olmo_core.aliases import PathOrStr
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.io import get_file_size
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -22,47 +23,35 @@ random.seed(SEED)
 np.random.seed(SEED)
 
 # Temperature for the prior distribution, if your distribution is too skewed, you can use a temperature to smooth it
-TEMP = 0.5
+TEMP = 0.7
 
 # The minimum and maximum strength for the dirichlet distribution.
 # With a small value, the distribution will be more concentrated, and with a large value, the distribution will be more uniform.
 MIN_STRENGH = 0.1
 MAX_STRENGH = 5.0
 
-# We first sample SAMPLE_MULTIPLIER times more samples than randomly select some of them
-SAMPLE_MULTIPLIER = 100
-
-# How many epochs are allowed for each domain for the large-scale model training. This hyper-parameter
-#   is used because the natural trade off between the reweighting v.s. the number of avaiable tokens in each domain.
-#   Usually we think repeating 4 epochs is okay for language model pre-training, and here we set it as 15
-#   because the avaiable token of The Pile is much larger than the token amount for training Chinchilla-Optimal 1B models (i.e., 25B tokens).
-#   However, if you want to train the large-scale model with all avaiable tokens, you can use less than 4 epochs also in the proxy
-#   model training.
-MAXIMUM_USAGE = 2
-
-# Assume that we have 1B (512,000 examples, and 2048 tokens per example) tokens
-#   for the proxy model training, the minimum sampling rate 2e-4 indicates that
-#   at least there will be 100 examples for each domain, which is statistically significant.
-#
-# If you use less tokens for training the proxy models, you may increase the minimum sampling rate
-#   to ensure the statistical significance of the domain. I personally recommend using at least 1e-5
-#   if you have 1B tokens for training the proxy models.
-MINIMUM = 2e-4
+# We first sample num_samples * SAMPLE_MULTIPLIER times, then randomly select some of them
+SAMPLE_MULTIPLIER = 500
+MAXIMUM_USAGE = 1
+MINIMUM_WEIGHT = 2e-4
 
 
 def generate_weights_dirichlet(
-    prior_dist, minimum_number, num_samples=128, enable_bound=True, temperature=1.0
+    prior_dist,
+    minimum_weight: float,
+    num_samples_out: int,
+    temperature: float,
+    enable_bound: bool = False,
 ):
     final_samples = []
 
     if enable_bound:
         # generate the bound for reject sampling
-        number_bound = []
+        weight_bound = []
         for i in range(len(prior_dist)):
-            # the token cannot be used more than 4 times
-            number_bound.append([0.0, min(prior_dist[i] * MAXIMUM_USAGE, 1.0)])
+            weight_bound.append([0.0, min(prior_dist[i] * MAXIMUM_USAGE, 1.0)])
     else:
-        number_bound = None
+        weight_bound = None
 
     # apply temperature
     if temperature < 1.0:
@@ -70,39 +59,58 @@ def generate_weights_dirichlet(
         prior_dist = prior_dist / np.sum(prior_dist)
 
     # combine reject sampling with dirichlet distribution
-    for i in range(num_samples * SAMPLE_MULTIPLIER):
+    for i in range(num_samples_out * SAMPLE_MULTIPLIER):
         if MIN_STRENGH == MAX_STRENGH:
             samples = np.random.dirichlet(prior_dist * MIN_STRENGH, 1)
         else:
             samples = []
             min_strength_log = np.log10(MIN_STRENGH)
             max_strength_log = np.log10(MAX_STRENGH)
-            for strength in np.logspace(min_strength_log, max_strength_log, 15):
-                # add a noise to the strength
+
+            for strength in np.logspace(min_strength_log, max_strength_log, 1000):
+                # add noise to the strength
                 samples_per_strength = np.random.dirichlet(prior_dist * strength, 1)
                 samples.append(samples_per_strength)
-            # random sample one
-            samples = random.choice(samples)
-        # if there is a bound, the bound is a list of tuples indicating the lower and upper bound of each group
-        ensure_flag = True
-        if number_bound is not None:
-            for j in range(len(samples[0])):
-                if samples[0][j] < number_bound[j][0] or samples[0][j] > number_bound[j][1]:
-                    ensure_flag = False
-                    break
-        if ensure_flag is False:
-            continue
-        # post normalization, set zero for the number less than minimum_number
-        samples = np.where(samples < minimum_number, 0, samples)
+
+            valid_samples = []
+            if weight_bound is not None:
+                # Filter samples to those that are within the bounds
+                for sample in samples:
+                    for j in range(len(sample[0])):
+                        if not (weight_bound[j][0] <= sample[0][j] <= weight_bound[j][1]):
+                            logger.info(
+                                f"Sample {sample[0][j]} is outside of bounds for index {j}: "
+                                f"({weight_bound[j][0]}, {weight_bound[j][1]})"
+                            )
+                            break
+                    else:
+                        valid_samples.append(sample)
+            else:
+                valid_samples = samples
+
+            if not valid_samples:
+                raise ValueError("No valid samples found for bounds!")
+
+            samples = random.choice(valid_samples)
+
+        # post normalization, set zero for any value less than minimum_number
+        samples = np.where(samples < minimum_weight, 0, samples)
         # round samples into the same scale of minimum_number
         samples = samples / np.sum(samples, axis=1).reshape(-1, 1)
-        samples = np.round(samples / minimum_number) * minimum_number
+        samples = np.round(samples / minimum_weight) * minimum_weight
         # add the samples to the final_samples
         final_samples.append(samples[0])
 
+    if len(final_samples) < num_samples_out:
+        raise ValueError(
+            f"The number of samples '{len(final_samples)}' is less than the required number of samples '{num_samples_out: int}'!"
+        )
+
     final_samples = sort_and_deduplicate(np.array(final_samples))
-    selected_samples = random.sample(final_samples, num_samples)
+
+    selected_samples = random.sample(final_samples, num_samples_out)
     selected_samples = np.stack(selected_samples, axis=0)
+
     return selected_samples
 
 
@@ -114,10 +122,9 @@ def mk_mixtures(config: ExperimentConfig):
     random.seed(config.seed)
     np.random.seed(config.seed)
 
-    logger.info("Prior Distribution:")
-    logger.info("\n".join([f"{key} : {value}" for key, value in prior_config.items()]))
-
     logger.info(f"Using seed: {config.seed}")
+    logger.info("Source distribution:")
+    logger.info(prior_config)
 
     prior_dist = []
     for _, v in prior_config.items():
@@ -125,7 +132,12 @@ def mk_mixtures(config: ExperimentConfig):
 
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
-    train_weights = generate_weights_dirichlet(prior_dist, MINIMUM, num_samples, temperature=TEMP)
+    train_weights = generate_weights_dirichlet(
+        prior_dist=prior_dist,
+        minimum_weight=MINIMUM_WEIGHT,
+        num_samples_out=num_samples,
+        temperature=TEMP,
+    )
 
     weight_maps = []
     for weights in train_weights:
@@ -155,35 +167,39 @@ def calculate_priors(
     fs = s3fs.S3FileSystem(anon=False)
 
     token_counts = defaultdict(int)
+    # Count tokens in each source directory
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        future_to_source = {
+            executor.submit(
+                lambda sc: {
+                    sc.name: sum(
+                        executor.submit(
+                            lambda path: sum(
+                                _count_tokens_for_file(f"s3://{match}", dtype)
+                                for match in fs.glob(path)
+                            ),
+                            path,
+                        ).result()
+                        for path in sc.paths
+                    )
+                },
+                source_config,
+            ): source_config
+            for source_config in source_configs
+        }
 
-    # Count tokens in each folder
-    for source_config in source_configs:
-        try:
-
-            def count_tokens_for_path(path):
-                matches = fs.glob(path)
-                token_count = 0
-                for match in matches:
-                    token_count += _count_tokens_for_file(f"s3://{match}", dtype)
-                return token_count
-
-            token_count = 0
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                futures = {
-                    executor.submit(count_tokens_for_path, path): path
-                    for path in source_config.paths
-                }
-                for future in concurrent.futures.as_completed(futures):
-                    try:
-                        token_count += future.result()
-                    except Exception as e:
-                        logger.info(f"Error processing path {futures[future]}: {str(e)}")
-
-            token_counts[source_config.name] = token_count
-
-        except Exception as e:
-            logger.info(f"Error processing {source_config.name}: {str(e)}")
-            token_counts[source_config.name] = 0
+        for future in tqdm(
+            concurrent.futures.as_completed(future_to_source),
+            total=len(future_to_source),
+            desc="Counting source tokens",
+        ):
+            source_config = future_to_source[future]
+            try:
+                result = future.result()
+                token_counts.update(result)
+            except Exception as e:
+                logger.info(f"Error processing {source_config.name}: {str(e)}")
+                token_counts[source_config.name] = 0
 
     # Calculate relative sizes
     total_tokens = sum(token_counts.values())
