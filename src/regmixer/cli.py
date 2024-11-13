@@ -82,17 +82,18 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
             logger.info("Dry run mode enabled. Printing experiment configurations...")
             for experiment in launch_group.instances:
                 logger.info(experiment.build_experiment_spec())
-
             return
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [executor.submit(experiment.launch) for experiment in launch_group.instances]
+
         results = [future.result() for future in futures]
         logger.info(results)
         logger.info(f"Experiment group '{group_uuid}' launched successfully!")
     except KeyboardInterrupt:
-        logger.warning("\nCancelling experiment group...")
-        # TODO: Try to cancel the experiments in the group
+        logger.warning(
+            "\nAborting experiment group launch! You may need to manually stop the launched experiments."
+        )
 
 
 def prettify_mixes(mixes: list[dict[str, float]]):
@@ -155,7 +156,7 @@ def validate(config: Path):
         data = yaml.safe_load(f)
 
     mixes = _generate_mixes(config)
-    experiment_group = mk_experiment_group(ExperimentConfig(**data), mixes)
+    experiment_group = mk_experiment_group(ExperimentConfig(**data), mixes, generate_uuid()[:8])
 
     for experiment in experiment_group.instances:
         logger.info(mk_instance_cmd(experiment, experiment_group.config, experiment_group.group_id))

@@ -34,7 +34,7 @@ def mk_experiments(
     """Generate source instances from a config."""
     return [
         ExperimentInstance(
-            name=f"{config.name}-{idx:04}-{group_uuid}",
+            name=f"{config.name}-{group_uuid}-{idx:04}",
             sources=mk_source_instances(config.sources, mix),
         )
         for idx, mix in enumerate(mixes)
