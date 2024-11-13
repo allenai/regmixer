@@ -7,6 +7,8 @@ from typing import Optional
 
 import click
 import yaml
+from beaker import Beaker
+from beaker.services.job import JobClient
 from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
@@ -15,6 +17,13 @@ from regmixer.synthesize_mixture import mk_mixtures
 from regmixer.utils import mk_experiment_group, mk_instance_cmd, mk_launch_configs
 
 logger = logging.getLogger(__name__)
+
+
+def config_from_path(config: Path) -> ExperimentConfig:
+    with open(config, "r") as f:
+        data = yaml.safe_load(f)
+
+    return ExperimentConfig(**data)
 
 
 @click.group()
@@ -123,6 +132,46 @@ def _generate_mixes(config_file: Path, output: Optional[Path] = None):
     return mixes
 
 
+def status_for_group(path: Path, group_id: str):
+    beaker = Beaker.from_env()
+    client = JobClient(beaker=beaker)
+    config = config_from_path(path)
+    cluster = beaker.cluster.get(config.cluster)
+    jobs = client.list(cluster=cluster)
+
+    statuses = [
+        {"status": job.status, "display_name": job.display_name}
+        for job in jobs
+        if job.display_name.startswith(f"{config.name}-{group_id}")
+    ]
+    statuses.sort(key=lambda x: x["display_name"])
+    logger.info(statuses)
+
+
+def stop_for_group(path: Path, group_id: str):
+    beaker = Beaker.from_env()
+    client = JobClient(beaker=beaker)
+    config = config_from_path(path)
+    cluster = beaker.cluster.get(config.cluster)
+    jobs = [
+        {"id": job.id, "display_name": job.display_name, "status": job.status}
+        for job in client.list(cluster=cluster)
+        if job.display_name.startswith(f"{config.name}-{group_id}")
+    ]
+
+    if len(jobs) == 0:
+        logger.info(f"No jobs found for group {group_id}")
+        return
+
+    jobs.sort(key=lambda x: x["display_name"])
+    logger.info("Jobs to cancel:")
+    logger.info(jobs)
+    if click.confirm("Cancel these jobs?", default=False):
+        for job in jobs:
+            logger.info(f"Stopping job {job['display_name']}...")
+            client.stop(job["id"])
+
+
 @cli.command()
 @click.option(
     "-c",
@@ -176,21 +225,43 @@ def validate(config: Path):
 
 
 @cli.command()
-def status():
-    """Get the status of an experiment group."""
-    raise NotImplementedError
+@click.option(
+    "-g",
+    "--group-id",
+    required=True,
+    help="The group ID of the experiment group to stop.",
+)
+@click.option(
+    "-c",
+    "--config",
+    type=click.Path(exists=True),
+    required=True,
+    help="Relative path to the experiment configuration file.",
+)
+def status(config: Path, group_id: str):
+    """Get the status of a launched experiment group."""
+
+    status_for_group(config, group_id)
 
 
 @cli.command()
-def stop():
-    """Stop an experiment group."""
-    raise NotImplementedError
+@click.option(
+    "-g",
+    "--group-id",
+    required=True,
+    help="The group ID of the experiment group to stop.",
+)
+@click.option(
+    "-c",
+    "--config",
+    type=click.Path(exists=True),
+    required=True,
+    help="Relative path to the experiment configuration file.",
+)
+def cancel(config: Path, group_id: str):
+    """Cancel all running jobs for an experiment group."""
 
-
-@cli.command()
-def list():
-    """List all experiment groups."""
-    raise NotImplementedError
+    stop_for_group(config, group_id)
 
 
 if __name__ == "__main__":
