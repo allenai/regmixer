@@ -1,7 +1,13 @@
-from typing import List
+import json
+import logging
+import os
+from pathlib import Path
+from typing import List, Optional
 
+import yaml
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
+from olmo_core.utils import generate_uuid
 
 from regmixer.aliases import (
     ExperimentConfig,
@@ -10,6 +16,16 @@ from regmixer.aliases import (
     SourceConfig,
     SourceInstance,
 )
+from regmixer.synthesize_mixture import mk_mixtures
+
+logger = logging.getLogger(__name__)
+
+
+def config_from_path(config: Path) -> ExperimentConfig:
+    with open(config, "r") as f:
+        data = yaml.safe_load(f)
+
+    return ExperimentConfig(**data)
 
 
 def mk_source_instances(
@@ -130,3 +146,31 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
 def mk_launch_group(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     """Build a launch group from an experiment group."""
     return mk_launch_configs(group)
+
+
+def prettify_mixes(mixes: list[dict[str, float]]):
+    result = {"mixes": mixes}
+    return json.dumps(result, indent=2)
+
+
+def mk_mixes(config_file: Path, output: Optional[Path] = None):
+    with open(config_file, "r") as f:
+        data = yaml.safe_load(f)
+
+    config = ExperimentConfig(**data)
+    mixes = mk_mixtures(config)
+    mix_string = prettify_mixes(mixes)
+
+    if not output:
+        output = Path(f"/tmp/regmixer/{config.name}_{generate_uuid()[:6]}.json")
+
+    if output:
+        os.makedirs(os.path.dirname(output), exist_ok=True)
+
+        with open(output, "w") as f:
+            f.write(mix_string)
+
+        logger.info(f"Mixes saved to {output}:")
+    logger.info(mix_string)
+
+    return mixes

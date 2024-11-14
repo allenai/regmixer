@@ -1,7 +1,6 @@
 import concurrent.futures
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -13,17 +12,15 @@ from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
-from regmixer.synthesize_mixture import mk_mixtures
-from regmixer.utils import mk_experiment_group, mk_instance_cmd, mk_launch_configs
+from regmixer.utils import (
+    config_from_path,
+    mk_experiment_group,
+    mk_instance_cmd,
+    mk_launch_configs,
+    mk_mixes,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def config_from_path(config: Path) -> ExperimentConfig:
-    with open(config, "r") as f:
-        data = yaml.safe_load(f)
-
-    return ExperimentConfig(**data)
 
 
 @click.group()
@@ -64,6 +61,7 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
     if mixture_file:
         with open(mixture_file, "r") as f:
             predefined_mixes = json.load(f)
+
         launch_group = LaunchGroup(
             instances=mk_launch_configs(
                 mk_experiment_group(
@@ -72,7 +70,7 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
             )
         )
     else:
-        mixes = _generate_mixes(config)
+        mixes = mk_mixes(config)
 
         if click.confirm("Launch experiment with this set of mixtures?", default=False):
             launch_group = LaunchGroup(
@@ -103,33 +101,6 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
         logger.warning(
             "\nAborting experiment group launch! You may need to manually stop the launched experiments."
         )
-
-
-def prettify_mixes(mixes: list[dict[str, float]]):
-    result = {"mixes": mixes}
-    return json.dumps(result, indent=2)
-
-
-def _generate_mixes(config_file: Path, output: Optional[Path] = None):
-    with open(config_file, "r") as f:
-        data = yaml.safe_load(f)
-
-    config = ExperimentConfig(**data)
-    mixes = mk_mixtures(config)
-    mix_string = prettify_mixes(mixes)
-
-    if not output:
-        output = Path(f"/tmp/regmixer/{config.name}_{generate_uuid()[:6]}.json")
-
-    if output:
-        os.makedirs(os.path.dirname(output), exist_ok=True)
-
-        with open(output, "w") as f:
-            f.write(mix_string)
-        logger.info(f"Mixes saved to {output}:")
-    logger.info(mix_string)
-
-    return mixes
 
 
 def status_for_group(path: Path, group_id: str):
@@ -188,7 +159,7 @@ def stop_for_group(path: Path, group_id: str):
 )
 def generate_mixes(config: Path, output: Optional[Path] = None):
     """Generate a set of mixtures based on a provided config"""
-    _generate_mixes(config, output)
+    mk_mixes(config, output)
 
 
 @cli.command()
@@ -204,7 +175,7 @@ def validate(config: Path):
     with open(config, "r") as f:
         data = yaml.safe_load(f)
 
-    mixes = _generate_mixes(config)
+    mixes = mk_mixes(config)
     experiment_group = mk_experiment_group(ExperimentConfig(**data), mixes, generate_uuid()[:8])
 
     for experiment in experiment_group.instances:

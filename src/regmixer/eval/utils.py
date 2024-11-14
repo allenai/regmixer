@@ -1,5 +1,6 @@
 import logging
 import pathlib
+from typing import Tuple
 
 import click
 import lightgbm as lgb
@@ -12,8 +13,12 @@ from olmo_core.utils import prepare_cli_environment
 from scipy.stats import spearmanr
 
 from regmixer.eval.constants import GroupedWandbMetrics, WandbMetrics
+from regmixer.synthesize_mixture import calculate_priors
+from regmixer.utils import config_from_path
+import warnings
 
 logger = logging.getLogger(__name__)
+warnings.filterwarnings("ignore", category=UserWarning, module="lightgbm")
 
 OUTPUT_DIR = "output/"
 DEFAULT_WORKSPACE = "ai2-llm/regmixer"
@@ -23,9 +28,14 @@ LGBM_HPS = {
     "objective": "regression",
     "metric": ["l1", "l2"],
     "seed": 42,
+    "num_iterations": 1000,
     "learning_rate": 1e-2,
     "verbosity": -1,
 }
+
+# TODO: Make this configurable
+metric_group = GroupedWandbMetrics.mmlu_bpb
+metric_group_name = "avg_mmlu_bpb"
 
 
 @click.group()
@@ -46,7 +56,14 @@ def cli():
     help="The group ID to fit the regression model against",
     required=True,
 )
-def fit(group: str):
+@click.option(
+    "-c",
+    "--config",
+    type=click.Path(exists=True),
+    required=True,
+    help="Relative path to the experiment configuration file.",
+)
+def fit(group: str, config: pathlib.Path):
     api = wandb.Api()
     all_runs = api.runs(
         path="ai2-llm/regmixer",
@@ -65,7 +82,9 @@ def fit(group: str):
                     filtered[run_id] = (
                         run_id,
                         run.history(
-                            samples=1, pandas=(True), keys=[metric.value for metric in WandbMetrics]
+                            samples=10,
+                            pandas=(True),
+                            keys=[metric.value for metric in WandbMetrics],
                         ),
                     )
                     logger.info(
@@ -76,7 +95,7 @@ def fit(group: str):
                 new_run = (
                     run_id,
                     run.history(
-                        samples=1, pandas=(True), keys=[metric.value for metric in WandbMetrics]
+                        samples=10, pandas=(True), keys=[metric.value for metric in WandbMetrics]
                     ),
                     run.config,
                 )
@@ -90,7 +109,10 @@ def fit(group: str):
                     logger.warning(f"Run instance '{run_id}:{run.id}' has no samples, skipping...")
 
         except KeyError:
-            raise KeyError("'{group}' experiment group not found!")
+            logger.info(
+                f"'{group}' experiment group not found for run {run.display_name}, skipping!"
+            )
+            continue
 
     filtered = list(filtered.values())
     logger.info(f"Found {len(filtered)} runs for group {group} to fit regression...")
@@ -98,34 +120,47 @@ def fit(group: str):
     for run in filtered:
         logger.info(f"Sampled run: {run[0]} with shape: {run[1].shape}")
 
+    launch_config = config_from_path(config)
+
+    logger.info(f"Calculating source weights...")
+    priors = calculate_priors(
+        source_configs=launch_config.sources,
+        dtype=launch_config.dtype,
+    )
+    logger.info(f"Source weights:")
+    logger.info(priors)
+
     run_ratios = [
-        {"run": run[0], "index": idx, **_mk_weights_from_config(run[2])}
+        {"run": run[0], "index": idx, **_mk_weights_from_config(run[2], priors)}
         for idx, run in enumerate(filtered)
     ]
 
     run_metrics = [
-        {"run": run[0], "index": idx, **_mk_run_metrics(run[1])} for idx, run in enumerate(filtered)
+        {
+            "run": run[0],
+            "index": idx,
+            **_mk_run_metrics(run[1], (metric_group_name, metric_group.value)),
+        }
+        for idx, run in enumerate(filtered)
     ]
 
-    logger.info(run_ratios)
-    # logger.info(run_metrics)
-
-    config = pd.DataFrame(run_ratios)
+    ratios = pd.DataFrame(run_ratios)
     metrics = pd.DataFrame(run_metrics)
 
-    X_train = config[config.columns[2:]].values
+    X_train = ratios[ratios.columns[2:]].values
     Y_train = metrics[metrics.columns[2:]].values
-    X_test = config[config.columns[2:]].values
+    X_test = ratios[ratios.columns[2:]].values
     Y_test = metrics[metrics.columns[2:]].values
 
     np.random.seed(42)
-    predictor = []
+    predictors = []
 
-    indexed_metrics = list(enumerate(GroupedWandbMetrics.mmlu_bpb.value))
+    indexed_metrics = list(enumerate([metric_group_name]))
+    logger.info(f"Fitting regression for metrics: {indexed_metrics}")
 
-    for i, metric in indexed_metrics:
-        target = Y_train[:, i]
-        test_target = Y_test[:, i]
+    for idx, metric in indexed_metrics:
+        target = Y_train[:, idx]
+        test_target = Y_test[:, idx]
 
         gbm = lgb.LGBMRegressor(**LGBM_HPS)
 
@@ -140,20 +175,18 @@ def fit(group: str):
         )
         r, _ = spearmanr(a=regression.predict(X_test), b=test_target)
         corr = np.round(r * 100, decimals=2)
-        logger.info(f"{i}: {metric.name} :: Correlation: {corr}")
+        logger.info(f"{idx}: {metric} :: Correlation: {corr}")
 
-        predictor.append(regression)
+        predictors.append(regression)
 
-    for i, metric in indexed_metrics:
-        _build_plot(Y_test, X_test, i, predictor, metric_name=metric.name)
+    for idx, metric in indexed_metrics:
+        _build_plot(Y_test, X_test, idx, predictors, metric_name=metric)
         _simulate(
-            index=i,
-            predictor=predictor,
-            df_config=config,
-            # TODO: Grab the global distribution somehow here maybe from the config that was generated
-            # right now this uses the first distributions as the base prior
-            prior_distributions=config[config.columns[2:]].head(1).values[0],
-            metric_name=metric.name,
+            index=idx,
+            predictor=predictors,
+            df_config=ratios,
+            prior_distributions=list(priors[0].values()),
+            metric_name=metric,
         )
 
 
@@ -161,11 +194,11 @@ def _build_plot(
     Y_test: np.ndarray,
     X_test: np.ndarray,
     index: int,
-    predictor: list[lgb.LGBMRegressor],
+    predictors: list[lgb.LGBMRegressor],
     metric_name: str,
 ):
-    keys = {"pred": "Pred Loss", "true": "True Loss"}
-    data = {keys["true"]: Y_test[:, index], keys["pred"]: predictor[index].predict(X_test)}
+    keys = {"pred": "Predicted", "true": "Actual"}
+    data = {keys["true"]: Y_test[:, index], keys["pred"]: predictors[index].predict(X_test)}
     graph = sns.jointplot(
         data,
         x=keys["pred"],
@@ -204,12 +237,16 @@ def _build_plot(
     graph.ax_joint.grid(True, ls="dashed")
     graph.ax_joint.spines[["right", "top"]].set_visible(True)
 
-    plt.savefig(f"{OUTPUT_DIR}{metric_name}_fit.png", bbox_inches="tight")
+    graph.savefig(f"{OUTPUT_DIR}{metric_name}_fit.png", bbox_inches="tight")
 
 
-def _mk_run_metrics(history) -> dict[str, float]:
+def _mk_run_metrics(history, average: Tuple[str, list[str]]) -> dict[str, float]:
     df = pd.DataFrame(history)
     metrics = {}
+    if average:
+        for metric_name in average[1]:
+            metrics[average[0]] = df.loc[:, metric_name].tail(1).mean()
+
     for metric in WandbMetrics:
         try:
             metrics[metric.name] = df.loc[:, metric.value].tail(1).values[0]
@@ -220,13 +257,16 @@ def _mk_run_metrics(history) -> dict[str, float]:
     return metrics
 
 
-def _mk_weights_from_config(config: dict) -> dict[str, float]:
-    source_configs = (
-        config.get("dataset", {}).get("source_mixture_config", {}).get("source_configs", [])
-    )
+def _mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
+    source_configs = {
+        source["source_name"]: source
+        for source in config.get("dataset", {})
+        .get("source_mixture_config", {})
+        .get("source_configs", [])
+    }
     weights = {}
-    for source in source_configs:
-        weights[source["source_name"]] = source["target_ratio"]
+    for source_name in priors[0].keys():
+        weights[source_name] = source_configs.get(source_name, {}).get("target_ratio", 0.0)
 
     return weights
 
@@ -237,17 +277,17 @@ def _simulate(
     prior_distributions: list[float],
     df_config: pd.DataFrame,
     metric_name: str,
-    n_samples: int = 100000,
+    n_samples: int = 500000,
 ):
     np.random.seed(42)
 
     samples = np.random.dirichlet(prior_distributions * 1, n_samples)
     simulation = predictor[index].predict(samples)
 
-    plt.hist(simulation, bins=32)
+    plt.close()
 
-    plt.xlabel("Pred Loss")
-    plt.ylabel("Frequency")
+    plt.hist(simulation, bins=32)
+    plt.savefig(f"{OUTPUT_DIR}{metric_name}_hist.png", bbox_inches="tight")
 
     k = 128
     top_k_samples = samples[np.argsort(simulation)[0:k]]
@@ -262,12 +302,9 @@ def _simulate(
     )
     df = pd.melt(df)
     df["type"] = (["Original"] + ["Optimal"] * top_k_samples.shape[0]) * len(columns)
-    df.info()
 
-    logger.info("Original: ")
-    logger.info(prior_distributions)
-    print()
-    logger.info("Optimal: ")
+    logger.info(f":::::::::{metric_name}:::::::::")
+    logger.info("Predicted optimal weights: ")
     logger.info(optimal_source_weights)
 
     plt.rc("axes", unicode_minus=False)
@@ -282,8 +319,8 @@ def _simulate(
 
     _, ax = plt.subplots(figsize=(12, 10), layout="compressed")
     ax.ticklabel_format(useMathText=True)
-    ax.xaxis.set_tick_params(labelsize=14)
-    ax.tick_params(axis="x", labelrotation=45)
+    ax.xaxis.set_tick_params(labelsize=12)
+    ax.tick_params(axis="x", labelrotation=90)
 
     pallette = {
         "Original": "#105257",
