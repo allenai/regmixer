@@ -50,7 +50,7 @@ def fit(group: str):
     api = wandb.Api()
     all_runs = api.runs(
         path="ai2-llm/regmixer",
-        filters={"display_name": {"$regex": f"{group}$"}},
+        filters={"display_name": {"$regex": f".*{group}.*"}},
     )
     logger.info(f"Found {len(all_runs)} runs that match group id filter, gathering samples...")
     filtered = {}
@@ -78,6 +78,7 @@ def fit(group: str):
                     run.history(
                         samples=1, pandas=(True), keys=[metric.value for metric in WandbMetrics]
                     ),
+                    run.config,
                 )
                 if new_run[1].shape[0] > 0:
                     filtered[run_id] = new_run
@@ -97,20 +98,18 @@ def fit(group: str):
     for run in filtered:
         logger.info(f"Sampled run: {run[0]} with shape: {run[1].shape}")
 
-    # TODO: Get rid of this once we have real random config
-    ratios = np.random.uniform(size=len(filtered))
-    run_ratios = []
-    for idx, run in enumerate(filtered):
-        run_ratios.append(
-            {"run": run[0], "index": idx, "source1": ratios[idx], "source2": 1.0 - ratios[idx]}
-        )
-
-    run_metrics = [
-        {"run": run[0], "index": idx, **_build_run_metrics(run[1])}
+    run_ratios = [
+        {"run": run[0], "index": idx, **_mk_weights_from_config(run[2])}
         for idx, run in enumerate(filtered)
     ]
 
-    logger.info(run_metrics)
+    run_metrics = [
+        {"run": run[0], "index": idx, **_mk_run_metrics(run[1])} for idx, run in enumerate(filtered)
+    ]
+
+    logger.info(run_ratios)
+    # logger.info(run_metrics)
+
     config = pd.DataFrame(run_ratios)
     metrics = pd.DataFrame(run_metrics)
 
@@ -208,18 +207,28 @@ def _build_plot(
     plt.savefig(f"{OUTPUT_DIR}{metric_name}_fit.png", bbox_inches="tight")
 
 
-def _build_run_metrics(history) -> dict[str, float]:
+def _mk_run_metrics(history) -> dict[str, float]:
     df = pd.DataFrame(history)
     metrics = {}
     for metric in WandbMetrics:
         try:
-            logger.info(df.loc[:, metric.value])
             metrics[metric.name] = df.loc[:, metric.value].tail(1).values[0]
         except KeyError:
             logger.warning(f"Metric {metric.value} not found in history, skipping...")
             continue
 
     return metrics
+
+
+def _mk_weights_from_config(config: dict) -> dict[str, float]:
+    source_configs = (
+        config.get("dataset", {}).get("source_mixture_config", {}).get("source_configs", [])
+    )
+    weights = {}
+    for source in source_configs:
+        weights[source["source_name"]] = source["target_ratio"]
+
+    return weights
 
 
 def _simulate(
