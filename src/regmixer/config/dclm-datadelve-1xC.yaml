@@ -4,13 +4,13 @@ budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 8
-variants: 5
+variants: 50
 preemptible: true
 max_tokens: 3_800_000_000 # 190_000_000 * 20
 sequence_length: 2048
 seed: 42
 priority: high
-cluster: ai2/saturn-cirrascale
+cluster: ai2/jupiter-cirrascale-2
 dtype: "uint32"
 sources:
   - name: adult_content
