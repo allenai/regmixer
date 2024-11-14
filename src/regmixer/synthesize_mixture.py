@@ -1,5 +1,7 @@
 import concurrent.futures
 import logging
+import os
+import pathlib
 import random
 from collections import defaultdict
 from typing import Tuple
@@ -14,6 +16,9 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 logging.getLogger("botocore").setLevel(logging.WARNING)
 
+
+import hashlib
+import json
 
 from regmixer.aliases import ExperimentConfig, SourceConfig
 
@@ -159,8 +164,25 @@ def _count_tokens_for_file(path: PathOrStr, dtype: NumpyDatasetDType) -> int:
 
 
 def calculate_priors(
-    source_configs: list[SourceConfig], dtype: NumpyDatasetDType
+    source_configs: list[SourceConfig], dtype: NumpyDatasetDType, use_cache: bool = True
 ) -> Tuple[dict[str, float], int]:
+    config_hash = hashlib.md5(
+        json.dumps(
+            [(sc.name, sc.paths) for sc in source_configs],
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    cache_path = pathlib.Path(f"/tmp/regmixer/priors_cache_{config_hash}.json")
+    if use_cache:
+        try:
+            with open(cache_path, "r") as f:
+                logger.info("Cache file found, using cached values.")
+                obj = json.load(f)
+                return (obj["relative_sizes"], obj["total_tokens"])
+        except FileNotFoundError:
+            logger.info("No cache file found, calculating from source files...")
+
     fs = s3fs.S3FileSystem(anon=False)
 
     token_counts = defaultdict(int)
@@ -206,6 +228,11 @@ def calculate_priors(
         raise Exception(f"Error processing config, no tokens found!")
 
     relative_sizes = {path: count / total_tokens for path, count in token_counts.items()}
+
+    if use_cache:
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        with open(cache_path, "w") as f:
+            json.dump({"relative_sizes": relative_sizes, "total_tokens": total_tokens}, f)
 
     return (relative_sizes, total_tokens)
 
