@@ -130,14 +130,14 @@ def train(
         beaker_user=beaker_user,
         cluster=cluster,
         group_id=group_id.strip(),
-        run_name=run_name,
+        run_name=run_name.strip(),
         max_tokens=max_tokens,
         sources=sources,
         sequence_length=sequence_length,
         seed=seed,
-        dtype=dtype,
-        tokenizer=tokenizer,
-        model_identifier=model_identifier,
+        dtype=dtype.strip(),
+        tokenizer=tokenizer.strip(),
+        model_identifier=model_identifier.strip(),
     ).build()
     dataset = config.dataset.build()
 
