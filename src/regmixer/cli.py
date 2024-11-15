@@ -49,7 +49,14 @@ def cli():
     default=False,
     help="Print the experiment group configurations without launching.",
 )
-def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
+@click.option(
+    "--no-cache",
+    "-n",
+    is_flag=False,
+    default=False,
+    help="Do not cache sources for this experiment group.",
+)
+def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: bool):
     """Launch an experiment."""
 
     with open(config, "r") as f:
@@ -70,7 +77,7 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
             )
         )
     else:
-        mixes = mk_mixes(config)
+        mixes = mk_mixes(config, use_cache=(no_cache == False))
 
         if click.confirm("Launch experiment with this set of mixtures?", default=False):
             launch_group = LaunchGroup(

@@ -116,13 +116,13 @@ def generate_weights_dirichlet(
     return selected_samples
 
 
-def mk_mixtures(config: ExperimentConfig):
+def mk_mixtures(config: ExperimentConfig, use_cache: bool = True):
     random.seed(config.seed)
     np.random.seed(config.seed)
 
     num_samples = config.variants
     sources = config.sources
-    source_dist, source_total = calculate_priors(sources, config.dtype)
+    source_dist, source_total = calculate_priors(sources, config.dtype, use_cache=use_cache)
 
     logger.info(f"Using seed: {config.seed}")
     logger.info("Source distribution:")
@@ -164,7 +164,7 @@ def _count_tokens_for_file(path: PathOrStr, dtype: NumpyDatasetDType) -> int:
 
 
 def calculate_priors(
-    source_configs: list[SourceConfig], dtype: NumpyDatasetDType, use_cache: bool = True
+    source_configs: list[SourceConfig], dtype: NumpyDatasetDType, use_cache: bool
 ) -> Tuple[dict[str, float], int]:
     config_hash = hashlib.md5(
         json.dumps(

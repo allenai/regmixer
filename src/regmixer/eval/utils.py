@@ -124,8 +124,7 @@ def fit(group: str, config: pathlib.Path):
 
     logger.info(f"Calculating source weights...")
     priors = calculate_priors(
-        source_configs=launch_config.sources,
-        dtype=launch_config.dtype,
+        source_configs=launch_config.sources, dtype=launch_config.dtype, use_cache=True
     )
     logger.info(f"Source weights:")
     logger.info(priors)
