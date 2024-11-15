@@ -1,8 +1,9 @@
+import logging
 import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from olmo_core.config import Config, DType
+from olmo_core.config import DType
 from olmo_core.data import (
     DataMix,
     NumpyDataLoaderConfig,
@@ -12,10 +13,9 @@ from olmo_core.data import (
 )
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.distributed.parallel import DataParallelType
-from olmo_core.io import is_url
 from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
 from olmo_core.optim import AdamWConfig, CosWithWarmup, OptimGroupOverride
-from olmo_core.train import Duration, TrainerConfig
+from olmo_core.train import TrainerConfig
 from olmo_core.train.callbacks import (
     Callback,
     CheckpointerCallback,
@@ -32,88 +32,10 @@ from olmo_core.train.callbacks import (
 from regmixer.aliases import SourceInstance
 from regmixer.data.dataset import MixtureBuilder
 from regmixer.model.evaluators import DownstreamEvaluators
+from regmixer.model.aliases import ModelConfig, ModelTrainConfig, SupportedModels, Tokenizer
 
 
-@dataclass
-class ModelTrainConfig(Config):
-    model: TransformerConfig
-    optim: AdamWConfig
-    dataset: NumpyDatasetConfig
-    data_loader: NumpyDataLoaderConfig
-    trainer: TrainerConfig
-    init_seed: int = 12536
-
-
-@dataclass
-class ModelConfig:
-    parameters: int
-    d_model: int
-    n_heads: int
-    n_layers: int
-    mlp_ratio: int
-    weight_tying: bool
-    alibi: bool
-    rope: bool
-    rope_theta: int
-    flash_attention: bool
-    attention_dropout: float
-    attention_layer_norm: bool
-    include_bias: bool
-    layer_norm_type: str
-    layer_norm_with_affine: bool
-    layer_norm_eps: float
-    bias_for_layer_norm: bool
-    attention_layer_norm_with_affine: bool
-    activation_type: str
-    residual_dropout: float
-    embedding_dropout: float
-    max_sequence_length: int
-    vocab_size: int
-    embedding_size: int
-    eos_token_id: int
-    pad_token_id: int
-    init_device: str
-    init_fn: str
-    init_std: float
-    init_cutoff_factor: int
-    norm_after: bool
-    precision: str
-
-
-DEFAULT_MODEL_CONFIG = ModelConfig(
-    parameters=190_354_176,
-    d_model=768,
-    n_heads=12,
-    n_layers=12,
-    mlp_ratio=8,
-    weight_tying=False,
-    alibi=False,
-    rope=True,
-    rope_theta=500000,
-    flash_attention=True,
-    attention_dropout=0.0,
-    attention_layer_norm=True,
-    include_bias=False,
-    layer_norm_type="rms",
-    layer_norm_with_affine=True,
-    layer_norm_eps=1e-6,
-    bias_for_layer_norm=False,
-    attention_layer_norm_with_affine=True,
-    activation_type="swiglu",
-    residual_dropout=0.0,
-    embedding_dropout=0.0,
-    max_sequence_length=4096,
-    vocab_size=100278,
-    embedding_size=100352,
-    eos_token_id=100257,
-    pad_token_id=100277,
-    init_device="cuda",
-    init_fn="normal",
-    init_std=0.02,
-    init_cutoff_factor=3,
-    norm_after=True,
-    precision="amp_bf16",
-)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -125,19 +47,19 @@ class TransformerConfigBuilder:
         run_name (str): The name of the run.
         sources (List[SourceInstance]): A list of source instances.
         sequence_length (int): The sequence length for the model.
-        max_tokens (int): The maximum number of tokens.
+        max_tokens (int): The maximum number of tokens to be processed in a batch.
         model_config (ModelConfig): The model configuration.
         group_id (str): The group ID for the run.
         cluster (str): The cluster name.
         beaker_user (str): The Beaker user name.
         s3 (bool): Whether to use S3 for storage.
         seed (int): The random seed for reproducibility. Default is 42.
-        config (Optional[ModelConfig]): An optional model configuration. Default is None.
-        overrides (Optional[List[str]]): A list of override strings. Default is an empty list.
+        tokenizer (str): The tokenizer to be used.
+        config (Optional[ModelConfig]): An optional model configuration. Default is Olmo190M.
         profile (bool): Whether to enable profiling. Default is False.
 
     Methods:
-        __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user, seed, s3, config, overrides, profile):
+        __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user, seed, s3, config, profile):
             Initializes the TransformerConfigBuilder with the provided parameters.
 
         get_read_location() -> str:
@@ -169,8 +91,8 @@ class TransformerConfigBuilder:
     beaker_user: str
     s3: bool
     seed: int
-    config: Optional[ModelConfig] = None
-    overrides: Optional[List[str]] = None
+    tokenizer: str
+    dtype: str
     profile: bool = False
 
     def __init__(
@@ -182,10 +104,11 @@ class TransformerConfigBuilder:
         group_id: str,
         cluster: str,
         beaker_user: str,
+        tokenizer: str,
+        dtype: str,
+        model_identifier: str,
         seed: int = 42,
         s3: bool = True,
-        config: ModelConfig = DEFAULT_MODEL_CONFIG,
-        overrides: List[str] = [],
         profile: bool = False,
     ):
         self.run_name = run_name
@@ -194,13 +117,14 @@ class TransformerConfigBuilder:
         self.max_tokens = max_tokens
         self.group_id = group_id
         self.seed = seed
-        self.overrides = overrides
-        self.model_config = config
+        self.model_config = SupportedModels[model_identifier].value
         self.beaker_user = beaker_user
         self.profile = profile
         self.s3 = s3
+        self.tokenizer = tokenizer
         self.read_location = self.get_read_location()
         self.root_dir: str = "s3://ai2-llm"
+        self.dataset_dtype = NumpyDatasetDType[dtype]
 
         if "jupiter" in cluster and not s3:
             self.root_dir = "/weka/oe-training-default/ai2-llm"
@@ -216,7 +140,6 @@ class TransformerConfigBuilder:
         self._default_global_batch_size = self.get_batch_size()
         self._default_device_batch_size = 8
         self._default_dataparallel_type = DataParallelType.ddp
-        self._default_dataset_dtype = NumpyDatasetDType.uint32
         self._default_save_interval = 1000
         self._default_eval_interval = 200
 
@@ -224,8 +147,11 @@ class TransformerConfigBuilder:
         return ("s3://ai2-llm" if self.s3 else "/weka/oe-training-default/ai2-llm").rstrip("/")
 
     def get_tokenizer_config(self) -> TokenizerConfig:
-        # TODO: Decide whether to make this configurable
-        return TokenizerConfig.dolma2()
+        try:
+            return Tokenizer[self.tokenizer].value
+        except Exception as e:
+            logger.info(f"Invalid tokenizer identifier: {self.tokenizer}")
+            raise e
 
     def get_warmup_steps(self) -> int:
         return round(
@@ -327,7 +253,7 @@ class TransformerConfigBuilder:
             sequence_length=self.sequence_length,
             seed=self.seed,
             processes=min(os.cpu_count() or 1, 6),
-            dtype=self._default_dataset_dtype,
+            dtype=self.dataset_dtype,
         ).build()
 
         dataset_config = NumpyDatasetConfig(

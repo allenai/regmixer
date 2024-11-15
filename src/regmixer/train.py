@@ -69,13 +69,6 @@ def cli():
     help="Seed for the experiment",
 )
 @click.option(
-    "--override",
-    "-o",
-    multiple=True,
-    type=str,
-    help="Overrides for the transformer config",
-)
-@click.option(
     "--group-id",
     "-g",
     type=str,
@@ -93,17 +86,37 @@ def cli():
     type=str,
     help="Cluster running the experiment",
 )
+@click.option(
+    "--dtype",
+    "-d",
+    type=str,
+    help="Data type for the dataset",
+)
+@click.option(
+    "--tokenizer",
+    "-T",
+    type=str,
+    help="Tokenizer for the dataset",
+)
+@click.option(
+    "--model-identifier",
+    "-m",
+    type=str,
+    help="Model identifier",
+)
 @record
 def train(
     run_name: str,
     max_tokens: int,
     source: List[Tuple[str, List[str], str]],
-    override: List[str],
     sequence_length: int,
     seed: int,
     group_id: str,
     beaker_user: str,
     cluster: str,
+    dtype: str,
+    tokenizer: str,
+    model_identifier: str,
 ):
     """
     Launch a training run with the given parameters.
@@ -120,9 +133,11 @@ def train(
         run_name=run_name,
         max_tokens=max_tokens,
         sources=sources,
-        overrides=override,
         sequence_length=sequence_length,
         seed=seed,
+        dtype=dtype,
+        tokenizer=tokenizer,
+        model_identifier=model_identifier,
     ).build()
     dataset = config.dataset.build()
 

@@ -114,7 +114,7 @@ def fit(group: str, config: pathlib.Path):
             )
             continue
 
-    filtered = list(filtered.values())
+    filtered = list(filtered.values()) * 10
     logger.info(f"Found {len(filtered)} runs for group {group} to fit regression...")
 
     for run in filtered:

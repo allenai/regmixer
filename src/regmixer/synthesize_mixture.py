@@ -137,7 +137,7 @@ def mk_mixtures(config: ExperimentConfig):
         prior_dist=prior_dist,
         minimum_weight=ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
-        temperature=config.temperature,
+        temperature=config.mix_temperature,
         token_scale=source_total / config.max_tokens,
     )
 
