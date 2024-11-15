@@ -64,7 +64,8 @@ class TransformerConfigBuilder:
         profile (bool): Whether to enable profiling. Default is False.
 
     Methods:
-        __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user, tokenizer, dtype, model_identifier, seed=42, s3=True, profile=False):
+        __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user,
+                 tokenizer, dtype, model_identifier, seed=42, s3=True, profile=False):
             Initializes the TransformerConfigBuilder.
 
         get_read_location() -> str:

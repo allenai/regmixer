@@ -58,9 +58,9 @@ class ModelConfig:
     def olmo_30m(cls) -> "ModelConfig":
         return ModelConfig(
             compile=True,
-            d_model=768,
-            n_heads=12,
-            n_layers=12,
+            d_model=256,
+            n_heads=8,
+            n_layers=4,
             rope_theta=500000,
             flash_attention=True,
             max_sequence_length=4096,
