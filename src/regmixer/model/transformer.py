@@ -59,27 +59,30 @@ class TransformerConfigBuilder:
         beaker_user (str): The Beaker user name.
         s3 (bool): Whether to use S3 for storage.
         seed (int): The random seed for reproducibility. Default is 42.
-        tokenizer (str): The tokenizer to be used.
-        model_config (ModelConfig): The model configuration to be used.
+        tokenizer (TokenizerConfig): The tokenizer configuration.
+        dtype (str): The data type for the dataset.
         profile (bool): Whether to enable profiling. Default is False.
 
     Methods:
-        __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user, seed, s3, config, profile):
-            Initializes the TransformerConfigBuilder with the provided parameters.
+        __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user, tokenizer, dtype, model_identifier, seed=42, s3=True, profile=False):
+            Initializes the TransformerConfigBuilder.
 
         get_read_location() -> str:
             Returns the read location based on whether S3 is used.
 
-        get_tokenizer_config() -> TokenizerConfig:
-            Returns the tokenizer configuration.
+        get_tokenizer_config(tokenizer: str) -> TokenizerConfig:
+            Returns the tokenizer configuration based on the tokenizer identifier.
 
-        get_warmup_steps() -> int:
-            Returns the number of warmup steps.
+        get_warmup_steps(parameters: int) -> int:
+            Returns the number of warmup steps based on the model parameters.
 
-        get_batch_size():
+        get_batch_size(parameters: int) -> int:
             Returns the global batch size based on the sequence length and model parameters.
 
-        build_callbacks() -> Dict[str, Callback]:
+        next_power_of_2(x: int) -> int:
+            Returns the next power of 2 greater than or equal to x.
+
+        build_callbacks(model: TransformerConfig) -> Dict[str, Callback]:
             Builds and returns a dictionary of callbacks for the trainer.
 
         build() -> ModelTrainConfig:
@@ -143,7 +146,6 @@ class TransformerConfigBuilder:
         self._default_decay_embeddings = False
         self._default_vocab_size = 100278
         self._default_batch_size_divisor = 32
-        self._default_global_batch_size = self.get_batch_size()
         self._default_device_batch_size = 8
         self._default_dataparallel_type = DataParallelType.ddp
         self._default_save_interval = 1000
@@ -159,17 +161,16 @@ class TransformerConfigBuilder:
             logger.info(f"Invalid tokenizer identifier: {tokenizer}")
             raise e
 
-    def get_warmup_steps(self) -> int:
+    def get_warmup_steps(self, parameters: int) -> int:
         return round(
-            self.model_config.parameters
-            / (self._default_global_batch_size * self.model_config.max_sequence_length)
+            parameters / (self.get_batch_size(parameters) * self.model_config.max_sequence_length)
         )
 
-    def get_batch_size(self):
+    def get_batch_size(self, parameters: int) -> int:
         if self.sequence_length != 2048:
             raise NotImplementedError("Only sequence length 2048 is supported right now")
 
-        global_batch_size = 160 * (self.model_config.parameters / 108000000) ** (2 / 3)
+        global_batch_size = 160 * (parameters / 108000000) ** (2 / 3)
         global_batch_size /= self._default_batch_size_divisor
         global_batch_size = round(global_batch_size)
         global_batch_size *= self._default_batch_size_divisor
@@ -182,10 +183,10 @@ class TransformerConfigBuilder:
     def next_power_of_2(self, x: int) -> int:
         return 1 if x == 0 else 2 ** (x - 1).bit_length()
 
-    def build_callbacks(self) -> Dict[str, Callback]:
+    def build_callbacks(self, model: TransformerConfig) -> Dict[str, Callback]:
         return {
             "lr_scheduler": SchedulerCallback(
-                scheduler=CosWithWarmup(warmup_steps=self.get_warmup_steps())
+                scheduler=CosWithWarmup(warmup_steps=self.get_warmup_steps(model.num_params))
             ),
             "gpu_monitor": GPUMemoryMonitorCallback(),
             "grad_clipper": GradClipperCallback(max_grad_norm=self._default_max_grad_norm),
@@ -223,13 +224,7 @@ class TransformerConfigBuilder:
 
     def build(self) -> ModelTrainConfig:
         tokenizer = self.tokenizer
-        lr = 4.7e-3 * (self.model_config.parameters / self._default_vocab_size) ** (-1 / 3)
-
-        if self.sequence_length == 4096:
-            lr /= 4
-            raise NotImplementedError("Only sequence length 2048 is supported right now")
-
-        model_config = TransformerConfig.llama_like(
+        model = TransformerConfig.llama_like(
             d_model=self.model_config.d_model,
             n_layers=self.model_config.n_layers,
             n_heads=self.model_config.n_heads,
@@ -242,8 +237,15 @@ class TransformerConfigBuilder:
             ),
         )
 
+        global_batch_size = self.get_batch_size(model.num_params)
+        learning_rate = 4.7e-3 * (model.num_params / self._default_vocab_size) ** (-1 / 3)
+
+        if self.sequence_length == 4096:
+            learning_rate /= 4
+            raise NotImplementedError("Only sequence length 2048 is supported right now")
+
         optim_config = AdamWConfig(
-            lr=lr,
+            lr=learning_rate,
             eps=self._default_eps,
             betas=self._default_betas,
             group_overrides=[
@@ -271,7 +273,7 @@ class TransformerConfigBuilder:
         )
 
         data_loader_config = NumpyDataLoaderConfig(
-            global_batch_size=self._default_global_batch_size * self.sequence_length,
+            global_batch_size=global_batch_size * self.sequence_length,
             seed=self.seed,
             num_workers=16,
         )
@@ -284,11 +286,11 @@ class TransformerConfigBuilder:
             cancel_check_interval=5,
         )
 
-        for callback_name, callback in self.build_callbacks().items():
+        for callback_name, callback in self.build_callbacks(model).items():
             trainer_config.callbacks[callback_name] = callback
 
         return ModelTrainConfig(
-            model=model_config,
+            model=model,
             optim=optim_config,
             dataset=dataset_config,
             data_loader=data_loader_config,

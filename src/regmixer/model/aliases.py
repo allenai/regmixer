@@ -20,7 +20,6 @@ class ModelTrainConfig(Config):
 
 @dataclass
 class ModelConfig:
-    parameters: int
     d_model: int
     n_heads: int
     n_layers: int
@@ -53,7 +52,6 @@ class ModelConfig:
     @classmethod
     def olmo_190m(cls) -> "ModelConfig":
         return ModelConfig(
-            parameters=190_354_176,
             d_model=768,
             n_heads=12,
             n_layers=12,
@@ -87,7 +85,6 @@ class ModelConfig:
     @classmethod
     def olmo_30m(cls) -> "ModelConfig":
         return ModelConfig(
-            parameters=30_000_000,
             d_model=768,
             n_heads=12,
             n_layers=12,
