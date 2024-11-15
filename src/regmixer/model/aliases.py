@@ -27,11 +27,10 @@ class ModelConfig:
     n_layers: int
     rope_theta: int
     flash_attention: bool
-    layer_norm_eps: float
     max_sequence_length: int
     embedding_size: int
     precision: str
-    block_type: TransformerBlockType
+    layer_norm_eps: float = 1e-6
     save_interval: int = 1000
     eval_interval: int = 200
     device_batch_size: int = 8
@@ -41,8 +40,9 @@ class ModelConfig:
     weight_decay: float = 0.1
     max_grad_norm: float = 1.0
     decay_embeddings: bool = False
-    dp_type: DataParallelType = DataParallelType.ddp
     qk_norm: bool = True
+    dp_type: DataParallelType = DataParallelType.ddp
+    block_type: TransformerBlockType = TransformerBlockType.reordered_norm
 
     @classmethod
     def olmo_190m(cls) -> "ModelConfig":
@@ -53,11 +53,9 @@ class ModelConfig:
             n_layers=12,
             rope_theta=500000,
             flash_attention=True,
-            layer_norm_eps=1e-6,
             max_sequence_length=4096,
             embedding_size=100352,
             precision="amp_bf16",
-            block_type=TransformerBlockType.reordered_norm,
         )
 
     @classmethod
@@ -69,11 +67,9 @@ class ModelConfig:
             n_layers=12,
             rope_theta=500000,
             flash_attention=True,
-            layer_norm_eps=1e-6,
             max_sequence_length=4096,
             embedding_size=100352,
             precision="amp_bf16",
-            block_type=TransformerBlockType.reordered_norm,
         )
 
 
