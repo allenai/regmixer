@@ -177,7 +177,9 @@ def calculate_priors(
     if use_cache:
         try:
             with open(cache_path, "r") as f:
-                logger.info("Cache file found, using cached values.")
+                logger.info(
+                    "Source distribution cache found, using cached values! This can be disabled by setting --no-cache when launching the experiement group."
+                )
                 obj = json.load(f)
                 return (obj["relative_sizes"], obj["total_tokens"])
         except FileNotFoundError:

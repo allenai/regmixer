@@ -137,7 +137,7 @@ def train(
         seed=seed,
         dtype=dtype,
         tokenizer=tokenizer,
-        model=model_identifier,
+        model_identifier=model_identifier,
     ).build()
     dataset = config.dataset.build()
 

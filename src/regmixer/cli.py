@@ -194,9 +194,11 @@ def validate(config: Path):
             run_name="validate-no-op",
             max_tokens=experiment_group.config.max_tokens,
             sources=experiment.sources,
-            overrides=[],
             sequence_length=experiment_group.config.sequence_length,
             seed=experiment_group.config.seed,
+            tokenizer=experiment_group.config.tokenizer,
+            dtype=experiment_group.config.dtype,
+            model_identifier=experiment_group.config.proxy_model_id,
         ).build()
         dataset = transformer.dataset.build()
         dataset.prepare()
