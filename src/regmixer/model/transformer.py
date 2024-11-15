@@ -220,7 +220,6 @@ class TransformerConfigBuilder:
             layer_norm_eps=self.model_config.layer_norm_eps,
             qk_norm=self.model_config.qk_norm,
             block_name=self.model_config.block_type,
-            use_flash=self.model_config.flash_attention,
             dp_config=TransformerDataParallelConfig(
                 name=self.model_config.dp_type,
                 param_dtype=DType.bfloat16,
