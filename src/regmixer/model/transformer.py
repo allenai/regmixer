@@ -32,7 +32,12 @@ from olmo_core.train.callbacks import (
 from regmixer.aliases import SourceInstance
 from regmixer.data.dataset import MixtureBuilder
 from regmixer.model.evaluators import DownstreamEvaluators
-from regmixer.model.aliases import ModelConfig, ModelTrainConfig, SupportedModels, Tokenizer
+from regmixer.model.aliases import (
+    ModelConfig,
+    ModelTrainConfig,
+    SupportedModels,
+    SupportedTokenizers,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +60,7 @@ class TransformerConfigBuilder:
         s3 (bool): Whether to use S3 for storage.
         seed (int): The random seed for reproducibility. Default is 42.
         tokenizer (str): The tokenizer to be used.
-        config (Optional[ModelConfig]): An optional model configuration. Default is Olmo190M.
+        model_config (ModelConfig): The model configuration to be used.
         profile (bool): Whether to enable profiling. Default is False.
 
     Methods:
@@ -91,7 +96,7 @@ class TransformerConfigBuilder:
     beaker_user: str
     s3: bool
     seed: int
-    tokenizer: str
+    tokenizer: TokenizerConfig
     dtype: str
     profile: bool = False
 
@@ -121,7 +126,7 @@ class TransformerConfigBuilder:
         self.beaker_user = beaker_user
         self.profile = profile
         self.s3 = s3
-        self.tokenizer = tokenizer
+        self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
         self.read_location = self.get_read_location()
         self.root_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
@@ -129,6 +134,7 @@ class TransformerConfigBuilder:
         if "jupiter" in cluster and not s3:
             self.root_dir = "/weka/oe-training-default/ai2-llm"
 
+        # TODO: Move these to defaults into model/aliases.py
         self._default_device_batch_size = 8
         self._default_betas = (0.9, 0.95)
         self._default_weight_decay = 0.1
@@ -146,11 +152,11 @@ class TransformerConfigBuilder:
     def get_read_location(self) -> str:
         return ("s3://ai2-llm" if self.s3 else "/weka/oe-training-default/ai2-llm").rstrip("/")
 
-    def get_tokenizer_config(self) -> TokenizerConfig:
+    def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
-            return Tokenizer[self.tokenizer].value
-        except Exception as e:
-            logger.info(f"Invalid tokenizer identifier: {self.tokenizer}")
+            return SupportedTokenizers[tokenizer].value
+        except ValueError as e:
+            logger.info(f"Invalid tokenizer identifier: {tokenizer}")
             raise e
 
     def get_warmup_steps(self) -> int:
@@ -203,20 +209,20 @@ class TransformerConfigBuilder:
                     name=NumpyDatasetType.padded_fsl,
                     mix_base_dir=self.root_dir,
                     sequence_length=self.sequence_length,
-                    tokenizer=self.get_tokenizer_config(),
+                    tokenizer=self.tokenizer,
                     work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache",
                 ),
                 eval_interval=self._default_eval_interval,
             ),
             "downstream_evaluator": DownstreamEvaluatorCallbackConfig(
                 tasks=[task.value for task in DownstreamEvaluators],
-                tokenizer=self.get_tokenizer_config(),
+                tokenizer=self.tokenizer,
                 eval_interval=self._default_eval_interval,
             ),
         }
 
     def build(self) -> ModelTrainConfig:
-        tokenizer = self.get_tokenizer_config()
+        tokenizer = self.tokenizer
         lr = 4.7e-3 * (self.model_config.parameters / self._default_vocab_size) ** (-1 / 3)
 
         if self.sequence_length == 4096:

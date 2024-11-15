@@ -124,6 +124,6 @@ class SupportedModels(Enum):
     olmo_30m = ModelConfig.olmo_30m()
 
 
-class Tokenizer(Enum):
+class SupportedTokenizers(Enum):
     dolma2 = TokenizerConfig.dolma2()
     gpt_neox = TokenizerConfig.gpt_neox_olmo_dolma_v1_5()
