@@ -1,7 +1,7 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from olmo_core.config import DType
 from olmo_core.data import (
@@ -137,20 +137,6 @@ class TransformerConfigBuilder:
         if "jupiter" in cluster and not s3:
             self.root_dir = "/weka/oe-training-default/ai2-llm"
 
-        # TODO: Move these to defaults into model/aliases.py
-        self._default_device_batch_size = 8
-        self._default_betas = (0.9, 0.95)
-        self._default_weight_decay = 0.1
-        self._default_eps = 1e-8
-        self._default_max_grad_norm = 1.0
-        self._default_decay_embeddings = False
-        self._default_vocab_size = 100278
-        self._default_batch_size_divisor = 32
-        self._default_device_batch_size = 8
-        self._default_dataparallel_type = DataParallelType.ddp
-        self._default_save_interval = 1000
-        self._default_eval_interval = 200
-
     def get_read_location(self) -> str:
         return ("s3://ai2-llm" if self.s3 else "/weka/oe-training-default/ai2-llm").rstrip("/")
 
@@ -171,9 +157,9 @@ class TransformerConfigBuilder:
             raise NotImplementedError("Only sequence length 2048 is supported right now")
 
         global_batch_size = 160 * (parameters / 108000000) ** (2 / 3)
-        global_batch_size /= self._default_batch_size_divisor
+        global_batch_size /= self.model_config.batch_divisor
         global_batch_size = round(global_batch_size)
-        global_batch_size *= self._default_batch_size_divisor
+        global_batch_size *= self.model_config.batch_divisor
 
         global_batch_size = self.next_power_of_2(global_batch_size)
         print(f"Global batch size: {global_batch_size}")
@@ -189,11 +175,11 @@ class TransformerConfigBuilder:
                 scheduler=CosWithWarmup(warmup_steps=self.get_warmup_steps(model.num_params))
             ),
             "gpu_monitor": GPUMemoryMonitorCallback(),
-            "grad_clipper": GradClipperCallback(max_grad_norm=self._default_max_grad_norm),
+            "grad_clipper": GradClipperCallback(max_grad_norm=self.model_config.max_grad_norm),
             "config_saver": ConfigSaverCallback(),
             "profiler": ProfilerCallback(enabled=self.profile),
             "checkpointer": CheckpointerCallback(
-                save_interval=self._default_save_interval,
+                save_interval=self.model_config.save_interval,
                 ephemeral_save_interval=100,
                 save_async=True,
             ),
@@ -213,12 +199,12 @@ class TransformerConfigBuilder:
                     tokenizer=self.tokenizer,
                     work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache",
                 ),
-                eval_interval=self._default_eval_interval,
+                eval_interval=self.model_config.eval_interval,
             ),
             "downstream_evaluator": DownstreamEvaluatorCallbackConfig(
                 tasks=[task.value for task in DownstreamEvaluators],
                 tokenizer=self.tokenizer,
-                eval_interval=self._default_eval_interval,
+                eval_interval=self.model_config.eval_interval,
             ),
         }
 
@@ -230,15 +216,19 @@ class TransformerConfigBuilder:
             n_layers=self.model_config.n_layers,
             n_heads=self.model_config.n_heads,
             vocab_size=tokenizer.padded_vocab_size(),
+            rope_theta=self.model_config.rope_theta,
+            layer_norm_eps=self.model_config.layer_norm_eps,
+            qk_norm=self.model_config.qk_norm,
+            block_name=self.model_config.block_type,
             dp_config=TransformerDataParallelConfig(
-                name=self._default_dataparallel_type,
+                name=self.model_config.dp_type,
                 param_dtype=DType.bfloat16,
                 reduce_dtype=DType.float32,
             ),
         )
 
         global_batch_size = self.get_batch_size(model.num_params)
-        learning_rate = 4.7e-3 * (model.num_params / self._default_vocab_size) ** (-1 / 3)
+        learning_rate = 4.7e-3 * (model.num_params / tokenizer.padded_vocab_size()) ** (-1 / 3)
 
         if self.sequence_length == 4096:
             learning_rate /= 4
@@ -246,11 +236,12 @@ class TransformerConfigBuilder:
 
         optim_config = AdamWConfig(
             lr=learning_rate,
-            eps=self._default_eps,
-            betas=self._default_betas,
+            eps=self.model_config.eps,
+            betas=self.model_config.betas,
             group_overrides=[
                 OptimGroupOverride(
-                    params=["embeddings.weight"], opts=dict(weight_decay=self._default_weight_decay)
+                    params=["embeddings.weight"],
+                    opts=dict(weight_decay=self.model_config.weight_decay),
                 )
             ],
         )
@@ -280,7 +271,7 @@ class TransformerConfigBuilder:
 
         trainer_config = TrainerConfig(
             save_folder=f"/tmp/{self.run_name}",
-            rank_microbatch_size=self._default_device_batch_size * self.sequence_length,
+            rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
             metrics_collect_interval=10,
             cancel_check_interval=5,

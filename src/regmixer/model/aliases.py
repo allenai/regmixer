@@ -3,7 +3,8 @@ from enum import Enum
 
 from olmo_core.config import Config
 from olmo_core.data import NumpyDataLoaderConfig, NumpyDatasetConfig, TokenizerConfig
-from olmo_core.nn.transformer import TransformerConfig
+from olmo_core.distributed.parallel import DataParallelType
+from olmo_core.nn.transformer import TransformerConfig, TransformerBlockType
 from olmo_core.optim import AdamWConfig
 from olmo_core.train import TrainerConfig
 
@@ -27,7 +28,6 @@ class ModelConfig:
     mlp_ratio: int
     weight_tying: bool
     alibi: bool
-    rope: bool
     rope_theta: int
     flash_attention: bool
     attention_dropout: float
@@ -49,6 +49,18 @@ class ModelConfig:
     init_cutoff_factor: int
     norm_after: bool
     precision: str
+    block_type: TransformerBlockType
+    save_interval: int = 1000
+    eval_interval: int = 200
+    device_batch_size: int = 8
+    batch_divisor: int = 32
+    eps: float = 1e-8
+    betas: tuple = (0.9, 0.95)
+    weight_decay: float = 0.1
+    max_grad_norm: float = 1.0
+    decay_embeddings: bool = False
+    dp_type: DataParallelType = DataParallelType.ddp
+    qk_norm: bool = True
 
     @classmethod
     def olmo_190m(cls) -> "ModelConfig":
@@ -60,7 +72,6 @@ class ModelConfig:
             mlp_ratio=8,
             weight_tying=False,
             alibi=False,
-            rope=True,
             rope_theta=500000,
             flash_attention=True,
             attention_dropout=0.0,
@@ -82,6 +93,7 @@ class ModelConfig:
             init_cutoff_factor=3,
             norm_after=True,
             precision="amp_bf16",
+            block_type=TransformerBlockType.reordered_norm,
         )
 
     @classmethod
@@ -94,7 +106,6 @@ class ModelConfig:
             mlp_ratio=8,
             weight_tying=False,
             alibi=False,
-            rope=True,
             rope_theta=500000,
             flash_attention=True,
             attention_dropout=0.0,
@@ -116,6 +127,7 @@ class ModelConfig:
             init_cutoff_factor=3,
             norm_after=True,
             precision="amp_bf16",
+            block_type=TransformerBlockType.reordered_norm,
         )
 
 
