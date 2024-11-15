@@ -93,7 +93,7 @@ def mk_instance_cmd(
         f"-u {beaker_user}",
         f"-d {config.dtype.value}",
         f"-T {config.tokenizer}",
-        f"-m {config.model_identifier}",
+        f"-m {config.proxy_model_id}",
         *sources,
     ]
 

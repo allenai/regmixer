@@ -39,7 +39,7 @@ class ExperimentConfig(BaseModel):
     priority: Priority
     sources: list[SourceConfig]
     tokenizer: str
-    model_identifier: str
+    proxy_model_id: str
     dtype: NumpyDatasetDType = NumpyDatasetDType.uint32
     mix_temperature: float = 1.0
     preemptible: bool = True
