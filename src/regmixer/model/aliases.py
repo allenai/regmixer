@@ -28,8 +28,6 @@ class ModelConfig:
     rope_theta: int
     flash_attention: bool
     max_sequence_length: int
-    embedding_size: int
-    precision: str
     layer_norm_eps: float = 1e-6
     save_interval: int = 1000
     eval_interval: int = 200
@@ -54,8 +52,6 @@ class ModelConfig:
             rope_theta=500000,
             flash_attention=True,
             max_sequence_length=4096,
-            embedding_size=100352,
-            precision="amp_bf16",
         )
 
     @classmethod
@@ -68,8 +64,6 @@ class ModelConfig:
             rope_theta=500000,
             flash_attention=True,
             max_sequence_length=4096,
-            embedding_size=100352,
-            precision="amp_bf16",
         )
 
 
