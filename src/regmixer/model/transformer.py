@@ -225,11 +225,11 @@ class TransformerConfigBuilder:
     def build(self) -> ModelTrainConfig:
         tokenizer = self.tokenizer
         model = TransformerConfig.llama_like(
+            compile=self.model_config.compile,
             d_model=self.model_config.d_model,
             n_layers=self.model_config.n_layers,
             n_heads=self.model_config.n_heads,
             vocab_size=tokenizer.padded_vocab_size(),
-            compile=True,
             dp_config=TransformerDataParallelConfig(
                 name=self._default_dataparallel_type,
                 param_dtype=DType.bfloat16,
