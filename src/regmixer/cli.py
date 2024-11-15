@@ -52,7 +52,7 @@ def cli():
 @click.option(
     "--no-cache",
     "-n",
-    is_flag=False,
+    is_flag=True,
     default=False,
     help="Do not cache sources for this experiment group.",
 )
