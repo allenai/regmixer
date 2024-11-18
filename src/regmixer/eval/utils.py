@@ -63,7 +63,14 @@ def cli():
     required=True,
     help="Relative path to the experiment configuration file.",
 )
-def fit(group: str, config: pathlib.Path):
+@click.option(
+    "-t",
+    "--temperature",
+    type=float,
+    default=1.0,
+    help="Temperature to apply to the optimal weights",
+)
+def fit(group: str, config: pathlib.Path, temperature: float = 1.0):
     api = wandb.Api()
     all_runs = api.runs(
         path="ai2-llm/regmixer",
@@ -179,17 +186,18 @@ def fit(group: str, config: pathlib.Path):
         predictors.append(regression)
 
     for idx, metric in indexed_metrics:
-        _build_plot(Y_test, X_test, idx, predictors, metric_name=metric)
+        _plot_correlation(Y_test, X_test, idx, predictors, metric_name=metric)
         _simulate(
             index=idx,
             predictor=predictors,
             df_config=ratios,
             prior_distributions=list(priors[0].values()),
             metric_name=metric,
+            temperature=temperature,
         )
 
 
-def _build_plot(
+def _plot_correlation(
     Y_test: np.ndarray,
     X_test: np.ndarray,
     index: int,
@@ -277,6 +285,7 @@ def _simulate(
     df_config: pd.DataFrame,
     metric_name: str,
     n_samples: int = 500000,
+    temperature: float = 1.0,
 ):
     np.random.seed(42)
 
@@ -293,6 +302,11 @@ def _simulate(
     top_k_samples.shape
 
     optimal_source_weights = np.mean(top_k_samples, axis=0)
+
+    if temperature < 1.0:
+        optimal_source_weights = np.exp(np.log(optimal_source_weights) / temperature)
+        optimal_source_weights = optimal_source_weights / np.sum(optimal_source_weights)
+
     columns = df_config.columns[2:]
 
     df = pd.DataFrame(

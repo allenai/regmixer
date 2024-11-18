@@ -29,7 +29,7 @@ class ConfigDefaults:
     max_strength: float = 5.0
     sample_multiplier: int = 10
     maximum_repetition: int = 1
-    minimum_weight: float = 2e-4  # 0.0002
+    minimum_weight: float = 2e-3  # 0.002
 
 
 def generate_weights_dirichlet(
