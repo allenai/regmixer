@@ -411,7 +411,7 @@ def _simulate(
     prior_distributions: list[float],
     df_config: pd.DataFrame,
     metric_name: str,
-    n_samples: int = 1_000_000,
+    n_samples: int = 100_000,
     temperature: float = 1.0,
 ):
     np.random.seed(42)
