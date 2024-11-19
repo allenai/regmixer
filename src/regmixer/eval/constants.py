@@ -126,6 +126,25 @@ class WandbMetrics(Enum):
 
 
 class GroupedWandbMetrics(Enum):
+    arc_challenge = [
+        WandbMetrics.arc_challenge_len_norm.value,
+        WandbMetrics.arc_challenge_mc_5shot_accuracy.value,
+        WandbMetrics.arc_challenge_rc_5shot_len_norm.value,
+    ]
+    arc_challenge_bpb = [
+        WandbMetrics.arc_challenge_mc_5shot_bpb.value,
+        WandbMetrics.arc_challenge_rc_5shot_bpb.value,
+    ]
+    arc_easy = [
+        WandbMetrics.arc_easy_accuracy.value,
+        WandbMetrics.arc_easy_mc_5shot_accuracy.value,
+        WandbMetrics.arc_easy_ppl_ce_loss.value,
+        WandbMetrics.arc_easy_rc_5shot_accuracy.value,
+    ]
+    arc_easy_bpb = [
+        WandbMetrics.arc_easy_mc_5shot_bpb.value,
+        WandbMetrics.arc_easy_rc_5shot_bpb.value,
+    ]
     mmlu_bpb = [
         WandbMetrics.mmlu_humanities_bpb.value,
         WandbMetrics.mmlu_humanities_var_bpb.value,
@@ -152,24 +171,14 @@ class GroupedWandbMetrics(Enum):
     ]
     few_shot = [
         WandbMetrics.arc_challenge_mc_5shot_accuracy.value,
-        WandbMetrics.arc_challenge_mc_5shot_bpb.value,
-        WandbMetrics.arc_challenge_rc_5shot_bpb.value,
         WandbMetrics.arc_challenge_rc_5shot_len_norm.value,
         WandbMetrics.arc_easy_mc_5shot_accuracy.value,
-        WandbMetrics.arc_easy_mc_5shot_bpb.value,
         WandbMetrics.arc_easy_rc_5shot_accuracy.value,
-        WandbMetrics.arc_easy_rc_5shot_bpb.value,
         WandbMetrics.boolq_mc_5shot_accuracy.value,
-        WandbMetrics.boolq_mc_5shot_bpb.value,
         WandbMetrics.boolq_rc_5shot_accuracy.value,
-        WandbMetrics.boolq_rc_5shot_bpb.value,
         WandbMetrics.csqa_mc_5shot_accuracy.value,
-        WandbMetrics.csqa_mc_5shot_bpb.value,
-        WandbMetrics.csqa_rc_5shot_bpb.value,
         WandbMetrics.csqa_rc_5shot_len_norm.value,
         WandbMetrics.hellaswag_mc_5shot_accuracy.value,
-        WandbMetrics.hellaswag_mc_5shot_bpb.value,
-        WandbMetrics.hellaswag_rc_5shot_bpb.value,
         WandbMetrics.hellaswag_rc_5shot_len_norm.value,
         WandbMetrics.mmlu_humanities_mc_5shot_len_norm.value,
         WandbMetrics.mmlu_humanities_mc_5shot_test_len_norm.value,
@@ -180,19 +189,45 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.mmlu_stem_mc_5shot_len_norm.value,
         WandbMetrics.mmlu_stem_mc_5shot_test_len_norm.value,
         WandbMetrics.openbookqa_mc_5shot_accuracy.value,
-        WandbMetrics.openbookqa_mc_5shot_bpb.value,
-        WandbMetrics.openbookqa_rc_5shot_bpb.value,
         WandbMetrics.openbookqa_rc_5shot_len_norm.value,
         WandbMetrics.piqa_mc_5shot_accuracy.value,
-        WandbMetrics.piqa_mc_5shot_bpb.value,
-        WandbMetrics.piqa_rc_5shot_bpb.value,
         WandbMetrics.piqa_rc_5shot_len_norm.value,
         WandbMetrics.socialiqa_mc_5shot_accuracy.value,
-        WandbMetrics.socialiqa_mc_5shot_bpb.value,
-        WandbMetrics.socialiqa_rc_5shot_bpb.value,
         WandbMetrics.socialiqa_rc_5shot_len_norm.value,
         WandbMetrics.winogrande_mc_5shot_accuracy.value,
-        WandbMetrics.winogrande_mc_5shot_bpb.value,
         WandbMetrics.winogrande_rc_5shot_accuracy.value,
+    ]
+    few_shot_bpb = [
+        WandbMetrics.arc_challenge_mc_5shot_bpb.value,
+        WandbMetrics.arc_challenge_rc_5shot_bpb.value,
+        WandbMetrics.arc_easy_mc_5shot_bpb.value,
+        WandbMetrics.arc_easy_rc_5shot_bpb.value,
+        WandbMetrics.boolq_mc_5shot_bpb.value,
+        WandbMetrics.boolq_rc_5shot_bpb.value,
+        WandbMetrics.csqa_mc_5shot_bpb.value,
+        WandbMetrics.csqa_rc_5shot_bpb.value,
+        WandbMetrics.hellaswag_mc_5shot_bpb.value,
+        WandbMetrics.hellaswag_rc_5shot_bpb.value,
+        WandbMetrics.openbookqa_mc_5shot_bpb.value,
+        WandbMetrics.openbookqa_rc_5shot_bpb.value,
+        WandbMetrics.piqa_mc_5shot_bpb.value,
+        WandbMetrics.piqa_rc_5shot_bpb.value,
+        WandbMetrics.socialiqa_mc_5shot_bpb.value,
+        WandbMetrics.socialiqa_rc_5shot_bpb.value,
+        WandbMetrics.winogrande_mc_5shot_bpb.value,
         WandbMetrics.winogrande_rc_5shot_bpb.value,
     ]
+    validation_loss = [
+        WandbMetrics.c4_en_validation_ce_loss.value,
+        WandbMetrics.dolma_books_validation_ce_loss.value,
+        WandbMetrics.dolma_common_crawl_validation_ce_loss.value,
+        WandbMetrics.dolma_pes2o_validation_ce_loss.value,
+        WandbMetrics.dolma_reddit_validation_ce_loss.value,
+        WandbMetrics.dolma_stack_validation_ce_loss.value,
+        WandbMetrics.dolma_wiki_validation_ce_loss.value,
+        WandbMetrics.ice_validation_ce_loss.value,
+        WandbMetrics.m2d2_s2orc_validation_ce_loss.value,
+        WandbMetrics.pile_validation_ce_loss.value,
+        WandbMetrics.trivia_qa_wiki_ppl_ce_loss.value,
+    ]
+    all_metrics = [metric.value for metric in WandbMetrics]
