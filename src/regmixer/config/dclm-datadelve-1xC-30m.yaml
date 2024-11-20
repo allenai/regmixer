@@ -18,73 +18,73 @@ cluster: ai2/saturn-cirrascale
 sources:
   - name: adult_content
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/adult_content/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/adult_content/**/*.npy
   - name: art_and_design
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/art_and_design/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/art_and_design/**/*.npy
   - name: software_development
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software_development/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/software_development/**/*.npy
   - name: education_and_jobs
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/education_and_jobs/**/*.npy
   - name: electronics_and_hardware
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/electronics_and_hardware/**/*.npy
   - name: entertainment
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/entertainment/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/entertainment/**/*.npy
   - name: crime_and_law
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/crime_and_law/**/*.npy
   - name: social_life
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/social_life/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/social_life/**/*.npy
   - name: fashion_and_beauty
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/fashion_and_beauty/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/fashion_and_beauty/**/*.npy
   - name: finance_and_business
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/finance_and_business/**/*.npy
   - name: food_and_dining
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/food_and_dining/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/food_and_dining/**/*.npy
   - name: games
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/games/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/games/**/*.npy
   - name: health
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/health/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/health/**/*.npy
   - name: history_and_geography
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/history_and_geography/**/*.npy
   - name: home_and_hobbies
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/home_and_hobbies/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/home_and_hobbies/**/*.npy
   - name: industrial
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/industrial/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/industrial/**/*.npy
   - name: literature
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/literature/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/literature/**/*.npy
   - name: politics
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/politics/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/politics/**/*.npy
   - name: religion
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/religion/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/religion/**/*.npy
   - name: science_math_and_technology
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/science_math_and_technology/**/*.npy
   - name: software
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/software/**/*.npy
   - name: sports_and_fitness
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/sports_and_fitness/**/*.npy
   - name: transportation
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/transportation/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/transportation/**/*.npy
   - name: travel_and_tourism
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/travel_and_tourism/**/*.npy
