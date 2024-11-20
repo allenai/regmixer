@@ -65,6 +65,13 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
     experiment_config = ExperimentConfig(**data)
     group_uuid = generate_uuid()[:8]
 
+    logger.info("Building experiment group with the following config...")
+    logger.info(experiment_config)
+
+    if not click.confirm("Proceed with this configuration?", default=False):
+        logger.info("Launch cancelled!")
+        return
+
     if mixture_file:
         with open(mixture_file, "r") as f:
             predefined_mixes = json.load(f)
@@ -86,7 +93,7 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
                 )
             )
         else:
-            logger.info("Launch cancelled")
+            logger.info("Launch cancelled!")
             return
 
     logger.info("Launching experiment group...")
