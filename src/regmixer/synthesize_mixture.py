@@ -127,6 +127,7 @@ def mk_mixtures(config: ExperimentConfig, use_cache: bool = True):
     logger.info(f"Using seed: {config.seed}")
     logger.info("Source distribution:")
     logger.info(source_dist)
+    logger.info(f"Total tokens: {source_total}")
 
     prior_dist = [v for _, v in source_dist.items()]
 
