@@ -191,17 +191,17 @@ class TransformerConfigBuilder:
                 cancel_check_interval=10,
                 enabled=True,
             ),
-            # "lm_evaluator": LMEvaluatorCallbackConfig(
-            #     eval_dataset=NumpyDatasetConfig.from_data_mix(
-            #         DataMix.v3_small_ppl_validation,
-            #         name=NumpyDatasetType.padded_fsl,
-            #         mix_base_dir=self.root_dir,
-            #         sequence_length=self.sequence_length,
-            #         tokenizer=self.tokenizer,
-            #         work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache",
-            #     ),
-            #     eval_interval=self.model_config.eval_interval,
-            # ),
+            "lm_evaluator": LMEvaluatorCallbackConfig(
+                eval_dataset=NumpyDatasetConfig.from_data_mix(
+                    DataMix.v3_small_ppl_validation,
+                    name=NumpyDatasetType.padded_fsl,
+                    mix_base_dir=self.root_dir,
+                    sequence_length=self.sequence_length,
+                    tokenizer=self.tokenizer,
+                    work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/{TokenizerConfig.identifier or 'default'}/dataset-cache",
+                ),
+                eval_interval=self.model_config.eval_interval,
+            ),
             "downstream_evaluator": DownstreamEvaluatorCallbackConfig(
                 tasks=[task.value for task in DownstreamEvaluators],
                 tokenizer=self.tokenizer,
