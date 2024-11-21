@@ -133,8 +133,8 @@ class TransformerConfigBuilder:
 
         if "jupiter" in cluster and not s3:
             self.root_dir = "/weka/oe-training-default/ai2-llm"
-        elif "augusta" in cluster:
-            self.root_dir = "gs://ai2-llm"
+        # elif "augusta" in cluster:
+        #     self.root_dir = "gs://ai2-llm"
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
