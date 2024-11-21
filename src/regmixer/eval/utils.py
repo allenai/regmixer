@@ -88,7 +88,7 @@ def cli():
     required=False,
 )
 @click.option(
-    "-a",
+    "-A",
     "--group-average",
     type=str,
     help="The metric group to average for the regression task (regression will be fit against the average)",
@@ -256,7 +256,7 @@ def fit(
             index=idx,
             predictor=predictors,
             df_config=ratios,
-            prior_distributions=list(priors[0].values()),
+            prior_distributions=np.array(list(priors[0].values())),
             metric_name=metric,
             temperature=temperature,
         )
@@ -408,20 +408,26 @@ def _mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
 def _simulate(
     index: int,
     predictor: list[lgb.LGBMRegressor],
-    prior_distributions: list[float],
+    prior_distributions: np.ndarray,
     df_config: pd.DataFrame,
     metric_name: str,
     n_samples: int = 100_000,
     temperature: float = 1.0,
+    high_entropy: bool = True,
 ):
     np.random.seed(42)
+    samples = np.random.dirichlet(prior_distributions * temperature, 10 * n_samples)
 
-    samples = np.random.dirichlet(prior_distributions * 1, n_samples)
+    if high_entropy:
+        entropy = -np.sum(samples * np.log(samples + 1e-3), axis=1)
+        high_entropy_indices = np.argsort(entropy)[-n_samples:]
+        samples = samples[high_entropy_indices]
+
     simulation = predictor[index].predict(samples)
 
     plt.close()
     plt.hist(simulation, bins=32)
-    plt.savefig(f"{_mk_plot_prefix(metric_name, temperature)}_hist.png", bbox_inches="tight")
+    plt.savefig(f"{_mk_plot_prefix(metric_name, temperature)}_simulations.png", bbox_inches="tight")
     plt.close()
 
     k = 128
@@ -470,6 +476,7 @@ def _simulate(
         "Original": "#105257",
         "Optimal": "#F0529C",
     }
+
     sns.barplot(data=df, x="variable", y="value", hue="type", palette=pallette, ax=ax)
 
     ax.legend(
@@ -482,7 +489,7 @@ def _simulate(
         ncol=2,
     )
 
-    ax.grid(True)
+    ax.yaxis.grid(True, linestyle="--", which="both", color="gray", alpha=0.7)
     ax.set_ylim(0, 1.1)
 
     ax.set_xlabel(
