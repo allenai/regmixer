@@ -12,6 +12,7 @@ from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
+from tqdm import tqdm
 from regmixer.utils import (
     config_from_path,
     mk_experiment_group,
@@ -105,10 +106,17 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
                 logger.info(experiment.build_experiment_spec())
             return
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(experiment.launch) for experiment in launch_group.instances]
 
-        results = [future.result() for future in futures]
+            for future in tqdm(
+                concurrent.futures.as_completed(futures),
+                total=len(futures),
+                desc="Launching experiments",
+            ):
+                results.append(future.result())
+
         logger.info(results)
         logger.info(f"Experiment group '{group_uuid}' launched successfully!")
     except KeyboardInterrupt:
