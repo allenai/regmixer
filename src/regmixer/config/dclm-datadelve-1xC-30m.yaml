@@ -14,7 +14,7 @@ proxy_model_id: "olmo_30m"
 tokenizer: "gpt_neox"
 dtype: "uint16"
 priority: high
-cluster: ai2/saturn-cirrascale
+cluster: ai2/augusta-google-1
 sources:
   - name: adult_content
     paths:
