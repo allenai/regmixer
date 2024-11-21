@@ -11,8 +11,8 @@ from olmo_core.data import (
     NumpyDatasetType,
     TokenizerConfig,
 )
+from olmo_core.io import is_url
 from olmo_core.data.types import NumpyDatasetDType
-from olmo_core.distributed.parallel import DataParallelType
 from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
 from olmo_core.optim import AdamWConfig, CosWithWarmup, OptimGroupOverride
 from olmo_core.train import TrainerConfig
@@ -67,9 +67,6 @@ class TransformerConfigBuilder:
         __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user,
                  tokenizer, dtype, model_identifier, seed=42, s3=True, profile=False):
             Initializes the TransformerConfigBuilder.
-
-        get_read_location() -> str:
-            Returns the read location based on whether S3 is used.
 
         get_tokenizer_config(tokenizer: str) -> TokenizerConfig:
             Returns the tokenizer configuration based on the tokenizer identifier.
@@ -131,15 +128,13 @@ class TransformerConfigBuilder:
         self.profile = profile
         self.s3 = s3
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
-        self.read_location = self.get_read_location()
         self.root_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
 
         if "jupiter" in cluster and not s3:
             self.root_dir = "/weka/oe-training-default/ai2-llm"
-
-    def get_read_location(self) -> str:
-        return ("s3://ai2-llm" if self.s3 else "/weka/oe-training-default/ai2-llm").rstrip("/")
+        elif "augusta" in cluster:
+            self.root_dir = "gs://ai2-llm"
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
@@ -163,7 +158,7 @@ class TransformerConfigBuilder:
         global_batch_size *= self.model_config.batch_divisor
 
         global_batch_size = self.next_power_of_2(global_batch_size)
-        print(f"Global batch size: {global_batch_size}")
+        print(f"Global batch size is: {global_batch_size}")
 
         return global_batch_size
 
@@ -198,7 +193,11 @@ class TransformerConfigBuilder:
                     mix_base_dir=self.root_dir,
                     sequence_length=self.sequence_length,
                     tokenizer=self.tokenizer,
-                    work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache",
+                    work_dir=(
+                        "./dataset-cache"
+                        if is_url(self.root_dir)
+                        else f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache"
+                    ),
                 ),
                 eval_interval=self.model_config.eval_interval,
             ),
