@@ -198,7 +198,7 @@ class TransformerConfigBuilder:
                     mix_base_dir=self.root_dir,
                     sequence_length=self.sequence_length,
                     tokenizer=self.tokenizer,
-                    work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/{TokenizerConfig.identifier or 'default'}/dataset-cache",
+                    work_dir=f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache",
                 ),
                 eval_interval=self.model_config.eval_interval,
             ),
