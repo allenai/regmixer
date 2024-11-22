@@ -187,7 +187,9 @@ def fit(
 
     logger.info(f"Calculating source weights...")
     priors = calculate_priors(
-        source_configs=launch_config.sources, dtype=launch_config.dtype, use_cache=True
+        source_configs=launch_config.sources,
+        dtype=launch_config.dtype,
+        use_cache=(no_cache == False),
     )
     logger.info(f"Source weights:")
     logger.info(priors)
@@ -327,6 +329,39 @@ def mk_run_instance(run: Run, history: list[Any]) -> RunInstance:
     )
 
 
+def _plot_simulations(
+    prior_distributions: np.ndarray,
+    samples,
+    columns: list[str],
+    metric_name: str,
+    temperature: float,
+    output_dir: str = BASE_OUTPUT_DIR,
+):
+    plt.close()
+    df = pd.DataFrame(
+        data=np.concatenate([np.array([prior_distributions]), samples], axis=0),
+        columns=columns,
+    )
+    df = df.sample(n=20, random_state=42)
+    df["sample"] = df.index
+    melted_df = df.melt(id_vars=["sample"], var_name="Domain", value_name="Weight")
+    g = sns.FacetGrid(melted_df, col="sample", col_wrap=4, aspect=2)
+    g.map_dataframe(sns.barplot, x="Domain", y="Weight", palette="viridis", hue="Domain")
+    g.set(ylim=(0, 1.1))
+    g.set_axis_labels("Domain", "Weight")
+
+    for ax in g.axes.flat:
+        for label in ax.get_xticklabels():
+            label.set_rotation(90)
+
+    plt.savefig(
+        f"{_mk_plot_prefix(output_dir, metric_name, temperature)}_sim_grid.png",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
+    plt.close()
+
+
 def _plot_correlation(
     Y_test: np.ndarray,
     X_test: np.ndarray,
@@ -458,12 +493,22 @@ def _simulate(
     logger.info(f"Simulating with {samples.shape[0]:,} samples for {metric_name}...")
     simulation = predictor[index].predict(samples)
 
+    columns = df_config.columns[2:]
+    _plot_simulations(
+        prior_distributions=prior_distributions,
+        samples=samples,
+        columns=columns.to_list(),
+        metric_name=metric_name,
+        temperature=alpha,
+        output_dir=output_dir,
+    )
+
     plt.close()
     plt.hist(simulation, bins=32, color="#F0529C")
     plt.xlabel("Predicted")
     plt.ylabel("Frequency")
     plt.savefig(
-        f"{_mk_plot_prefix(output_dir, metric_name, alpha)}_simulations.png",
+        f"{_mk_plot_prefix(output_dir, metric_name, alpha)}_sim_dist.png",
         bbox_inches="tight",
     )
     plt.close()
@@ -473,9 +518,8 @@ def _simulate(
     top_k_samples.shape
 
     predicted_domain_weights = np.mean(top_k_samples, axis=0)
+    # Normalize the weights
     final_weights = (predicted_domain_weights + prior_distributions) / 2
-
-    columns = df_config.columns[2:]
 
     df = pd.DataFrame(
         data=np.concatenate([np.array([prior_distributions]), top_k_samples], axis=0),
