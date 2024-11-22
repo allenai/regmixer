@@ -26,8 +26,8 @@ import re
 logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning, module="lightgbm")
 
-OUTPUT_DIR = "output/"
-CACHE_DIR = "cache/"
+BASE_OUTPUT_DIR = "output/"
+BASE_CACHE_DIR = "cache/"
 DEFAULT_WORKSPACE = "ai2-llm/regmixer"
 LGBM_HPS = {
     "task": "train",
@@ -57,10 +57,12 @@ class RunInstance:
         }
 
 
+def get_output_dir(group: str) -> str:
+    return f"{BASE_OUTPUT_DIR}{group}/"
+
+
 @click.group()
 def cli():
-    pathlib.Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
-    pathlib.Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
     prepare_cli_environment()
 
 
@@ -136,12 +138,14 @@ def fit(
     workspace: str,
     no_cache: bool,
 ):
-
+    output_dir = get_output_dir(group)
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(BASE_CACHE_DIR).mkdir(parents=True, exist_ok=True)
     if group_average and group_metrics:
         raise ValueError("Cannot provide both group-average and group-metrics")
 
     api = wandb.Api()
-    cache_path = pathlib.Path(CACHE_DIR) / f"{group}_runs_cache.json"
+    cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{group}_runs_cache.json"
 
     if no_cache:
         logger.info(f"Cache disabled, will not use cache for run samples...")
@@ -250,7 +254,13 @@ def fit(
 
     for idx, metric in indexed_metrics:
         _plot_correlation(
-            Y_test, X_test, idx, predictors=predictors, metric_name=metric, temperature=temperature
+            Y_test,
+            X_test,
+            idx,
+            predictors=predictors,
+            metric_name=metric,
+            temperature=temperature,
+            output_dir=output_dir,
         )
         _simulate(
             index=idx,
@@ -259,6 +269,7 @@ def fit(
             prior_distributions=np.array(list(priors[0].values())),
             metric_name=metric,
             temperature=temperature,
+            output_dir=output_dir,
         )
 
 
@@ -324,6 +335,7 @@ def _plot_correlation(
     predictors: list[lgb.LGBMRegressor],
     metric_name: str,
     temperature: Optional[float] = None,
+    output_dir: str = BASE_OUTPUT_DIR,
 ):
     plt.close()
     keys = {"pred": "Predicted", "true": "Actual"}
@@ -366,7 +378,9 @@ def _plot_correlation(
     graph.ax_joint.grid(True, ls="dashed")
     graph.ax_joint.spines[["right", "top"]].set_visible(True)
 
-    graph.savefig(f"{_mk_plot_prefix(metric_name, temperature)}_fit.png", bbox_inches="tight")
+    graph.savefig(
+        f"{_mk_plot_prefix(output_dir, metric_name, temperature)}_fit.png", bbox_inches="tight"
+    )
 
 
 def _mk_run_metrics(
@@ -413,21 +427,28 @@ def _simulate(
     metric_name: str,
     n_samples: int = 100_000,
     temperature: float = 1.0,
-    high_entropy: bool = True,
+    use_entropy: bool = True,
+    min_entropy: float = 1e-4,
+    output_dir: str = BASE_OUTPUT_DIR,
 ):
     np.random.seed(42)
     samples = np.random.dirichlet(prior_distributions * temperature, 10 * n_samples)
 
-    if high_entropy:
-        entropy = -np.sum(samples * np.log(samples + 1e-3), axis=1)
+    if use_entropy:
+        entropy = -np.sum(samples * np.log(samples + min_entropy), axis=1)
         high_entropy_indices = np.argsort(entropy)[-n_samples:]
         samples = samples[high_entropy_indices]
+    else:
+        samples = samples[:n_samples]
 
     simulation = predictor[index].predict(samples)
 
     plt.close()
     plt.hist(simulation, bins=32)
-    plt.savefig(f"{_mk_plot_prefix(metric_name, temperature)}_simulations.png", bbox_inches="tight")
+    plt.savefig(
+        f"{_mk_plot_prefix(output_dir, metric_name, temperature)}_simulations.png",
+        bbox_inches="tight",
+    )
     plt.close()
 
     k = 128
@@ -449,7 +470,9 @@ def _simulate(
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
 
-    with open(f"{_mk_plot_prefix(metric_name, temperature=temperature)}_optimal.json", "w") as f:
+    with open(
+        f"{_mk_plot_prefix(output_dir, metric_name, temperature=temperature)}_optimal.json", "w"
+    ) as f:
         out = []
         for idx, weight in enumerate(final_weights):
             out.append({"domain": columns[idx], "weight": weight})
@@ -506,20 +529,20 @@ def _simulate(
     )
 
     plt.savefig(
-        f"{_mk_plot_prefix(metric_name, temperature=temperature)}_optimal.png",
+        f"{_mk_plot_prefix(output_dir, metric_name, temperature=temperature)}_optimal.png",
         bbox_inches="tight",
         pad_inches=0.1,
     )
 
 
-def _mk_plot_prefix(metric: str, temperature: Optional[float] = None) -> str:
+def _mk_plot_prefix(outout_dir: str, metric: str, temperature: Optional[float] = None) -> str:
     def sanitize(s: str) -> str:
         return re.sub(r"[^a-zA-Z0-9_\-]", "_", s)
 
-    return f"{OUTPUT_DIR}{sanitize(metric)}" + (
+    return f"{outout_dir}{sanitize(metric)}" + (
         f"_temp_{str(temperature).replace('.', '_')}" if temperature and temperature != 1.0 else ""
     )
 
 
 if __name__ == "main":
-    cli()
+    cli(obj={})
