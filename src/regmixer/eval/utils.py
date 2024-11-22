@@ -22,6 +22,7 @@ from regmixer.synthesize_mixture import calculate_priors
 from regmixer.utils import config_from_path
 import warnings
 import re
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning, module="lightgbm")
@@ -36,8 +37,9 @@ LGBM_HPS = {
     "metric": ["l1", "l2"],
     "seed": 42,
     "num_iterations": 10000,
-    "learning_rate": 1e-2,
+    "learning_rate": 0.1,
     "verbosity": -1,
+    "early_stopping_round": 3,
 }
 
 
@@ -242,9 +244,6 @@ def fit(
             target,
             eval_set=[(X_test, test_target)],
             eval_metric="l2",
-            callbacks=[
-                lgb.early_stopping(stopping_rounds=3, verbose=False),
-            ],
         )
         r, _ = spearmanr(a=regression.predict(X_test), b=test_target)
         corr = np.round(r * 100, decimals=2)
@@ -268,7 +267,7 @@ def fit(
             df_config=ratios,
             prior_distributions=np.array(list(priors[0].values())),
             metric_name=metric,
-            temperature=temperature,
+            alpha=temperature,
             output_dir=output_dir,
         )
 
@@ -426,27 +425,45 @@ def _simulate(
     df_config: pd.DataFrame,
     metric_name: str,
     n_samples: int = 100_000,
-    temperature: float = 1.0,
+    alpha: float = 1.0,
     use_entropy: bool = True,
-    min_entropy: float = 1e-4,
+    min_entropy: float = 1e-3,
     output_dir: str = BASE_OUTPUT_DIR,
 ):
     np.random.seed(42)
-    samples = np.random.dirichlet(prior_distributions * temperature, 10 * n_samples)
+    num_samples_per_strength = 25
+    candidates = []
+
+    logger.info(
+        f"Generating {n_samples * num_samples_per_strength:,} sample candidates for {metric_name}..."
+    )
+    for idx in tqdm(range(n_samples), desc="Generating candidates"):
+        min_strength_log = np.log10(min_entropy)
+        max_strength_log = np.log10(alpha)
+
+        for strength in np.logspace(min_strength_log, max_strength_log, num_samples_per_strength):
+            candidates.append(np.random.dirichlet(prior_distributions * strength, 1))
+
+    all_samples = np.array(candidates).reshape(-1, len(prior_distributions))
+    all_samples = all_samples[~np.isnan(all_samples).any(axis=1)]
+    logger.info(f"Generated {all_samples.shape} valid samples for {metric_name}...")
 
     if use_entropy:
-        entropy = -np.sum(samples * np.log(samples + min_entropy), axis=1)
+        entropy = -np.sum(all_samples * np.log(all_samples + min_entropy), axis=1)
         high_entropy_indices = np.argsort(entropy)[-n_samples:]
-        samples = samples[high_entropy_indices]
+        samples = all_samples[high_entropy_indices]
     else:
-        samples = samples[:n_samples]
+        samples = all_samples[n_samples:]
 
+    logger.info(f"Simulating with {samples.shape[0]:,} samples for {metric_name}...")
     simulation = predictor[index].predict(samples)
 
     plt.close()
-    plt.hist(simulation, bins=32)
+    plt.hist(simulation, bins=32, color="#F0529C")
+    plt.xlabel("Predicted")
+    plt.ylabel("Frequency")
     plt.savefig(
-        f"{_mk_plot_prefix(output_dir, metric_name, temperature)}_simulations.png",
+        f"{_mk_plot_prefix(output_dir, metric_name, alpha)}_simulations.png",
         bbox_inches="tight",
     )
     plt.close()
@@ -471,7 +488,7 @@ def _simulate(
     logger.info("Predicted optimal weights:")
 
     with open(
-        f"{_mk_plot_prefix(output_dir, metric_name, temperature=temperature)}_optimal.json", "w"
+        f"{_mk_plot_prefix(output_dir, metric_name, temperature=alpha)}_optimal.json", "w"
     ) as f:
         out = []
         for idx, weight in enumerate(final_weights):
@@ -529,7 +546,7 @@ def _simulate(
     )
 
     plt.savefig(
-        f"{_mk_plot_prefix(output_dir, metric_name, temperature=temperature)}_optimal.png",
+        f"{_mk_plot_prefix(output_dir, metric_name, temperature=alpha)}_optimal.png",
         bbox_inches="tight",
         pad_inches=0.1,
     )
