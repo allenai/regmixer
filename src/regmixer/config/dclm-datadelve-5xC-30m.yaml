@@ -1,17 +1,20 @@
-name: "dclm-datadelve-1xC"
-description: "Mixture of datadelve partitioned dclm sample @ 1xC scale"
+name: "dclm-datadelve-1xC-30m"
+description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 1xC scale"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 8
-variants: 5
+variants: 100
 preemptible: true
-max_tokens: 3_800_000_000 # 190_000_000 * 20
+max_tokens: 3_000_000_000 # 30_000_000 * 20 * 5 == 5xC
 sequence_length: 2048
 seed: 42
+temperature: 0.75
+proxy_model_id: "olmo_30m"
+tokenizer: "gpt_neox"
+dtype: "uint16"
 priority: high
 cluster: ai2/saturn-cirrascale
-dtype: "uint32"
 sources:
   - name: adult_content
     paths:

@@ -29,7 +29,7 @@ class ConfigDefaults:
     max_strength: float = 5.0
     sample_multiplier: int = 10
     maximum_repetition: int = 1
-    minimum_weight: float = 2e-4  # 0.0002
+    minimum_weight: float = 2e-3  # 0.002
 
 
 def generate_weights_dirichlet(
@@ -116,17 +116,18 @@ def generate_weights_dirichlet(
     return selected_samples
 
 
-def mk_mixtures(config: ExperimentConfig):
+def mk_mixtures(config: ExperimentConfig, use_cache: bool = True):
     random.seed(config.seed)
     np.random.seed(config.seed)
 
     num_samples = config.variants
     sources = config.sources
-    source_dist, source_total = calculate_priors(sources, config.dtype)
+    source_dist, source_total = calculate_priors(sources, config.dtype, use_cache=use_cache)
 
     logger.info(f"Using seed: {config.seed}")
     logger.info("Source distribution:")
     logger.info(source_dist)
+    logger.info(f"Total tokens: {source_total}")
 
     prior_dist = [v for _, v in source_dist.items()]
 
@@ -137,7 +138,7 @@ def mk_mixtures(config: ExperimentConfig):
         prior_dist=prior_dist,
         minimum_weight=ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
-        temperature=config.temperature,
+        temperature=config.mix_temperature,
         token_scale=source_total / config.max_tokens,
     )
 
@@ -164,7 +165,7 @@ def _count_tokens_for_file(path: PathOrStr, dtype: NumpyDatasetDType) -> int:
 
 
 def calculate_priors(
-    source_configs: list[SourceConfig], dtype: NumpyDatasetDType, use_cache: bool = True
+    source_configs: list[SourceConfig], dtype: NumpyDatasetDType, use_cache: bool
 ) -> Tuple[dict[str, float], int]:
     config_hash = hashlib.md5(
         json.dumps(
@@ -177,7 +178,9 @@ def calculate_priors(
     if use_cache:
         try:
             with open(cache_path, "r") as f:
-                logger.info("Cache file found, using cached values.")
+                logger.info(
+                    "Source distribution cache found, using cached values! This can be disabled by setting use_cache=False."
+                )
                 obj = json.load(f)
                 return (obj["relative_sizes"], obj["total_tokens"])
         except FileNotFoundError:

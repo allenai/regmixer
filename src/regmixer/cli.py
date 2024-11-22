@@ -12,6 +12,7 @@ from olmo_core.utils import generate_uuid, prepare_cli_environment
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
+from tqdm import tqdm
 from regmixer.utils import (
     config_from_path,
     mk_experiment_group,
@@ -49,7 +50,14 @@ def cli():
     default=False,
     help="Print the experiment group configurations without launching.",
 )
-def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
+@click.option(
+    "--no-cache",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Do not cache sources for this experiment group.",
+)
+def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: bool):
     """Launch an experiment."""
 
     with open(config, "r") as f:
@@ -57,6 +65,13 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
 
     experiment_config = ExperimentConfig(**data)
     group_uuid = generate_uuid()[:8]
+
+    logger.info("Building experiment group with the following config...")
+    logger.info(experiment_config)
+
+    if not click.confirm("Proceed with this configuration?", default=False):
+        logger.info("Launch cancelled!")
+        return
 
     if mixture_file:
         with open(mixture_file, "r") as f:
@@ -70,7 +85,7 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
             )
         )
     else:
-        mixes = mk_mixes(config)
+        mixes = mk_mixes(config, use_cache=(no_cache == False))
 
         if click.confirm("Launch experiment with this set of mixtures?", default=False):
             launch_group = LaunchGroup(
@@ -79,7 +94,7 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
                 )
             )
         else:
-            logger.info("Launch cancelled")
+            logger.info("Launch cancelled!")
             return
 
     logger.info("Launching experiment group...")
@@ -91,10 +106,17 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool):
                 logger.info(experiment.build_experiment_spec())
             return
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(experiment.launch) for experiment in launch_group.instances]
 
-        results = [future.result() for future in futures]
+            for future in tqdm(
+                concurrent.futures.as_completed(futures),
+                total=len(futures),
+                desc="Launching experiments",
+            ):
+                results.append(future.result())
+
         logger.info(results)
         logger.info(f"Experiment group '{group_uuid}' launched successfully!")
     except KeyboardInterrupt:
@@ -187,9 +209,11 @@ def validate(config: Path):
             run_name="validate-no-op",
             max_tokens=experiment_group.config.max_tokens,
             sources=experiment.sources,
-            overrides=[],
             sequence_length=experiment_group.config.sequence_length,
             seed=experiment_group.config.seed,
+            tokenizer=experiment_group.config.tokenizer,
+            dtype=experiment_group.config.dtype,
+            model_identifier=experiment_group.config.proxy_model_id,
         ).build()
         dataset = transformer.dataset.build()
         dataset.prepare()

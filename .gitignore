@@ -55,3 +55,4 @@ site/
 # Outputs
 
 output/
+cache/

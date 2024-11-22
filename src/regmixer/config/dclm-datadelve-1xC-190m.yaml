@@ -1,13 +1,15 @@
-name: "dclm-datadelve-1xC"
-description: "Mixture of datadelve partitioned dclm sample @ 5xC scale"
+name: "dclm-datadelve-1xC-190m"
+description: "Mixture of datadelve partitioned dclm sample olmo-190m @ 1xC scale"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
-gpus: 1
+gpus: 8
 variants: 5
 preemptible: true
-max_tokens: 19_000_000_000 # 190_000_000 * 100
+max_tokens: 3_800_000_000 # 190_000_000 * 20
 sequence_length: 2048
+proxy_model_id: "olmo_190m"
+tokenizer: "dolma2"
 seed: 42
 priority: high
 cluster: ai2/saturn-cirrascale

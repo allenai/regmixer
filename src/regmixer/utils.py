@@ -91,6 +91,9 @@ def mk_instance_cmd(
         f"-S {config.seed}",
         f"-c {config.cluster}",
         f"-u {beaker_user}",
+        f"-d {config.dtype.value}",
+        f"-T {config.tokenizer}",
+        f"-m {config.proxy_model_id}",
         *sources,
     ]
 
@@ -153,12 +156,14 @@ def prettify_mixes(mixes: list[dict[str, float]]):
     return json.dumps(result, indent=2)
 
 
-def mk_mixes(config_file: Path, output: Optional[Path] = None):
+def mk_mixes(
+    config_file: Path, output: Optional[Path] = None, use_cache: bool = True
+) -> list[dict[str, float]]:
     with open(config_file, "r") as f:
         data = yaml.safe_load(f)
 
     config = ExperimentConfig(**data)
-    mixes = mk_mixtures(config)
+    mixes = mk_mixtures(config, use_cache=use_cache)
     mix_string = prettify_mixes(mixes)
 
     if not output:

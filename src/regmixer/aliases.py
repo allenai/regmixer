@@ -35,10 +35,13 @@ class ExperimentConfig(BaseModel):
     sequence_length: int
     seed: int
     cluster: str
-    dtype: NumpyDatasetDType = NumpyDatasetDType.uint32
+    tokenizer: str
     priority: Priority
     sources: list[SourceConfig]
-    temperature: float = 1.0
+    tokenizer: str
+    proxy_model_id: str
+    dtype: NumpyDatasetDType = NumpyDatasetDType.uint32
+    mix_temperature: float = 1.0
     preemptible: bool = True
     shared_filesystem: bool = False
     nfs: bool = False
