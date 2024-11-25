@@ -524,8 +524,6 @@ def _simulate(
 
     predicted_domain_weights = np.mean(top_k_samples, axis=0)
     final_weights = predicted_domain_weights
-    # Normalize the weights
-    # final_weights = (predicted_domain_weights + prior_distributions) / 2
 
     df = pd.DataFrame(
         data=np.concatenate([np.array([prior_distributions]), top_k_samples], axis=0),
