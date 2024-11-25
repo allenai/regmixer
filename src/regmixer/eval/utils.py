@@ -84,11 +84,11 @@ def cli():
     required=True,
 )
 @click.option(
-    "-t",
-    "--temperature",
+    "-a",
+    "--alpha",
     type=float,
     default=1.0,
-    help="Temperature to apply to the optimal weights",
+    help="Alpha to apply to simulated distributions",
     required=False,
 )
 @click.option(
@@ -133,7 +133,7 @@ def cli():
 def fit(
     group: str,
     config: pathlib.Path,
-    temperature: float,
+    alpha: float,
     num_samples: int,
     group_average: Optional[str],
     group_metrics: Optional[str],
@@ -260,7 +260,7 @@ def fit(
             idx,
             predictors=predictors,
             metric_name=metric,
-            temperature=temperature,
+            alpha=alpha,
             output_dir=output_dir,
         )
         _simulate(
@@ -269,7 +269,7 @@ def fit(
             df_config=ratios,
             prior_distributions=np.array(list(priors[0].values())),
             metric_name=metric,
-            alpha=temperature,
+            alpha=alpha,
             output_dir=output_dir,
         )
 
@@ -334,7 +334,7 @@ def _plot_simulations(
     samples,
     columns: list[str],
     metric_name: str,
-    temperature: float,
+    alpha: float,
     output_dir: str = BASE_OUTPUT_DIR,
 ):
     plt.close()
@@ -347,15 +347,16 @@ def _plot_simulations(
     melted_df = df.melt(id_vars=["sample"], var_name="Domain", value_name="Weight")
     g = sns.FacetGrid(melted_df, col="sample", col_wrap=4, aspect=2)
     g.map_dataframe(sns.barplot, x="Domain", y="Weight", palette="viridis", hue="Domain")
-    g.set(ylim=(0, 1.1))
+    g.set(ylim=(0, 0.5))
     g.set_axis_labels("Domain", "Weight")
 
     for ax in g.axes.flat:
         for label in ax.get_xticklabels():
             label.set_rotation(90)
+        ax.yaxis.grid(True, linestyle="--", which="both", color="gray", alpha=0.7)
 
     plt.savefig(
-        f"{_mk_plot_prefix(output_dir, metric_name, temperature)}_sim_grid.png",
+        f"{_mk_plot_prefix(output_dir, metric_name, alpha)}_sim_grid.png",
         bbox_inches="tight",
         pad_inches=0.1,
     )
@@ -368,7 +369,7 @@ def _plot_correlation(
     index: int,
     predictors: list[lgb.LGBMRegressor],
     metric_name: str,
-    temperature: Optional[float] = None,
+    alpha: Optional[float] = None,
     output_dir: str = BASE_OUTPUT_DIR,
 ):
     plt.close()
@@ -380,11 +381,11 @@ def _plot_correlation(
         y=keys["true"],
         kind="reg",
         height=10,
-        scatter_kws={"s": 128, "color": "#5969CB"},
+        scatter_kws={"s": 64, "color": "#105257"},
         joint_kws={
             "line_kws": {
-                "color": "#C3364A",
-                "linewidth": 6,
+                "color": "#F0529C",
+                "linewidth": 4,
                 "linestyle": "dashed",
             }
         },
@@ -400,21 +401,19 @@ def _plot_correlation(
         edgecolor="black",
         fancybox=False,
         prop={
-            "size": 24,
+            "size": 18,
         },
         handlelength=-0.5,
     )
 
-    graph.ax_joint.set_ylabel(keys["true"], fontdict={"size": 32})
-    graph.ax_joint.set_xlabel(keys["pred"], fontdict={"size": 32})
+    graph.ax_joint.set_ylabel(keys["true"], fontdict={"size": 24})
+    graph.ax_joint.set_xlabel(keys["pred"], fontdict={"size": 24})
     graph.ax_marg_x.remove()
     graph.ax_marg_y.remove()
     graph.ax_joint.grid(True, ls="dashed")
     graph.ax_joint.spines[["right", "top"]].set_visible(True)
 
-    graph.savefig(
-        f"{_mk_plot_prefix(output_dir, metric_name, temperature)}_fit.png", bbox_inches="tight"
-    )
+    graph.savefig(f"{_mk_plot_prefix(output_dir, metric_name, alpha)}_fit.png", bbox_inches="tight")
 
 
 def _mk_run_metrics(
@@ -461,6 +460,7 @@ def _simulate(
     metric_name: str,
     n_samples: int = 100_000,
     alpha: float = 1.0,
+    normalization: bool = False,
     use_entropy: bool = True,
     min_entropy: float = 1e-3,
     output_dir: str = BASE_OUTPUT_DIR,
@@ -477,7 +477,12 @@ def _simulate(
         max_strength_log = np.log10(alpha)
 
         for strength in np.logspace(min_strength_log, max_strength_log, num_samples_per_strength):
-            candidates.append(np.random.dirichlet(prior_distributions * strength, 1))
+            weights = np.random.dirichlet(prior_distributions * strength, 1)
+
+            if normalization:
+                weights = (weights * 1.5 + prior_distributions) / 2.5
+
+            candidates.append(weights)
 
     all_samples = np.array(candidates).reshape(-1, len(prior_distributions))
     all_samples = all_samples[~np.isnan(all_samples).any(axis=1)]
@@ -499,7 +504,7 @@ def _simulate(
         samples=samples,
         columns=columns.to_list(),
         metric_name=metric_name,
-        temperature=alpha,
+        alpha=alpha,
         output_dir=output_dir,
     )
 
@@ -518,8 +523,7 @@ def _simulate(
     top_k_samples.shape
 
     predicted_domain_weights = np.mean(top_k_samples, axis=0)
-    # Normalize the weights
-    final_weights = (predicted_domain_weights + prior_distributions) / 2
+    final_weights = predicted_domain_weights
 
     df = pd.DataFrame(
         data=np.concatenate([np.array([prior_distributions]), top_k_samples], axis=0),
@@ -531,9 +535,7 @@ def _simulate(
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
 
-    with open(
-        f"{_mk_plot_prefix(output_dir, metric_name, temperature=alpha)}_optimal.json", "w"
-    ) as f:
+    with open(f"{_mk_plot_prefix(output_dir, metric_name, alpha=alpha)}_optimal.json", "w") as f:
         out = []
         for idx, weight in enumerate(final_weights):
             out.append({"domain": columns[idx], "weight": weight})
@@ -590,18 +592,18 @@ def _simulate(
     )
 
     plt.savefig(
-        f"{_mk_plot_prefix(output_dir, metric_name, temperature=alpha)}_optimal.png",
+        f"{_mk_plot_prefix(output_dir, metric_name, alpha=alpha)}_optimal.png",
         bbox_inches="tight",
         pad_inches=0.1,
     )
 
 
-def _mk_plot_prefix(outout_dir: str, metric: str, temperature: Optional[float] = None) -> str:
+def _mk_plot_prefix(outout_dir: str, metric: str, alpha: Optional[float] = None) -> str:
     def sanitize(s: str) -> str:
         return re.sub(r"[^a-zA-Z0-9_\-]", "_", s)
 
     return f"{outout_dir}{sanitize(metric)}" + (
-        f"_temp_{str(temperature).replace('.', '_')}" if temperature and temperature != 1.0 else ""
+        f"_alpha_{str(alpha).replace('.', '_')}" if alpha and alpha != 1.0 else ""
     )
 
 
