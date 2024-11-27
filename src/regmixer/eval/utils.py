@@ -1,11 +1,12 @@
-from pathlib import Path
-from dataclasses import dataclass
-from typing import Any, Optional, Tuple
 import json
 import logging
 import pathlib
+import re
+import warnings
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional, Tuple
 
-from wandb.apis.public import Run
 import click
 import lightgbm as lgb
 import matplotlib.pyplot as plt
@@ -13,16 +14,14 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import wandb
-
 from olmo_core.utils import prepare_cli_environment
 from scipy.stats import spearmanr
+from tqdm import tqdm
+from wandb.apis.public import Run
 
 from regmixer.eval.constants import GroupedWandbMetrics, WandbMetrics
 from regmixer.synthesize_mixture import calculate_priors
 from regmixer.utils import config_from_path
-import warnings
-import re
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning, module="lightgbm")
@@ -576,18 +575,18 @@ def _simulate(
     )
 
     ax.yaxis.grid(True, linestyle="--", which="both", color="gray", alpha=0.7)
-    ax.set_ylim(0, 1.1)
+    ax.set_ylim(0, 0.5)
 
     ax.set_xlabel(
         "Domain",
         fontdict={
-            "size": 32,
+            "size": 28,
         },
     )
     ax.set_ylabel(
         "Weight",
         fontdict={
-            "size": 32,
+            "size": 28,
         },
     )
 

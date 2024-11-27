@@ -230,4 +230,5 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.pile_validation_ce_loss.value,
         WandbMetrics.trivia_qa_wiki_ppl_ce_loss.value,
     ]
+    train_loss = [WandbMetrics.train_loss.value]
     all_metrics = [metric.value for metric in WandbMetrics]
