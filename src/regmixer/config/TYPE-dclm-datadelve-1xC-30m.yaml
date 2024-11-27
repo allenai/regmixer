@@ -1,0 +1,90 @@
+name: "dclm-datadelve-1xC-30m"
+description: "Mixture of datadelve type - partitioned dclm sample olmo-30m @ 1xC scale"
+budget: "ai2/oe-data"
+workspace: "ai2/dolma2"
+nodes: 1
+gpus: 8
+variants: 5
+preemptible: true
+max_tokens: 600_000_000 # 30_000_000 * 20
+sequence_length: 2048
+seed: 42
+temperature: 0.75
+proxy_model_id: "olmo_30m"
+tokenizer: "gpt_neox"
+dtype: "uint16"
+priority: high
+cluster: ai2/saturn-cirrascale #ai2/augusta-google-1
+sources:
+  - name: academic_writing
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/academic_writing/**/*.npy
+  - name: content_listing
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/content_listing/**/*.npy
+  - name: creative_writing
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/creative_writing/**/*.npy
+  - name: customer_support_page
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/customer_support_page/**/*.npy
+  - name: discussion_forum_or_comment_section
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/discussion_forum_or_comment_section/**/*.npy
+  - name: faqs
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/faqs/**/*.npy
+  - name: incomplete_content
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/incomplete_content/**/*.npy
+  - name: knowledge_article
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/knowledge_article/**/*.npy
+  - name: legal_notices
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/legal_notices/**/*.npy
+  - name: listicle
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/listicle/**/*.npy
+  - name: news_article
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/news_article/**/*.npy
+  - name: nonfiction_writing
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/nonfiction_writing/**/*.npy
+  - name: organizational_about_page
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/organizational_about_page/**/*.npy
+  - name: organizational_announcement
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/organizational_announcement/**/*.npy
+  - name: personal_about_page
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/personal_about_page/**/*.npy
+  - name: personal_blog
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/personal_blog/**/*.npy
+  - name: product_page
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/product_page/**/*.npy
+  - name: qanda_forum
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/qanda_forum/**/*.npy
+  - name: spam_or_ads
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/spam_or_ads/**/*.npy
+  - name: structured_data
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/structured_data/**/*.npy
+  - name: technical_writing
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/technical_writing/**/*.npy
+  - name: transcript_or_interview
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/transcript_or_interview/**/*.npy
+  - name: tutorial_or_how_to_guide
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/tutorial_or_how_to_guide/**/*.npy
+  - name: user_reviews
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/type/user_reviews/**/*.npy
