@@ -11,8 +11,8 @@ from olmo_core.data import (
     NumpyDatasetType,
     TokenizerConfig,
 )
-from olmo_core.io import is_url
 from olmo_core.data.types import NumpyDatasetDType
+from olmo_core.io import is_url
 from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
 from olmo_core.optim import AdamWConfig, CosWithWarmup, OptimGroupOverride
 from olmo_core.train import TrainerConfig
@@ -31,14 +31,13 @@ from olmo_core.train.callbacks import (
 
 from regmixer.aliases import SourceInstance
 from regmixer.data.dataset import MixtureBuilder
-from regmixer.model.evaluators import DownstreamEvaluators
 from regmixer.model.aliases import (
     ModelConfig,
     ModelTrainConfig,
     SupportedModels,
     SupportedTokenizers,
 )
-
+from regmixer.model.evaluators import DownstreamEvaluators
 
 logger = logging.getLogger(__name__)
 

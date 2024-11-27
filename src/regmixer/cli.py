@@ -9,10 +9,10 @@ import yaml
 from beaker import Beaker
 from beaker.services.job import JobClient
 from olmo_core.utils import generate_uuid, prepare_cli_environment
+from tqdm import tqdm
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
-from tqdm import tqdm
 from regmixer.utils import (
     config_from_path,
     mk_experiment_group,
