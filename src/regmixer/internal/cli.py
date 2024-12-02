@@ -206,3 +206,19 @@ def train(
 
 if __name__ == "__main__":
     cli()
+
+    """
+    Example usage:
+    rmc-internal train \
+        -n regmixer-avg-bpb-weights \
+        -t dolma2 \
+        -c ai2/saturn-cirrascale \
+        -w ai2/dolma2 \
+        -b ai2/oe-data \
+        -m 600_000_000 \
+        -l 2048 \
+        -p high \
+        -g 8 \
+        -N 1 \
+        -s avg_mmlu_bpb_alpha_7_0.yam
+    """
