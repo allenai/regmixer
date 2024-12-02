@@ -43,25 +43,37 @@ class ModelConfig:
     block_type: TransformerBlockType = TransformerBlockType.reordered_norm
 
     @classmethod
-    def olmo_190m(cls) -> "ModelConfig":
-        return ModelConfig(
-            compile=True,
-            d_model=768,
-            n_heads=12,
-            n_layers=12,
-            rope_theta=500000,
-            flash_attention=True,
-            max_sequence_length=4096,
-        )
-
-    @classmethod
     def olmo_30m(cls) -> "ModelConfig":
         return ModelConfig(
             compile=True,
             d_model=256,
             n_heads=8,
             n_layers=4,
-            rope_theta=500000,
+            rope_theta=500_000,
+            flash_attention=True,
+            max_sequence_length=4096,
+        )
+
+    @classmethod
+    def olmo_190m(cls) -> "ModelConfig":
+        return ModelConfig(
+            compile=True,
+            d_model=768,
+            n_heads=12,
+            n_layers=12,
+            rope_theta=500_000,
+            flash_attention=True,
+            max_sequence_length=4096,
+        )
+
+    @classmethod
+    def olmo_1b(cls) -> "ModelConfig":
+        return ModelConfig(
+            compile=True,
+            d_model=2048,
+            n_heads=16,
+            n_layers=18,
+            rope_theta=500_000,
             flash_attention=True,
             max_sequence_length=4096,
         )
@@ -70,6 +82,7 @@ class ModelConfig:
 class SupportedModels(Enum):
     olmo_190m = ModelConfig.olmo_190m()
     olmo_30m = ModelConfig.olmo_30m()
+    olmo_1b = ModelConfig.olmo_1b()
 
 
 class SupportedTokenizers(Enum):
