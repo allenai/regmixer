@@ -46,9 +46,9 @@ all = [
 
 [project.scripts]
 rmc = "regmixer.cli:cli"
-rmc-workspace = "regmixer.workspace:cli"
-rmc-train = "regmixer.train:cli"
 rmc-eval = "regmixer.eval.utils:cli"
+rmc-workspace = "regmixer.workspace:cli"
+rmc-internal = "regmixer.internal.cli:cli"
 
 [tool.black]
 line-length = 100

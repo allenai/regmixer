@@ -248,7 +248,7 @@ class TransformerConfigBuilder:
             max_tokens=self.max_tokens,
             sequence_length=self.sequence_length,
             seed=self.seed,
-            processes=min(os.cpu_count() or 1, 6),
+            processes=min(os.cpu_count() or 1, 16),
             dtype=self.dataset_dtype,
         ).build()
 
