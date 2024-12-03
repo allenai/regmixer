@@ -1,0 +1,97 @@
+sources:
+  - domain: social_life
+    weight: 0.004427725719720235
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/social_life/**/*.npy
+  - domain: health
+    weight: 0.17087847270400924
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/health/**/*.npy
+  - domain: home_and_hobbies
+    weight: 0.055165348487734585
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/home_and_hobbies/**/*.npy
+  - domain: literature
+    weight: 0.03364901847853028
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/literature/**/*.npy
+  - domain: finance_and_business
+    weight: 0.10259183097124366
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
+  - domain: fashion_and_beauty
+    weight: 0.00444818003494339
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/fashion_and_beauty/**/*.npy
+  - domain: art_and_design
+    weight: 0.011710242134503843
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/art_and_design/**/*.npy
+  - domain: adult_content
+    weight: 0.00961865430974295
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/adult_content/**/*.npy
+  - domain: crime_and_law
+    weight: 0.024227999735552987
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
+  - domain: games
+    weight: 0.04175350460625659
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/games/**/*.npy
+  - domain: entertainment
+    weight: 0.032000870873938776
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/entertainment/**/*.npy
+  - domain: politics
+    weight: 0.13640201012602932
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/politics/**/*.npy
+  - domain: science_math_and_technology
+    weight: 0.09649374798586141
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
+  - domain: transportation
+    weight: 0.026382168324494738
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/transportation/**/*.npy
+  - domain: travel_and_tourism
+    weight: 0.016195428676979554
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
+  - domain: religion
+    weight: 0.047450807320715466
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/religion/**/*.npy
+  - domain: sports_and_fitness
+    weight: 0.028314367028532256
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
+  - domain: software_development
+    weight: 0.00953527303338638
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software_development/**/*.npy
+  - domain: electronics_and_hardware
+    weight: 0.02705854284627622
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+  - domain: food_and_dining
+    weight: 0.018897392723021145
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/food_and_dining/**/*.npy
+  - domain: industrial
+    weight: 0.008741687554912426
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/industrial/**/*.npy
+  - domain: education_and_jobs
+    weight: 0.044344916874133056
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+  - domain: history_and_geography
+    weight: 0.027815206849368578
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
+  - domain: software
+    weight: 0.021896602600112627
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software/**/*.npy

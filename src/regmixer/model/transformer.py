@@ -132,8 +132,6 @@ class TransformerConfigBuilder:
 
         if "jupiter" in cluster and not s3:
             self.root_dir = "/weka/oe-training-default/ai2-llm"
-        # elif "augusta" in cluster:
-        #     self.root_dir = "gs://ai2-llm"
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
@@ -250,7 +248,7 @@ class TransformerConfigBuilder:
             max_tokens=self.max_tokens,
             sequence_length=self.sequence_length,
             seed=self.seed,
-            processes=min(os.cpu_count() or 1, 6),
+            processes=min(os.cpu_count() or 1, 16),
             dtype=self.dataset_dtype,
         ).build()
 
