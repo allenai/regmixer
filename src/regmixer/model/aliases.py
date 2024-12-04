@@ -68,6 +68,9 @@ class ModelConfig:
 
     @classmethod
     def olmo_1b(cls) -> "ModelConfig":
+        """
+        OLMo-1b (1_336_035_328 parameters)
+        """
         return ModelConfig(
             compile=True,
             d_model=2048,

@@ -52,7 +52,6 @@ def generate_weights_dirichlet(
 
     if enable_bound:
         logger.info("Weight bounds enabled...")
-        # TODO: Figure out how to introduce repitition factor into the weight outputs.
         weight_bounds = [
             (0.0, min(prior_dist[idx] * token_scale, 1.0)) for idx in range(len(prior_dist))
         ]
@@ -124,10 +123,10 @@ def mk_mixtures(config: ExperimentConfig, use_cache: bool = True):
     sources = config.sources
     source_dist, source_total = calculate_priors(sources, config.dtype, use_cache=use_cache)
 
+    logger.info(f"Total tokens for config: {source_total:,}")
     logger.info(f"Using seed: {config.seed}")
     logger.info("Source distribution:")
     logger.info(source_dist)
-    logger.info(f"Total tokens: {source_total}")
 
     prior_dist = [v for _, v in source_dist.items()]
 
@@ -225,7 +224,6 @@ def calculate_priors(
 
     # Calculate relative sizes
     total_tokens = sum(token_counts.values())
-    logger.info(f"Total tokens for config: {total_tokens:,}")
 
     if total_tokens == 0:
         raise Exception(f"Error processing config, no tokens found!")
