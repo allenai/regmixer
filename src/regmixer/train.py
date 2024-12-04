@@ -3,7 +3,6 @@ import logging
 from typing import List, Tuple, cast
 
 import click
-from olmo_core.distributed.utils import get_num_nodes, init_hybrid_shard_mesh
 from olmo_core.train import prepare_training_environment, teardown_training_environment
 from olmo_core.train.callbacks import ConfigSaverCallback, WandBCallback
 from olmo_core.utils import get_default_device, seed_all
@@ -141,11 +140,14 @@ def train(
     ).build()
     dataset = config.dataset.build()
 
+    device = get_default_device()
+    world_mesh = config.model.build_mesh(device=device)
+
     seed_all(config.init_seed)
     model = config.model.build(
         init_device="meta",
-        device=get_default_device(),
-        dp_mesh=None if get_num_nodes() == 1 else init_hybrid_shard_mesh(),
+        device=device,
+        mesh=world_mesh,
     )
     optim = config.optim.build(model)
     data_loader = config.data_loader.build(dataset)
