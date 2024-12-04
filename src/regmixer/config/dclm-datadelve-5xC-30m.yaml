@@ -1,4 +1,4 @@
-name: "dclm-datadelve-1xC-30m"
+name: "dclm-datadelve-5xC-30m"
 description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"

@@ -110,7 +110,7 @@ def cli():
     "--num-samples",
     type=int,
     default=10,
-    help="The number of evaluation samples per metric to average when fitting the regression",
+    help="The number of evaluation samples per metric to collect from the run history",
     required=False,
 )
 @click.option(
@@ -129,6 +129,14 @@ def cli():
     required=False,
     default=False,
 )
+@click.option(
+    "-e",
+    "--use-entropy",
+    type=bool,
+    help="Select highest entropy samples for simulation.",
+    required=False,
+    default=True,
+)
 def fit(
     group: str,
     config: pathlib.Path,
@@ -138,10 +146,12 @@ def fit(
     group_metrics: Optional[str],
     workspace: str,
     no_cache: bool,
+    use_entropy: bool,
 ):
     output_dir = get_output_dir(group)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
     pathlib.Path(BASE_CACHE_DIR).mkdir(parents=True, exist_ok=True)
+
     if group_average and group_metrics:
         raise ValueError("Cannot provide both group-average and group-metrics")
 
@@ -235,22 +245,9 @@ def fit(
     logger.info(indexed_metrics)
 
     for idx, metric in indexed_metrics:
-        target = Y_train[:, idx]
-        test_target = Y_test[:, idx]
+        predictors.append(build_regression(idx, metric, Y_train, Y_test, X_train, X_test))
 
-        gbm = lgb.LGBMRegressor(**LGBM_HPS)
-
-        regression = gbm.fit(
-            X_train,
-            target,
-            eval_set=[(X_test, test_target)],
-            eval_metric="l2",
-        )
-        r, _ = spearmanr(a=regression.predict(X_test), b=test_target)
-        corr = np.round(r * 100, decimals=2)
-        logger.info(f"{idx}: {metric} :: Correlation: {corr}")
-
-        predictors.append(regression)
+    results = []
 
     for idx, metric in indexed_metrics:
         _plot_correlation(
@@ -262,7 +259,7 @@ def fit(
             alpha=alpha,
             output_dir=output_dir,
         )
-        _simulate(
+        weights = simulate(
             index=idx,
             predictor=predictors,
             df_config=ratios,
@@ -270,7 +267,48 @@ def fit(
             metric_name=metric,
             alpha=alpha,
             output_dir=output_dir,
+            use_entropy=use_entropy,
         )
+
+        results.append((metric, weights))
+
+    if not group_average:
+        average = np.mean([result[1] for result in results], axis=0)
+        _plot_distributions(
+            prior=np.array(list(priors[0].values())),
+            prediction=average,
+            metric_name=f"avg_{eval_metric_group_name}",
+            alpha=alpha,
+            columns=ratios.columns[2:].to_list(),
+            output_dir=output_dir,
+        )
+
+
+def build_regression(
+    idx: int,
+    metric: str,
+    Y_train: pd.DataFrame,
+    Y_test: pd.DataFrame,
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+) -> lgb.LGBMRegressor:
+    target = Y_train[:, idx]
+    test_target = Y_test[:, idx]
+
+    gbm = lgb.LGBMRegressor(**LGBM_HPS)
+
+    regression = gbm.fit(
+        X_train,
+        target,
+        eval_set=[(X_test, test_target)],
+        eval_metric="l2",
+    )
+    r, _ = spearmanr(a=regression.predict(X_test), b=test_target)
+    corr = np.round(r * 100, decimals=2)
+
+    logger.info(f"{idx}: {metric} :: Correlation: {corr}")
+
+    return regression
 
 
 def get_runs_from_api(
@@ -451,19 +489,19 @@ def _mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
     return weights
 
 
-def _simulate(
+def simulate(
     index: int,
     predictor: list[lgb.LGBMRegressor],
     prior_distributions: np.ndarray,
     df_config: pd.DataFrame,
     metric_name: str,
+    use_entropy: bool,
     n_samples: int = 100_000,
     alpha: float = 1.0,
     normalization: bool = False,
-    use_entropy: bool = True,
     min_entropy: float = 1e-3,
     output_dir: str = BASE_OUTPUT_DIR,
-):
+) -> np.ndarray:
     np.random.seed(42)
     num_samples_per_strength = 25
     candidates = []
@@ -492,7 +530,7 @@ def _simulate(
         high_entropy_indices = np.argsort(entropy)[-n_samples:]
         samples = all_samples[high_entropy_indices]
     else:
-        samples = all_samples[n_samples:]
+        samples = all_samples[np.random.choice(all_samples.shape[0], n_samples, replace=False)]
 
     logger.info(f"Simulating with {samples.shape[0]:,} samples for {metric_name}...")
     simulation = predictor[index].predict(samples)
@@ -518,29 +556,61 @@ def _simulate(
     plt.close()
 
     k = 128
-    top_k_samples = samples[np.argsort(simulation)[0:k]]
+    top_k_simulations = np.argsort(simulation)[0:k]
+    # TODO: Make this conditional on the evaluation metric. ie: loss is min but downstream is max
+    logger.info(f"Best prediction: {np.min(simulation)}")
+    top_k_samples = samples[top_k_simulations]
     top_k_samples.shape
 
-    predicted_domain_weights = np.mean(top_k_samples, axis=0)
-    final_weights = predicted_domain_weights
+    top_k_mean_weights = np.mean(top_k_samples, axis=0)
+    top_k_predicted_loss = predictor[index].predict([top_k_mean_weights])
 
-    df = pd.DataFrame(
-        data=np.concatenate([np.array([prior_distributions]), top_k_samples], axis=0),
-        columns=columns,
-    )
-    df = pd.melt(df)
-    df["type"] = (["Original"] + ["Optimal"] * top_k_samples.shape[0]) * len(columns)
-
+    print("\n")
+    logger.info(f"Predicted loss (top_k): {top_k_predicted_loss}")
+    print("\n")
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
 
     with open(f"{_mk_plot_prefix(output_dir, metric_name, alpha=alpha)}_optimal.json", "w") as f:
         out = []
-        for idx, weight in enumerate(final_weights):
+        for idx, weight in enumerate(top_k_mean_weights):
             out.append({"domain": columns[idx], "weight": weight})
 
         logger.info(out)
         f.write(json.dumps(out))
+
+    _plot_distributions(
+        prior=prior_distributions,
+        prediction=top_k_mean_weights,
+        metric_name=metric_name,
+        alpha=alpha,
+        columns=columns.to_list(),
+        output_dir=output_dir,
+    )
+
+    return top_k_mean_weights
+
+
+def _plot_distributions(
+    prior: np.ndarray,
+    prediction: np.ndarray,
+    metric_name: str,
+    alpha: float,
+    columns: list[str],
+    output_dir: str = BASE_OUTPUT_DIR,
+):
+    df = pd.DataFrame(
+        data=np.concatenate(
+            [
+                np.array([prior]),
+                np.array([prediction]),
+            ],
+            axis=0,
+        ),
+        columns=columns,
+    )
+    df = pd.melt(df)
+    df["type"] = (["Original"] + ["Optimal"]) * len(columns)
 
     plt.rc("axes", unicode_minus=False)
     plt.rcParams.update(
@@ -571,7 +641,7 @@ def _simulate(
             "size": 18,
         },
         handlelength=0.5,
-        ncol=2,
+        ncol=3,
     )
 
     ax.yaxis.grid(True, linestyle="--", which="both", color="gray", alpha=0.7)
