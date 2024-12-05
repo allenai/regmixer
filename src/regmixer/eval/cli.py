@@ -26,7 +26,6 @@ from regmixer.eval.utils import (
 )
 
 logger = logging.getLogger(__name__)
-warnings.filterwarnings("ignore", category=UserWarning, module="lightgbm")
 
 BASE_CACHE_DIR = "cache/"
 DEFAULT_WORKSPACE = "ai2-llm/regmixer"
