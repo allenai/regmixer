@@ -29,22 +29,24 @@ def config_from_path(config: Path) -> ExperimentConfig:
 
 
 def mk_source_instances(
-    sources: list[SourceConfig], mix_map: dict[str, float]
+    sources: list[SourceConfig], mix_map: dict[str, tuple[float, float]]
 ) -> list[SourceInstance]:
-    # Note: We filter out any sources that have a weight of 0
-    filtered_sources = [source for source in sources if mix_map[source.name] > 0]
+    # Note: We filter out any sources that have a weight of 0 so we don' try to build
+    # empty token indices downstream in olmo-core
+    filtered_sources = [source for source in sources if mix_map[source.name][0] > 0]
     return [
         SourceInstance(
             name=source.name,
             paths=source.paths,
-            ratio=mix_map[source.name],
+            ratio=mix_map[source.name][0],
+            repetition_factor=mix_map[source.name][1],
         )
         for source in filtered_sources
     ]
 
 
 def mk_experiments(
-    config: ExperimentConfig, mixes: list[dict[str, float]], group_uuid: str
+    config: ExperimentConfig, mixes: list[dict[str, tuple[float, float]]], group_uuid: str
 ) -> list[ExperimentInstance]:
     """Generate source instances from a config."""
     return [
@@ -57,7 +59,7 @@ def mk_experiments(
 
 
 def mk_experiment_group(
-    config: ExperimentConfig, mixes: list[dict[str, float]], group_uuid: str
+    config: ExperimentConfig, mixes: list[dict[str, tuple[float, float]]], group_uuid: str
 ) -> ExperimentGroup:
     """Build an experiment group from an experiment config."""
 
@@ -78,7 +80,9 @@ def mk_instance_cmd(
 
     for source in instance.sources:
         paths = [f'"{path}"' for path in source.paths]
-        source_str = f'-s ("{source.name}",[{",".join(paths)}],{source.ratio})'
+        source_str = (
+            f'-s ("{source.name}",[{",".join(paths)}],{source.ratio},{source.repetition_factor})'
+        )
         sources.append(source_str)
 
     return [

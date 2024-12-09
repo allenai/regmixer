@@ -21,6 +21,7 @@ class SourceInstance(BaseModel):
     name: str
     paths: list[str]
     ratio: float
+    repetition_factor: float = 1.0
 
 
 class ExperimentConfig(BaseModel):
@@ -40,6 +41,7 @@ class ExperimentConfig(BaseModel):
     sources: list[SourceConfig]
     tokenizer: str
     proxy_model_id: str
+    allow_repetition: bool = True
     dtype: NumpyDatasetDType = NumpyDatasetDType.uint32
     mix_temperature: float = 1.0
     preemptible: bool = True

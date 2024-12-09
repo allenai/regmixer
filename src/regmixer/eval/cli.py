@@ -148,6 +148,9 @@ def fit(
                 api, workspace, experiment_groups, cache_path, no_cache, num_samples
             )
 
+    # Filter out failed runs or runs without evals
+    run_instances = [run for run in run_instances if run.samples.shape[0] > 0]
+
     logger.info(
         f"Found {len(run_instances)} runs in {workspace} that match group id filter, gathering samples..."
     )
@@ -223,6 +226,7 @@ def fit(
         predictors.append(build_regression(idx, Y_train, Y_test, X_train, X_test))
 
     results = []
+    cached_samples = np.array([])
 
     for idx, metric in indexed_metrics:
         plot_correlation(
@@ -234,7 +238,7 @@ def fit(
             alpha=alpha,
             output_dir=output_dir,
         )
-        weights = simulate(
+        weights, samples = simulate(
             index=idx,
             predictor=predictors,
             df_config=ratios,
@@ -243,8 +247,10 @@ def fit(
             alpha=alpha,
             output_dir=output_dir,
             use_entropy=use_entropy,
+            cached_samples=cached_samples,
         )
 
+        cached_samples = samples
         results.append((metric, weights))
 
     if not group_average:

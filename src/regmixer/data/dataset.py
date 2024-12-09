@@ -56,6 +56,7 @@ class MixtureBuilder:
                     source_name=source.name,
                     paths=paths + self.expand_globs(globs),
                     target_ratio=source.ratio,
+                    max_repetition_ratio=source.repetition_factor,
                 )
             )
 
