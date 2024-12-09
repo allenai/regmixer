@@ -122,7 +122,7 @@ def generate_weights_dirichlet(
 
         collected_samples.append(selected)
 
-    deduped = collected_samples  # TODO: sort_and_deduplicate(collected_samples)
+    deduped = sort_and_deduplicate(collected_samples)
 
     if len(collected_samples) < num_samples_out:
         raise ValueError(
@@ -264,12 +264,11 @@ def calculate_priors(
 
 def sort_and_deduplicate(
     samples: list[Tuple[np.ndarray, np.ndarray]], threshold=1e-5
-) -> list[np.ndarray]:
+) -> list[Tuple[np.ndarray, np.ndarray]]:
     """
     Remove identical configs to avoid duplicated training.
     """
-
-    arr = np.array(samples)
+    arr = np.array([sample[0] for sample in samples])
     sorted_indices = np.lexsort(arr.T)
     sorted_arr = arr[sorted_indices]
     result = [sorted_arr[0]]
@@ -280,4 +279,4 @@ def sort_and_deduplicate(
         if diff > threshold:
             result.append(sorted_arr[i])
 
-    return result
+    return [(res, samples[sorted_indices[i]][1]) for i, res in enumerate(result)]
