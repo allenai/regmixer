@@ -107,7 +107,7 @@ def cli():
 def train(
     run_name: str,
     max_tokens: int,
-    source: List[Tuple[str, List[str], str]],
+    source: List[Tuple[str, List[str], str, str]],
     sequence_length: int,
     seed: int,
     group_id: str,
@@ -120,10 +120,16 @@ def train(
     """
     Launch a training run with the given parameters.
     """
+
+    # Rebuild the source instances from the parsed tuples
     sources: List[SourceInstance] = []
     for item in source:
-        name, paths, ratio = item
-        sources.append(SourceInstance(name=name, paths=paths, ratio=float(ratio)))
+        name, paths, ratio, repetition = item
+        sources.append(
+            SourceInstance(
+                name=name, paths=paths, ratio=float(ratio), repetition_factor=float(repetition)
+            )
+        )
 
     config = TransformerConfigBuilder(
         beaker_user=beaker_user,

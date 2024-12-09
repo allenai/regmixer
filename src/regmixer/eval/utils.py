@@ -98,7 +98,7 @@ def get_runs_from_api(
         memo[run.display_name] = run
 
     all_runs: list[RunInstance] = sorted(
-        [mk_run_history(run, num_samples) for run in memo.values()],
+        [mk_run_history(run, num_samples) for run in memo.values() if run is not None],
         key=lambda run: run.display_name.lower(),
     )
 
@@ -156,7 +156,7 @@ def plot_simulations(
     melted_df = df.melt(id_vars=["sample"], var_name="Domain", value_name="Weight")
     g = sns.FacetGrid(melted_df, col="sample", col_wrap=4, aspect=2)
     g.map_dataframe(sns.barplot, x="Domain", y="Weight", palette="viridis", hue="Domain")
-    g.set(ylim=(0, 0.5))
+    g.set(ylim=(0, 0.75))
     g.set_axis_labels("Domain", "Weight")
 
     for ax in g.axes.flat:
@@ -234,6 +234,7 @@ def mk_run_metrics(
     df = pd.DataFrame(history)
     results = {}
     group_name, group_metrics = metrics
+
     if average:
         result = np.mean(
             [df.loc[:, metric_name].tail(samples).mean() for metric_name in group_metrics]
@@ -268,34 +269,38 @@ def simulate(
     df_config: pd.DataFrame,
     metric_name: str,
     use_entropy: bool,
+    cached_samples: np.ndarray,
     n_samples: int = 100_000,
     alpha: float = 1.0,
     normalization: bool = False,
     min_entropy: float = 1e-3,
     output_dir: str = BASE_OUTPUT_DIR,
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray]:
     np.random.seed(42)
-    num_samples_per_strength = 25
-    candidates = []
+    all_samples = cached_samples
 
-    logger.info(
-        f"Generating {n_samples * num_samples_per_strength:,} sample candidates for {metric_name}..."
-    )
-    for idx in tqdm(range(n_samples), desc="Generating candidates"):
-        min_strength_log = np.log10(1)
-        max_strength_log = np.log10(alpha)
+    if not cached_samples.shape[0] > 0:
+        candidates = []
+        num_samples_per_strength = 25
+        logger.info(f"Generating {n_samples * num_samples_per_strength:,} sample candidates...")
 
-        for strength in np.logspace(min_strength_log, max_strength_log, num_samples_per_strength):
-            weights = np.random.dirichlet(prior_distributions * strength, 1)
+        for idx in tqdm(range(n_samples), desc="Generating candidates"):
+            min_strength_log = np.log10(1)
+            max_strength_log = np.log10(alpha)
 
-            if normalization:
-                weights = (weights * 1.5 + prior_distributions) / 2.5
+            for strength in np.logspace(
+                min_strength_log, max_strength_log, num_samples_per_strength
+            ):
+                weights = np.random.dirichlet(prior_distributions * strength, 1)
 
-            candidates.append(weights)
+                if normalization:
+                    weights = (weights * 1.5 + prior_distributions) / 2.5
 
-    all_samples = np.array(candidates).reshape(-1, len(prior_distributions))
-    all_samples = all_samples[~np.isnan(all_samples).any(axis=1)]
-    logger.info(f"Generated {all_samples.shape} valid samples for {metric_name}...")
+                candidates.append(weights)
+
+        all_samples = np.array(candidates).reshape(-1, len(prior_distributions))
+        all_samples = all_samples[~np.isnan(all_samples).any(axis=1)]
+        logger.info(f"Generated {all_samples.shape} valid samples...")
 
     if use_entropy:
         entropy = -np.sum(all_samples * np.log(all_samples + min_entropy), axis=1)
@@ -337,9 +342,7 @@ def simulate(
     top_k_mean_weights = np.mean(top_k_samples, axis=0)
     top_k_predicted_loss = predictor[index].predict([top_k_mean_weights])
 
-    print("\n")
     logger.info(f"Predicted loss (top_k): {top_k_predicted_loss}")
-    print("\n")
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
 
@@ -360,7 +363,7 @@ def simulate(
         output_dir=output_dir,
     )
 
-    return top_k_mean_weights
+    return top_k_mean_weights, all_samples
 
 
 def plot_distributions(

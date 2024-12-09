@@ -33,31 +33,31 @@ class ConfigDefaults:
 
 
 def generate_weights_dirichlet(
-    train_groups: list[str],
+    domains: list[str],
     prior_dist: np.ndarray,
     minimum_weight: float,
     num_samples_out: int,
     temperature: float,
-    token_scale: float,
+    max_tokens: int,
+    source_tokens: int,
+    allow_repetition: bool,
     enable_bound: bool = True,
 ):
     """
     Generate weights for each domain group using a dirichlet distribution.
     """
 
+    token_scale = source_tokens / max_tokens
     logger.info(f"Source token population is {token_scale:.2f}:1 target population.")
 
-    collected_samples = []
+    collected_samples: list[Tuple[np.ndarray, np.ndarray]] = []
     weight_bounds = None
 
     if enable_bound:
-        logger.info("Weight bounds enabled...")
         weight_bounds = [
             (0.0, min(prior_dist[idx] * token_scale, 1.0)) for idx in range(len(prior_dist))
         ]
-        grouped_bounds = {
-            train_group: weight_bounds[idx] for idx, train_group in enumerate(train_groups)
-        }
+        grouped_bounds = {domain: weight_bounds[idx] for idx, domain in enumerate(domains)}
         logger.info("Weight bounds:")
         logger.info(grouped_bounds)
 
@@ -78,8 +78,10 @@ def generate_weights_dirichlet(
                 candidates.append(samples_per_strength)
 
         filtered_candidates = []
-        if weight_bounds is not None:
-            # Check each domain in the sample is within bounds otherwise discard
+
+        if weight_bounds and not allow_repetition:
+            # Check that all domains in the sample are within bounds otherwise reject
+            logger.info("Limiting candidates to within bounds, repetition is disabled...")
             filtered_candidates = [
                 sample
                 for sample in candidates
@@ -88,6 +90,7 @@ def generate_weights_dirichlet(
                     for idx, (lower, upper) in enumerate(weight_bounds)
                 )
             ]
+            filtered_candidates = candidates
         else:
             filtered_candidates = candidates
 
@@ -100,17 +103,34 @@ def generate_weights_dirichlet(
         candidates = np.round(candidates / minimum_weight) * minimum_weight
         candidates = candidates / np.sum(candidates)
 
-        # This is a temporary fix, we should probably update the olmo-core check to be np.allclose()
-        if np.sum(candidates) == 1.0:
-            # Pick one good candidate per iteration
-            collected_samples.append(candidates[0])
+        selected: Tuple[np.ndarray, np.ndarray] = (
+            candidates[0],
+            np.ones(candidates.shape[1]),
+        )
 
-    collected_samples = sort_and_deduplicate(np.array(collected_samples))
+        if allow_repetition:
+            for idx, _ in enumerate(prior_dist):
+                available_tokens = int(prior_dist[idx] * source_tokens)
+                required_tokens = int(selected[0][idx] * max_tokens)
+
+                # Don't divide by zero
+                if required_tokens == 0:
+                    continue
+
+                repetition = required_tokens / available_tokens
+                selected[1][idx] = max(1, repetition)
+
+        collected_samples.append(selected)
+
+    deduped = collected_samples  # TODO: sort_and_deduplicate(collected_samples)
+
     if len(collected_samples) < num_samples_out:
         raise ValueError(
             f"The number of collected samples '{len(collected_samples)}' is less than the required number of samples '{num_samples_out}'!"
         )
-    selected_samples = np.stack(random.sample(collected_samples, num_samples_out), axis=0)
+
+    selected_samples = random.sample(deduped, num_samples_out)
+    selected_samples = np.stack(selected_samples, axis=0)
 
     return selected_samples
 
@@ -132,20 +152,24 @@ def mk_mixtures(config: ExperimentConfig, use_cache: bool = True):
 
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
-    train_weights = generate_weights_dirichlet(
-        train_groups=list(source_dist.keys()),
+    weights = generate_weights_dirichlet(
+        domains=list(source_dist.keys()),
         prior_dist=prior_dist,
         minimum_weight=ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
         temperature=config.mix_temperature,
-        token_scale=source_total / config.max_tokens,
+        allow_repetition=config.allow_repetition,
+        max_tokens=config.max_tokens,
+        source_tokens=source_total,
     )
 
     weight_maps = []
-    for weights in train_weights:
+    for result in weights:
         weight_map = {}
-        for key, value in zip(source_dist.keys(), weights):
-            weight_map[key] = value
+        domains = list(source_dist.keys())
+        for name, weight, repetition in zip(domains, result[0], result[1]):
+            weight_map[name] = (weight, repetition)
+
         weight_maps.append(weight_map)
 
     return weight_maps
@@ -238,17 +262,21 @@ def calculate_priors(
     return (relative_sizes, total_tokens)
 
 
-def sort_and_deduplicate(data, threshold=1e-5):
+def sort_and_deduplicate(
+    samples: list[Tuple[np.ndarray, np.ndarray]], threshold=1e-5
+) -> list[np.ndarray]:
     """
     Remove identical configs to avoid duplicated training.
     """
-    arr = np.array(data)
+
+    arr = np.array(samples)
     sorted_indices = np.lexsort(arr.T)
     sorted_arr = arr[sorted_indices]
     result = [sorted_arr[0]]
 
     for i in range(1, len(sorted_arr)):
         diff = np.sum(np.abs(sorted_arr[i] - result[-1]))
+
         if diff > threshold:
             result.append(sorted_arr[i])
 

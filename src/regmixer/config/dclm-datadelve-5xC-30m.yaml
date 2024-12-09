@@ -4,9 +4,10 @@ budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 8
-variants: 256
+variants: 5
 preemptible: true
-max_tokens: 3_000_000_000 # 30_000_000 * 20 * 5 == 5xC
+max_tokens: 6_000_000_000 # 30_000_000 * 20 * 5 == 5xC
+allow_repetition: true
 sequence_length: 2048
 seed: 42
 temperature: 0.75
@@ -18,73 +19,73 @@ cluster: ai2/saturn-cirrascale
 sources:
   - name: adult_content
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/adult_content/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/adult_content/0001/*.npy
   - name: art_and_design
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/art_and_design/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/art_and_design/0001/*.npy
   - name: software_development
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/software_development/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/software_development/0001/*.npy
   - name: education_and_jobs
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/education_and_jobs/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/education_and_jobs/0001/*.npy
   - name: electronics_and_hardware
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/electronics_and_hardware/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/electronics_and_hardware/0001/*.npy
   - name: entertainment
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/entertainment/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/entertainment/0001/*.npy
   - name: crime_and_law
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/crime_and_law/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/crime_and_law/0001/*.npy
   - name: social_life
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/social_life/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/social_life/0001/*.npy
   - name: fashion_and_beauty
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/fashion_and_beauty/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/fashion_and_beauty/0001/*.npy
   - name: finance_and_business
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/finance_and_business/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/finance_and_business/0001/*.npy
   - name: food_and_dining
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/food_and_dining/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/food_and_dining/0001/*.npy
   - name: games
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/games/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/games/0001/*.npy
   - name: health
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/health/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/health/0001/*.npy
   - name: history_and_geography
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/history_and_geography/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/history_and_geography/0001/*.npy
   - name: home_and_hobbies
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/home_and_hobbies/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/home_and_hobbies/0001/*.npy
   - name: industrial
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/industrial/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/industrial/0001/*.npy
   - name: literature
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/literature/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/literature/0001/*.npy
   - name: politics
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/politics/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/politics/0001/*.npy
   - name: religion
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/religion/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/religion/0001/*.npy
   - name: science_math_and_technology
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/science_math_and_technology/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/science_math_and_technology/0001/*.npy
   - name: software
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/software/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/software/0001/*.npy
   - name: sports_and_fitness
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/sports_and_fitness/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/sports_and_fitness/0001/*.npy
   - name: transportation
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/transportation/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/transportation/0001/*.npy
   - name: travel_and_tourism
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/travel_and_tourism/**/*.npy
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/gpt-neox-olmo-dolma-v1_5/travel_and_tourism/0001/*.npy
