@@ -33,7 +33,7 @@ def mk_source_instances(
 ) -> list[SourceInstance]:
     # Note: We filter out any sources that have a weight of 0 so we don' try to build
     # empty token indices downstream in olmo-core
-    filtered_sources = [source for source in sources if mix_map[source.name][1] > 0]
+    filtered_sources = [source for source in sources if mix_map[source.name][0] > 0]
     return [
         SourceInstance(
             name=source.name,
