@@ -28,7 +28,7 @@ class ConfigDefaults:
     min_strength: float = 0.1
     max_strength: float = 5.0
     sample_multiplier: int = 10
-    maximum_repetition: int = 1
+    maximum_repetition: int = 5
     minimum_weight: float = 2e-3  # 0.002
 
 
@@ -79,8 +79,8 @@ def generate_weights_dirichlet(
 
         filtered_candidates = []
 
+        # If we don't allow repetition, we need to filter out candidates that are outside the bounds
         if weight_bounds and not allow_repetition:
-            # Check that all domains in the sample are within bounds otherwise reject
             logger.info("Limiting candidates to within bounds, repetition is disabled...")
             filtered_candidates = [
                 sample
@@ -108,19 +108,26 @@ def generate_weights_dirichlet(
             np.ones(candidates.shape[1]),
         )
 
+        reject = False
+
         if allow_repetition:
-            for idx, _ in enumerate(prior_dist):
+            for idx, _ in enumerate(domains):
                 available_tokens = int(prior_dist[idx] * source_tokens)
                 required_tokens = int(selected[0][idx] * max_tokens)
 
-                # Don't divide by zero
-                if required_tokens == 0:
-                    continue
+                repetition = required_tokens / available_tokens if available_tokens != 0 else 0
 
-                repetition = required_tokens / available_tokens
+                if repetition > ConfigDefaults.maximum_repetition:
+                    reject = True
+                    break
+
                 selected[1][idx] = max(1, repetition)
 
-        collected_samples.append(selected)
+        if not reject:
+            collected_samples.append(selected)
+
+    if len(collected_samples) == 0:
+        raise ValueError("No valid samples were generated, please check the configuration!")
 
     deduped = sort_and_deduplicate(collected_samples)
 
@@ -135,7 +142,9 @@ def generate_weights_dirichlet(
     return selected_samples
 
 
-def mk_mixtures(config: ExperimentConfig, use_cache: bool = True):
+def mk_mixtures(
+    config: ExperimentConfig, use_cache: bool = True
+) -> list[dict[str, Tuple[float, float]]]:
     random.seed(config.seed)
     np.random.seed(config.seed)
 
@@ -148,12 +157,15 @@ def mk_mixtures(config: ExperimentConfig, use_cache: bool = True):
     logger.info("Source distribution:")
     logger.info(source_dist)
 
-    prior_dist = [v for _, v in source_dist.items()]
+    source_items = list(source_dist.items())
+    prior_dist = [v for _, v in source_items]
+    domains = [k for k, _ in source_items]
 
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
-    weights = generate_weights_dirichlet(
-        domains=list(source_dist.keys()),
+
+    mixtures = generate_weights_dirichlet(
+        domains=domains,
         prior_dist=prior_dist,
         minimum_weight=ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
@@ -164,11 +176,10 @@ def mk_mixtures(config: ExperimentConfig, use_cache: bool = True):
     )
 
     weight_maps = []
-    for result in weights:
+    for mix in mixtures:
         weight_map = {}
-        domains = list(source_dist.keys())
-        for name, weight, repetition in zip(domains, result[0], result[1]):
-            weight_map[name] = (weight, repetition)
+        for idx in range(len(domains)):
+            weight_map[domains[idx]] = (mix[0][idx], mix[1][idx])
 
         weight_maps.append(weight_map)
 
@@ -268,15 +279,16 @@ def sort_and_deduplicate(
     """
     Remove identical configs to avoid duplicated training.
     """
-    arr = np.array([sample[0] for sample in samples])
-    sorted_indices = np.lexsort(arr.T)
-    sorted_arr = arr[sorted_indices]
-    result = [sorted_arr[0]]
+    unique_samples = []
+    for sample in samples:
+        is_duplicate = any(
+            np.allclose(sample[0], unique_sample[0], atol=threshold)
+            for unique_sample in unique_samples
+        )
+        if not is_duplicate:
+            unique_samples.append(sample)
 
-    for i in range(1, len(sorted_arr)):
-        diff = np.sum(np.abs(sorted_arr[i] - result[-1]))
-
-        if diff > threshold:
-            result.append(sorted_arr[i])
-
-    return [(res, samples[sorted_indices[i]][1]) for i, res in enumerate(result)]
+    logger.info(
+        f"Filtered {len(samples) - len(unique_samples)} duplicate distributions from candidate pool..."
+    )
+    return unique_samples

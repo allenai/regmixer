@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import yaml
 from beaker import Beaker
@@ -155,14 +155,14 @@ def mk_launch_group(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     return mk_launch_configs(group)
 
 
-def prettify_mixes(mixes: list[dict[str, float]]):
+def prettify_mixes(mixes: list[dict[str, Tuple[float, float]]]):
     result = {"mixes": mixes}
     return json.dumps(result, indent=2)
 
 
 def mk_mixes(
     config_file: Path, output: Optional[Path] = None, use_cache: bool = True
-) -> list[dict[str, float]]:
+) -> list[dict[str, Tuple[float, float]]]:
     with open(config_file, "r") as f:
         data = yaml.safe_load(f)
 
@@ -180,6 +180,6 @@ def mk_mixes(
             f.write(mix_string)
 
         logger.info(f"Mixes saved to {output}:")
-    logger.info(mix_string)
+    logger.info(mixes)
 
     return mixes
