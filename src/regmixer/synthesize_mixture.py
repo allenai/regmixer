@@ -115,7 +115,11 @@ def generate_weights_dirichlet(
                 available_tokens = int(prior_dist[idx] * source_tokens)
                 required_tokens = int(selected[0][idx] * max_tokens)
 
-                repetition = required_tokens / available_tokens if available_tokens != 0 else 0
+                repetition = (
+                    np.ceil(required_tokens / available_tokens * 1000) / 1000
+                    if available_tokens != 0
+                    else 0
+                )
 
                 if repetition > ConfigDefaults.maximum_repetition:
                     reject = True
