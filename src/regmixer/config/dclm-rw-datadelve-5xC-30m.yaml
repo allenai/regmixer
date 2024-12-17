@@ -1,4 +1,4 @@
-name: "dclm-rw-constrained-datadelve-5xC-30m"
+name: "dclm-refinedweb-constrained-datadelve-5xC-30m"
 description: "Mixture of datadelve partitioned dclm-refinedweb sample olmo-30m @ 5xC scale"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
@@ -15,11 +15,11 @@ proxy_model_id: "olmo_30m"
 tokenizer: "gpt_neox"
 dtype: "uint16"
 priority: high
-cluster: ai2/saturn-cirrascale
+cluster: ai2/jupiter-cirrascale-2
 sources:
   - name: adult_content
     paths:
-      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/adult_content/0001/*.npy
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/adult_content/0001/part-0*-00000.npy
   - name: art_and_design
     paths:
       - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/art_and_design/0001/part-0*-00000.npy
