@@ -1,0 +1,91 @@
+name: "dclm-rw-constrained-datadelve-5xC-30m"
+description: "Mixture of datadelve partitioned dclm-refinedweb sample olmo-30m @ 5xC scale"
+budget: "ai2/oe-data"
+workspace: "ai2/dolma2"
+nodes: 1
+gpus: 8
+variants: 128
+preemptible: true
+max_tokens: 3_000_000_000 # 30_000_000 * 20 * 5 == 5xC
+allow_repetition: true
+sequence_length: 2048
+seed: 42
+temperature: 0.75
+proxy_model_id: "olmo_30m"
+tokenizer: "gpt_neox"
+dtype: "uint16"
+priority: high
+cluster: ai2/saturn-cirrascale
+sources:
+  - name: adult_content
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/adult_content/0001/*.npy
+  - name: art_and_design
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/art_and_design/0001/part-0*-00000.npy
+  - name: software_development
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/software_development/0001/part-0*-00000.npy
+  - name: education_and_jobs
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/education_and_jobs/0001/part-0*-00000.npy
+  - name: electronics_and_hardware
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/electronics_and_hardware/0001/part-0*-00000.npy
+  - name: entertainment
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/entertainment/0001/part-0*-00000.npy
+  - name: crime_and_law
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/crime_and_law/0001/part-0*-00000.npy
+  - name: social_life
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/social_life/0001/part-0*-00000.npy
+  - name: fashion_and_beauty
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/fashion_and_beauty/0001/part-0*-00000.npy
+  - name: finance_and_business
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/finance_and_business/0001/part-0*-00000.npy
+  - name: food_and_dining
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/food_and_dining/0001/part-0*-00000.npy
+  - name: games
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/games/0001/part-0*-00000.npy
+  - name: health
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/health/0001/part-0*-00000.npy
+  - name: history_and_geography
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/history_and_geography/0001/part-0*-00000.npy
+  - name: home_and_hobbies
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/home_and_hobbies/0001/part-0*-00000.npy
+  - name: industrial
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/industrial/0001/part-0*-00000.npy
+  - name: literature
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/literature/0001/part-0*-00000.npy
+  - name: politics
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/politics/0001/part-0*-00000.npy
+  - name: religion
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/religion/0001/part-0*-00000.npy
+  - name: science_math_and_technology
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/science_math_and_technology/0001/part-0*-00000.npy
+  - name: software
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/software/0001/part-0*-00000.npy
+  - name: sports_and_fitness
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/sports_and_fitness/0001/part-0*-00000.npy
+  - name: transportation
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/transportation/0001/part-0*-00000.npy
+  - name: travel_and_tourism
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/travel_and_tourism/0001/part-0*-00000.npy
