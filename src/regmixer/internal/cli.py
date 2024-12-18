@@ -3,6 +3,7 @@ Launch an OLMo-core training run with the specified configuration.
 """
 
 import logging
+from typing import Tuple
 
 import click
 import yaml
@@ -154,6 +155,7 @@ def train(
     model_identifier: str,
     seed: int,
     dtype: str,
+    max_repetition: float,
 ):
     """Launch training run with the specified configuration properties."""
 
@@ -164,20 +166,19 @@ def train(
         SourceConfig(
             name=source["domain"],
             paths=source["paths"],
-            max_repetition_factor=source.get("max_repetition_factor", 5.0),
+            max_repetition_factor=max_repetition,
             max_source_ratio=source.get("max_source_ratio", 1.0),
         )
         for source in config["sources"]
     ]
 
-    weights = {}
-
-    for source in config["sources"]:
-        weights[source["domain"]] = source["weight"]
+    weights: dict[str, Tuple[float, float]] = {
+        source["domain"]: (source["weight"], max_repetition) for source in config["sources"]
+    }
 
     group_uuid = generate_uuid()[:8]
     experiment_config = ExperimentConfig(
-        name=f"olmo-1b-{name}",
+        name=f"regmixer-{name}",
         description=description,
         budget=budget,
         workspace=workspace,
@@ -217,17 +218,17 @@ if __name__ == "__main__":
     """
     Example usage:
     rmc-internal train \
-        -n regmixer-avg-bpb-weights \
-        -t dolma2 \
-        -c ai2/saturn-cirrascale \
+        -n avg_validation_loss_regmixer_optimal_1B \
+        -t gpt_neox \
+        -c ai2/jupiter-cirrascale-2 \
         -w ai2/dolma2 \
         -b ai2/oe-data \
-        -m 600_000_000 \
+        -m 52_000_000_000 \
         -l 2048 \
         -p high \
         -g 8 \
-        -N 1 \
+        -N 4 \
         -d uint16 \
         -r 5.0 \
-        -s avg_mmlu_bpb_alpha_7_0.yaml
+        -s avg_validation_loss_alpha_50_constrained.yaml
     """
