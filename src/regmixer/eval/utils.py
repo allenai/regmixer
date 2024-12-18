@@ -391,7 +391,7 @@ def plot_distributions(
         columns=columns,
     )
     df = pd.melt(df)
-    df["type"] = (["Original"] + ["Optimal"]) * len(columns)
+    df["type"] = (["Corpus"] + ["Optimal"]) * len(columns)
 
     plt.rc("axes", unicode_minus=False)
     plt.rcParams.update(
@@ -399,7 +399,7 @@ def plot_distributions(
             "text.usetex": False,
             "font.family": "serif",
             "mathtext.fontset": "cm",
-            "axes.labelsize": 18,
+            "axes.labelsize": 16,
         }
     )
 
@@ -409,11 +409,11 @@ def plot_distributions(
     ax.tick_params(axis="x", labelrotation=90)
 
     pallette = {
-        "Original": "#105257",
+        "Corpus": "#105257",
         "Optimal": "#F0529C",
     }
 
-    df_sorted = df[df["type"] == "Original"].sort_values(by="value", ascending=False)
+    df_sorted = df[df["type"] == "Corpus"].sort_values(by="value", ascending=False)
     df["variable"] = pd.Categorical(df["variable"], categories=df_sorted["variable"], ordered=True)
     sns.barplot(data=df, x="variable", y="value", hue="type", palette=pallette, ax=ax)
 
@@ -428,19 +428,18 @@ def plot_distributions(
     )
 
     ax.yaxis.grid(True, linestyle="--", which="both", color="gray", alpha=0.7)
-    ax.set_ylim(0, 0.5)
+    ax.set_ylim(0, 0.4)
 
     ax.set_xlabel(
         "Domain",
         fontdict={
-            "size": 28,
-            "labelpad": 10,
+            "size": 26,
         },
     )
     ax.set_ylabel(
         "Weight",
         fontdict={
-            "size": 28,
+            "size": 26,
         },
     )
 

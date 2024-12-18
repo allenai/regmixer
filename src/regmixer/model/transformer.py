@@ -137,6 +137,10 @@ class TransformerConfigBuilder:
         if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
             self.root_dir = f"/weka/oe-training-default/ai2-llm/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
 
+        self.dataset_cache = (
+            "./dataset-cache" if is_url(self.root_dir) else f"{self.root_dir}/dataset-cache"
+        )
+
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
             return SupportedTokenizers[tokenizer].value
@@ -194,11 +198,7 @@ class TransformerConfigBuilder:
                     mix_base_dir=self.data_dir,
                     sequence_length=self.sequence_length,
                     tokenizer=self.tokenizer,
-                    work_dir=(
-                        "./dataset-cache"
-                        if is_url(self.root_dir)
-                        else f"{self.root_dir}/dataset-cache"
-                    ),
+                    work_dir=self.dataset_cache,
                 ),
                 eval_interval=self.model_config.eval_interval,
             ),
@@ -261,7 +261,7 @@ class TransformerConfigBuilder:
             name=NumpyDatasetType.fsl,
             sequence_length=self.sequence_length,
             tokenizer=tokenizer,
-            work_dir="/tmp/dataset-cache",
+            work_dir=self.dataset_cache,
         )
 
         data_loader_config = NumpyDataLoaderConfig(
