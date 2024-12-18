@@ -115,7 +115,7 @@ def cli():
     "--dtype",
     type=str,
     default="uint32",
-    help="NumPy data type for the dataset",
+    help="Dtype for the token dataset",
 )
 @click.option(
     "-S",
