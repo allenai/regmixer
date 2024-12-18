@@ -46,8 +46,7 @@ class ExperimentConfig(BaseModel):
     mix_temperature: float = 1.0
     preemptible: bool = True
     shared_filesystem: bool = False
-    nfs: bool = False
-    weka: list[BeakerWekaBucket] = []
+    weka: bool = False
 
 
 class ExperimentInstance(BaseModel):

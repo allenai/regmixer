@@ -61,6 +61,7 @@ class TransformerConfigBuilder:
         tokenizer (TokenizerConfig): The tokenizer configuration.
         dtype (str): The data type for the dataset.
         profile (bool): Whether to enable profiling. Default is False.
+        weka (bool): Whether to use Weka buckets. Default is False.
 
     Methods:
         __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user,
@@ -99,6 +100,7 @@ class TransformerConfigBuilder:
     tokenizer: TokenizerConfig
     dtype: str
     profile: bool = False
+    weka: bool = False
 
     def __init__(
         self,
@@ -115,6 +117,7 @@ class TransformerConfigBuilder:
         seed: int = 42,
         s3: bool = True,
         profile: bool = False,
+        weka: bool = False,
     ):
         self.run_name = run_name
         self.sources = sources
@@ -129,9 +132,10 @@ class TransformerConfigBuilder:
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
         self.root_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
+        self.checkpoint_dir = f"/tmp/{self.run_name}"
 
-        if "jupiter" in cluster and not s3:
-            self.root_dir = "/weka/oe-training-default/ai2-llm"
+        if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
+            self.checkpoint_dir = f"/weka/oe-training-default/ai2-llm/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
@@ -267,7 +271,7 @@ class TransformerConfigBuilder:
         )
 
         trainer_config = TrainerConfig(
-            save_folder=f"/tmp/{self.run_name}",
+            save_folder=self.checkpoint_dir,
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
             metrics_collect_interval=10,

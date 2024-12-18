@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 
 import yaml
 from beaker import Beaker
-from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
+from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig, BeakerWekaBucket
 from olmo_core.utils import generate_uuid
 
 from regmixer.aliases import (
@@ -105,7 +105,12 @@ def mk_instance_cmd(
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     """Build a beaker launch config from an experiment group."""
 
+    weka_buckets: List[BeakerWekaBucket] = []
+    if group.config.weka:
+        weka_buckets.append(BeakerWekaBucket("oe-training-default", "/weka/oe-training-default"))
+
     beaker_user = (Beaker.from_env().account.whoami().name).upper()
+
     return [
         BeakerLaunchConfig(
             name=f"{experiment.name}",
@@ -116,9 +121,8 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             num_nodes=group.config.nodes,
             num_gpus=group.config.gpus,
             shared_filesystem=group.config.shared_filesystem,
-            nfs=group.config.shared_filesystem,
             allow_dirty=True,
-            weka_buckets=group.config.weka,
+            weka_buckets=weka_buckets,
             budget=group.config.budget or "ai2/oe-data",
             workspace=group.config.workspace,
             preemptible=group.config.preemptible,
