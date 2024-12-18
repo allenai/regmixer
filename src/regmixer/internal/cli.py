@@ -1,5 +1,5 @@
 """
-Launch an Olmo training run with the specified configuration.
+Launch an OLMo-core training run with the specified configuration.
 """
 
 import logging
@@ -31,56 +31,56 @@ def cli():
     "--name",
     type=str,
     required=True,
-    help="",
+    help="Experiment name",
 )
 @click.option(
     "-t",
     "--tokenizer",
     type=str,
     required=True,
-    help="",
+    help="Tokenizer to use",
 )
 @click.option(
     "-c",
     "--cluster",
     type=str,
     required=True,
-    help="",
+    help="Beaker cluster",
 )
 @click.option(
     "-w",
     "--workspace",
     type=str,
     required=True,
-    help="",
+    help="Experiment workspace",
 )
 @click.option(
     "-b",
     "--budget",
     type=str,
     required=True,
-    help="",
+    help="Experiment budget",
 )
 @click.option(
     "-d",
     "--description",
     type=str,
     default="",
-    help="",
+    help="Experiment description",
 )
 @click.option(
     "-N",
     "--nodes",
     type=int,
     default=1,
-    help="",
+    help="Number of nodes to use",
 )
 @click.option(
     "-g",
     "--gpus",
     type=int,
     default=1,
-    help="",
+    help="Number of GPUs per node",
 )
 @click.option(
     "-i",
@@ -94,42 +94,49 @@ def cli():
     "--max-tokens",
     type=int,
     required=True,
-    help="",
+    help="Max tokens to train on",
 )
 @click.option(
     "-l",
     "--sequence-length",
     type=int,
     required=True,
-    help="",
+    help="Sequence length for the dataset",
 )
 @click.option(
     "-s",
     "--sources-file",
     type=str,
     required=True,
-    help="Name of the sources config file in regmixer.internal.config",
+    help="Name of the source config file in regmixer.internal.config",
 )
 @click.option(
     "-D",
     "--dtype",
     type=str,
-    default=None,
-    help="",
+    default="uint32",
+    help="NumPy data type for the dataset",
 )
 @click.option(
     "-S",
     "--seed",
     type=int,
     default=42,
-    help="",
+    help="Random seed for the experiment",
 )
 @click.option(
     "-p",
     "--priority",
     type=Priority,
     default=Priority.low,
-    help="",
+    help="Beaker experiment priority level",
+)
+@click.option(
+    "-r",
+    "--max-repetition",
+    type=float,
+    default=5.0,
+    help="Max repetition factor for sources (applies to all sources)",
 )
 def train(
     name: str,
@@ -157,7 +164,7 @@ def train(
         SourceConfig(
             name=source["domain"],
             paths=source["paths"],
-            max_repetition_factor=source.get("max_repetition_factor", 1.0),
+            max_repetition_factor=source.get("max_repetition_factor", 5.0),
             max_source_ratio=source.get("max_source_ratio", 1.0),
         )
         for source in config["sources"]
@@ -186,7 +193,7 @@ def train(
         tokenizer=tokenizer,
         priority=priority,
         proxy_model_id=model_identifier,
-        dtype=NumpyDatasetDType[dtype or "uint32"],
+        dtype=NumpyDatasetDType[dtype],
     )
 
     logger.info(experiment_config)
@@ -220,5 +227,7 @@ if __name__ == "__main__":
         -p high \
         -g 8 \
         -N 1 \
-        -s avg_mmlu_bpb_alpha_7_0.yam
+        -d uint16 \
+        -r 5.0 \
+        -s avg_mmlu_bpb_alpha_7_0.yaml
     """

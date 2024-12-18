@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import spearmanr
 from tqdm import tqdm
 from wandb.apis.public import Run
 
@@ -73,7 +72,6 @@ def build_regression(
         eval_set=[(X_test, test_target)],
         eval_metric="l2",
     )
-    r, _ = spearmanr(a=regression.predict(X_test), b=test_target)
 
     return regression
 
@@ -165,7 +163,7 @@ def plot_simulations(
         ax.yaxis.grid(True, linestyle="--", which="both", color="gray", alpha=0.7)
 
     plt.savefig(
-        f"{mk_plot_prefix(output_dir, metric_name, alpha)}_sim_grid.png",
+        f"{mk_output_prefix(output_dir, metric_name, alpha)}_sim_grid.png",
         bbox_inches="tight",
         pad_inches=0.1,
     )
@@ -201,12 +199,13 @@ def plot_correlation(
         marginal_kws={"line_kws": {"color": "#5969CB", "linewidth": 6}},
     )
 
-    r, _ = spearmanr(data[keys["pred"]], data[keys["true"]])
+    corr = np.corrcoef(data[keys["pred"]], data[keys["true"]])[0, 1]
     (phantom,) = graph.ax_joint.plot([], [], linestyle="", alpha=0)
 
     graph.ax_joint.legend(
         [phantom],
-        [f"{metric_name} correlation: {np.round(r * 100, decimals=2)}"],  # noqa
+        # [f"{metric_name} correlation: {}"],  # noqa
+        [f"{metric_name} correlation: {np.round(corr * 100, decimals=2)}"],  # noqa
         edgecolor="black",
         fancybox=False,
         prop={
@@ -222,7 +221,9 @@ def plot_correlation(
     graph.ax_joint.grid(True, ls="dashed")
     graph.ax_joint.spines[["right", "top"]].set_visible(True)
 
-    graph.savefig(f"{mk_plot_prefix(output_dir, metric_name, alpha)}_fit.png", bbox_inches="tight")
+    graph.savefig(
+        f"{mk_output_prefix(output_dir, metric_name, alpha)}_fit.png", bbox_inches="tight"
+    )
 
 
 def mk_run_metrics(
@@ -270,7 +271,7 @@ def simulate(
     metric_name: str,
     use_entropy: bool,
     cached_samples: np.ndarray,
-    n_samples: int = 100_000,
+    n_samples: int = 1_000_000,
     alpha: float = 1.0,
     normalization: bool = False,
     min_entropy: float = 1e-3,
@@ -281,8 +282,10 @@ def simulate(
 
     if not cached_samples.shape[0] > 0:
         candidates = []
-        num_samples_per_strength = 25
-        logger.info(f"Generating {n_samples * num_samples_per_strength:,} sample candidates...")
+        num_samples_per_strength = 10
+        logger.info(
+            f"Generating {n_samples * num_samples_per_strength:,} ({num_samples_per_strength} per strength) sample candidates..."
+        )
 
         for idx in tqdm(range(n_samples), desc="Generating candidates"):
             min_strength_log = np.log10(1)
@@ -300,7 +303,7 @@ def simulate(
 
         all_samples = np.array(candidates).reshape(-1, len(prior_distributions))
         all_samples = all_samples[~np.isnan(all_samples).any(axis=1)]
-        logger.info(f"Generated {all_samples.shape} valid samples...")
+        logger.info(f"Generated {all_samples.shape:,} valid samples...")
 
     if use_entropy:
         entropy = -np.sum(all_samples * np.log(all_samples + min_entropy), axis=1)
@@ -322,12 +325,15 @@ def simulate(
         output_dir=output_dir,
     )
 
+    if not type(simulation) == np.ndarray:
+        raise ValueError(f"Simulation must be of type np.ndarray, got {type(simulation)}")
+
     plt.close()
     plt.hist(simulation, bins=32, color="#F0529C")
     plt.xlabel("Predicted")
     plt.ylabel("Frequency")
     plt.savefig(
-        f"{mk_plot_prefix(output_dir, metric_name, alpha)}_sim_dist.png",
+        f"{mk_output_prefix(output_dir, metric_name, alpha)}_sim_dist.png",
         bbox_inches="tight",
     )
     plt.close()
@@ -342,11 +348,11 @@ def simulate(
     top_k_mean_weights = np.mean(top_k_samples, axis=0)
     top_k_predicted_loss = predictor[index].predict([top_k_mean_weights])
 
-    logger.info(f"Predicted loss (top_k): {top_k_predicted_loss}")
+    logger.info(f"Predicted loss (top_k): {top_k_predicted_loss}\n")
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
 
-    with open(f"{mk_plot_prefix(output_dir, metric_name, alpha=alpha)}_optimal.json", "w") as f:
+    with open(f"{mk_output_prefix(output_dir, metric_name, alpha=alpha)}_optimal.json", "w") as f:
         out = []
         for idx, weight in enumerate(top_k_mean_weights):
             out.append({"domain": columns[idx], "weight": weight})
@@ -436,13 +442,13 @@ def plot_distributions(
     )
 
     plt.savefig(
-        f"{mk_plot_prefix(output_dir, metric_name, alpha=alpha)}_optimal.png",
+        f"{mk_output_prefix(output_dir, metric_name, alpha=alpha)}_optimal.png",
         bbox_inches="tight",
         pad_inches=0.1,
     )
 
 
-def mk_plot_prefix(outout_dir: str, metric: str, alpha: Optional[float] = None) -> str:
+def mk_output_prefix(outout_dir: str, metric: str, alpha: Optional[float] = None) -> str:
     def sanitize(s: str) -> str:
         return re.sub(r"[^a-zA-Z0-9_\-]", "_", s)
 

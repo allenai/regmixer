@@ -20,6 +20,7 @@ from regmixer.eval.utils import (
     mk_run_from_json,
     mk_run_metrics,
     mk_weights_from_config,
+    mk_output_prefix,
     plot_correlation,
     plot_distributions,
     simulate,
@@ -107,11 +108,20 @@ def cli():
     required=False,
     default=False,
 )
+@click.option(
+    "-S",
+    "--simulation-samples",
+    type=int,
+    default=100_000,
+    help="Number of simulation samples to generate for each metric",
+    required=False,
+)
 def fit(
     experiment_groups: list[str],
     config: pathlib.Path,
     alpha: float,
     num_samples: int,
+    simulation_samples: int,
     group_average: Optional[str],
     group_metrics: Optional[str],
     workspace: str,
@@ -165,7 +175,7 @@ def fit(
         eval_metric_group = GroupedWandbMetrics[group_metrics]
         eval_metric_group_name = group_metrics
 
-    logger.info(f"Building correlation with: {eval_metric_group_name}")
+    logger.info(f"Building correlation for metric group: {eval_metric_group_name}")
     logger.info(
         f"Found {len(run_instances)} valid run instances for group(s) {experiment_groups} to fit regression..."
     )
@@ -248,21 +258,34 @@ def fit(
             output_dir=output_dir,
             use_entropy=use_entropy,
             cached_samples=cached_samples,
+            n_samples=simulation_samples,
         )
 
         cached_samples = samples
         results.append((metric, weights))
 
     if not group_average:
+        # If we're not optimizing for the average of the metric group, then we average the reweighted distributions after fitting
+        avg_name = f"avg_{eval_metric_group_name}"
         average = np.mean([result[1] for result in results], axis=0)
+        columns = ratios.columns[2:].to_list()
         plot_distributions(
             prior=np.array(list(priors[0].values())),
             prediction=average,
-            metric_name=f"avg_{eval_metric_group_name}",
+            metric_name=avg_name,
             alpha=alpha,
-            columns=ratios.columns[2:].to_list(),
+            columns=columns,
             output_dir=output_dir,
         )
+
+        with open(
+            f"{mk_output_prefix(output_dir, avg_name, alpha=alpha)}_optimal.json",
+            "w",
+        ) as f:
+            out = [{"domain": columns[idx], "weight": weight} for idx, weight in enumerate(average)]
+            logger.info("Average of optimized weights:")
+            logger.info(out)
+            f.write(json.dumps(out))
 
 
 if __name__ == "main":
