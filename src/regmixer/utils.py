@@ -98,6 +98,7 @@ def mk_instance_cmd(
         f"-d {config.dtype.value}",
         f"-T {config.tokenizer}",
         f"-m {config.proxy_model_id}",
+        f"-w {config.weka}",
         *sources,
     ]
 

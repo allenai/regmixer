@@ -288,7 +288,7 @@ def simulate(
         )
 
         for idx in tqdm(range(n_samples), desc="Generating candidates"):
-            min_strength_log = np.log10(1e-3)
+            min_strength_log = np.log10(1e-2)
             max_strength_log = np.log10(alpha)
 
             for strength in np.logspace(
@@ -413,6 +413,8 @@ def plot_distributions(
         "Optimal": "#F0529C",
     }
 
+    df_sorted = df[df["type"] == "Original"].sort_values(by="value", ascending=False)
+    df["variable"] = pd.Categorical(df["variable"], categories=df_sorted["variable"], ordered=True)
     sns.barplot(data=df, x="variable", y="value", hue="type", palette=pallette, ax=ax)
 
     ax.legend(
@@ -421,7 +423,7 @@ def plot_distributions(
         prop={
             "size": 18,
         },
-        handlelength=0.5,
+        handlelength=0.4,
         ncol=3,
     )
 
@@ -432,6 +434,7 @@ def plot_distributions(
         "Domain",
         fontdict={
             "size": 28,
+            "labelpad": 10,
         },
     )
     ax.set_ylabel(

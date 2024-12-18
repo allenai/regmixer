@@ -99,8 +99,8 @@ class TransformerConfigBuilder:
     seed: int
     tokenizer: TokenizerConfig
     dtype: str
+    weka: bool
     profile: bool = False
-    weka: bool = False
 
     def __init__(
         self,
@@ -114,10 +114,10 @@ class TransformerConfigBuilder:
         tokenizer: str,
         dtype: str,
         model_identifier: str,
+        weka: bool,
         seed: int = 42,
         s3: bool = True,
         profile: bool = False,
-        weka: bool = False,
     ):
         self.run_name = run_name
         self.sources = sources
