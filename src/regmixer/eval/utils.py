@@ -288,7 +288,7 @@ def simulate(
         )
 
         for idx in tqdm(range(n_samples), desc="Generating candidates"):
-            min_strength_log = np.log10(1)
+            min_strength_log = np.log10(1e-3)
             max_strength_log = np.log10(alpha)
 
             for strength in np.logspace(
@@ -303,7 +303,7 @@ def simulate(
 
         all_samples = np.array(candidates).reshape(-1, len(prior_distributions))
         all_samples = all_samples[~np.isnan(all_samples).any(axis=1)]
-        logger.info(f"Generated {all_samples.shape:,} valid samples...")
+        logger.info(f"Generated {all_samples.shape[0]:,} valid samples...")
 
     if use_entropy:
         entropy = -np.sum(all_samples * np.log(all_samples + min_entropy), axis=1)
