@@ -1,6 +1,6 @@
 ```bash
 rmc-internal train \
-    -n avg_validation_loss_regmixer_optimal_1B \
+    -n avg_validation_loss_1B_2xC \
     -t gpt_neox \
     -c ai2/jupiter-cirrascale-2 \
     -w ai2/dolma2 \
@@ -10,7 +10,7 @@ rmc-internal train \
     -p high \
     -g 8 \
     -N 4 \
-    -d uint16 \
+    -D uint16 \
     -r 5.0 \
     -s avg_validation_loss_alpha_50_constrained.yaml
 ```
