@@ -195,6 +195,7 @@ def train(
         priority=priority,
         proxy_model_id=model_identifier,
         dtype=NumpyDatasetDType[dtype],
+        shared_filesystem=True,
     )
 
     logger.info(experiment_config)
