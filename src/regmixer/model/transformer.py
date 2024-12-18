@@ -130,12 +130,12 @@ class TransformerConfigBuilder:
         self.profile = profile
         self.s3 = s3
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
-        self.root_dir: str = "s3://ai2-llm"
+        self.data_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
-        self.checkpoint_dir = f"/tmp/{self.run_name}"
+        self.root_dir = f"/tmp/{self.run_name}"
 
         if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
-            self.checkpoint_dir = f"/weka/oe-training-default/ai2-llm/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
+            self.root_dir = f"/weka/oe-training-default/ai2-llm/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
@@ -191,13 +191,13 @@ class TransformerConfigBuilder:
                 eval_dataset=NumpyDatasetConfig.from_data_mix(
                     DataMix.v3_small_ppl_validation,
                     name=NumpyDatasetType.padded_fsl,
-                    mix_base_dir=self.root_dir,
+                    mix_base_dir=self.data_dir,
                     sequence_length=self.sequence_length,
                     tokenizer=self.tokenizer,
                     work_dir=(
                         "./dataset-cache"
                         if is_url(self.root_dir)
-                        else f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache"
+                        else f"{self.root_dir}/dataset-cache"
                     ),
                 ),
                 eval_interval=self.model_config.eval_interval,
@@ -271,7 +271,7 @@ class TransformerConfigBuilder:
         )
 
         trainer_config = TrainerConfig(
-            save_folder=self.checkpoint_dir,
+            save_folder=self.root_dir,
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
             metrics_collect_interval=10,
