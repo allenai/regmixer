@@ -288,7 +288,7 @@ def simulate(
         )
 
         for idx in tqdm(range(n_samples), desc="Generating candidates"):
-            min_strength_log = np.log10(1e-2)
+            min_strength_log = np.log10(1)
             max_strength_log = np.log10(alpha)
 
             for strength in np.logspace(

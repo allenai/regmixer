@@ -135,6 +135,7 @@ class TransformerConfigBuilder:
         self.root_dir = f"/tmp/{self.run_name}"
 
         if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
+            logger.info("Using Weka bucket as root dir")
             self.root_dir = f"/weka/oe-training-default/ai2-llm/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
 
         self.dataset_cache = (
@@ -266,12 +267,14 @@ class TransformerConfigBuilder:
 
         data_loader_config = NumpyDataLoaderConfig(
             global_batch_size=global_batch_size * self.sequence_length,
+            work_dir=self.dataset_cache,
             seed=self.seed,
             num_workers=16,
         )
 
         trainer_config = TrainerConfig(
             save_folder=self.root_dir,
+            work_dir=self.dataset_cache,
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
             metrics_collect_interval=10,
