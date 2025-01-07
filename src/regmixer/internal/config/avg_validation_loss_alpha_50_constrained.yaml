@@ -1,0 +1,97 @@
+sources:
+  - domain: adult_content
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/adult_content/**/*.npy
+    weight: 0.010644044272993623
+  - domain: art_and_design
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/art_and_design/**/*.npy
+    weight: 0.015549436245911739
+  - domain: software_development
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/software_development/**/*.npy
+    weight: 0.04970173326792699
+  - domain: education_and_jobs
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/education_and_jobs/**/*.npy
+    weight: 0.0077269180880846335
+  - domain: electronics_and_hardware
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/electronics_and_hardware/**/*.npy
+    weight: 0.013334242742766119
+  - domain: entertainment
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/entertainment/**/*.npy
+    weight: 0.0637188764602328
+  - domain: crime_and_law
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/crime_and_law/**/*.npy
+    weight: 0.05116249130879637
+  - domain: social_life
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/social_life/**/*.npy
+    weight: 0.030324302626237115
+  - domain: fashion_and_beauty
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/fashion_and_beauty/**/*.npy
+    weight: 0.00842043326598285
+  - domain: finance_and_business
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/finance_and_business/**/*.npy
+    weight: 0.09914937031846766
+  - domain: food_and_dining
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/food_and_dining/**/*.npy
+    weight: 0.01386390772339372
+  - domain: games
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/games/**/*.npy
+    weight: 0.015839347111426542
+  - domain: health
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/health/**/*.npy
+    weight: 0.11936561795569718
+  - domain: history_and_geography
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/history_and_geography/**/*.npy
+    weight: 0.02272958622220071
+  - domain: home_and_hobbies
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/home_and_hobbies/**/*.npy
+    weight: 0.04731189713223201
+  - domain: industrial
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/industrial/**/*.npy
+    weight: 0.01007603776871256
+  - domain: literature
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/literature/**/*.npy
+    weight: 0.05679917622686087
+  - domain: politics
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/politics/**/*.npy
+    weight: 0.10302285323060638
+  - domain: religion
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/religion/**/*.npy
+    weight: 0.024109485351181636
+  - domain: science_math_and_technology
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/science_math_and_technology/**/*.npy
+    weight: 0.1342224144421982
+  - domain: software
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/software/**/*.npy
+    weight: 0.037178982348169444
+  - domain: sports_and_fitness
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/sports_and_fitness/**/*.npy
+    weight: 0.054054975100405425
+  - domain: transportation
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/transportation/**/*.npy
+    weight: 0.007562888553284098
+  - domain: travel_and_tourism
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/refinedweb_datadelve_topics_50B_rand/allenai/gpt-neox-olmo-dolma-v1_5/travel_and_tourism/**/*.npy
+    weight: 0.004130982236231309

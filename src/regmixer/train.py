@@ -103,6 +103,13 @@ def cli():
     type=str,
     help="Model identifier",
 )
+@click.option(
+    "-w",
+    "--weka",
+    type=bool,
+    default=False,
+    help="Use Weka as root dir",
+)
 @record
 def train(
     run_name: str,
@@ -116,6 +123,7 @@ def train(
     dtype: str,
     tokenizer: str,
     model_identifier: str,
+    weka: bool,
 ):
     """
     Launch a training run with the given parameters.
@@ -143,6 +151,7 @@ def train(
         dtype=dtype.strip(),
         tokenizer=tokenizer.strip(),
         model_identifier=model_identifier.strip(),
+        weka=weka,
     ).build()
     dataset = config.dataset.build()
 

@@ -61,6 +61,7 @@ class TransformerConfigBuilder:
         tokenizer (TokenizerConfig): The tokenizer configuration.
         dtype (str): The data type for the dataset.
         profile (bool): Whether to enable profiling. Default is False.
+        weka (bool): Whether to use Weka buckets. Default is False.
 
     Methods:
         __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user,
@@ -98,6 +99,7 @@ class TransformerConfigBuilder:
     seed: int
     tokenizer: TokenizerConfig
     dtype: str
+    weka: bool
     profile: bool = False
 
     def __init__(
@@ -112,6 +114,7 @@ class TransformerConfigBuilder:
         tokenizer: str,
         dtype: str,
         model_identifier: str,
+        weka: bool,
         seed: int = 42,
         s3: bool = True,
         profile: bool = False,
@@ -127,11 +130,21 @@ class TransformerConfigBuilder:
         self.profile = profile
         self.s3 = s3
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
-        self.root_dir: str = "s3://ai2-llm"
+        self.data_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
+        self.root_dir = f"/tmp/{self.run_name}"
 
-        if "jupiter" in cluster and not s3:
-            self.root_dir = "/weka/oe-training-default/ai2-llm"
+        self.checkpoint_dir = (
+            f"{self.data_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
+        )
+
+        if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
+            logger.info("Using Weka bucket as root dir")
+            self.root_dir = f"/weka/oe-training-default/ai2-llm"
+
+        self.dataset_cache = (
+            f"{self.root_dir}/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
+        )
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
@@ -187,14 +200,10 @@ class TransformerConfigBuilder:
                 eval_dataset=NumpyDatasetConfig.from_data_mix(
                     DataMix.v3_small_ppl_validation,
                     name=NumpyDatasetType.padded_fsl,
-                    mix_base_dir=self.root_dir,
+                    mix_base_dir=self.data_dir,
                     sequence_length=self.sequence_length,
                     tokenizer=self.tokenizer,
-                    work_dir=(
-                        "./dataset-cache"
-                        if is_url(self.root_dir)
-                        else f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/dataset-cache"
-                    ),
+                    work_dir=self.dataset_cache,
                 ),
                 eval_interval=self.model_config.eval_interval,
             ),
@@ -257,17 +266,19 @@ class TransformerConfigBuilder:
             name=NumpyDatasetType.fsl,
             sequence_length=self.sequence_length,
             tokenizer=tokenizer,
-            work_dir="/tmp/dataset-cache",
+            work_dir=self.dataset_cache,
         )
 
         data_loader_config = NumpyDataLoaderConfig(
             global_batch_size=global_batch_size * self.sequence_length,
+            work_dir=self.dataset_cache,
             seed=self.seed,
             num_workers=16,
         )
 
         trainer_config = TrainerConfig(
-            save_folder=f"/tmp/{self.run_name}",
+            save_folder=self.checkpoint_dir,
+            work_dir=self.dataset_cache,
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
             metrics_collect_interval=10,

@@ -2,11 +2,11 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import yaml
 from beaker import Beaker
-from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig
+from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig, BeakerWekaBucket
 from olmo_core.utils import generate_uuid
 
 from regmixer.aliases import (
@@ -98,6 +98,7 @@ def mk_instance_cmd(
         f"-d {config.dtype.value}",
         f"-T {config.tokenizer}",
         f"-m {config.proxy_model_id}",
+        f"-w {config.weka}",
         *sources,
     ]
 
@@ -105,7 +106,12 @@ def mk_instance_cmd(
 def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     """Build a beaker launch config from an experiment group."""
 
+    weka_buckets: List[BeakerWekaBucket] = []
+    if group.config.weka:
+        weka_buckets.append(BeakerWekaBucket("oe-training-default", "/weka/oe-training-default"))
+
     beaker_user = (Beaker.from_env().account.whoami().name).upper()
+
     return [
         BeakerLaunchConfig(
             name=f"{experiment.name}",
@@ -116,9 +122,8 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
             num_nodes=group.config.nodes,
             num_gpus=group.config.gpus,
             shared_filesystem=group.config.shared_filesystem,
-            nfs=group.config.shared_filesystem,
             allow_dirty=True,
-            weka_buckets=group.config.weka,
+            weka_buckets=weka_buckets,
             budget=group.config.budget or "ai2/oe-data",
             workspace=group.config.workspace,
             preemptible=group.config.preemptible,
@@ -155,14 +160,14 @@ def mk_launch_group(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
     return mk_launch_configs(group)
 
 
-def prettify_mixes(mixes: list[dict[str, float]]):
+def prettify_mixes(mixes: list[dict[str, Tuple[float, float]]]):
     result = {"mixes": mixes}
     return json.dumps(result, indent=2)
 
 
 def mk_mixes(
     config_file: Path, output: Optional[Path] = None, use_cache: bool = True
-) -> list[dict[str, float]]:
+) -> list[dict[str, Tuple[float, float]]]:
     with open(config_file, "r") as f:
         data = yaml.safe_load(f)
 
@@ -180,6 +185,6 @@ def mk_mixes(
             f.write(mix_string)
 
         logger.info(f"Mixes saved to {output}:")
-    logger.info(mix_string)
+    logger.info(mixes)
 
     return mixes

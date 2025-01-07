@@ -197,24 +197,26 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.winogrande_mc_5shot_accuracy.value,
         WandbMetrics.winogrande_rc_5shot_accuracy.value,
     ]
-    few_shot_bpb = [
+    few_shot_bpb_mc = [
         WandbMetrics.arc_challenge_mc_5shot_bpb.value,
-        WandbMetrics.arc_challenge_rc_5shot_bpb.value,
         WandbMetrics.arc_easy_mc_5shot_bpb.value,
-        WandbMetrics.arc_easy_rc_5shot_bpb.value,
         WandbMetrics.boolq_mc_5shot_bpb.value,
-        WandbMetrics.boolq_rc_5shot_bpb.value,
         WandbMetrics.csqa_mc_5shot_bpb.value,
-        WandbMetrics.csqa_rc_5shot_bpb.value,
         WandbMetrics.hellaswag_mc_5shot_bpb.value,
-        WandbMetrics.hellaswag_rc_5shot_bpb.value,
         WandbMetrics.openbookqa_mc_5shot_bpb.value,
-        WandbMetrics.openbookqa_rc_5shot_bpb.value,
         WandbMetrics.piqa_mc_5shot_bpb.value,
-        WandbMetrics.piqa_rc_5shot_bpb.value,
         WandbMetrics.socialiqa_mc_5shot_bpb.value,
-        WandbMetrics.socialiqa_rc_5shot_bpb.value,
         WandbMetrics.winogrande_mc_5shot_bpb.value,
+    ]
+    few_shot_bpb_rc = [
+        WandbMetrics.arc_challenge_rc_5shot_bpb.value,
+        WandbMetrics.arc_easy_rc_5shot_bpb.value,
+        WandbMetrics.boolq_rc_5shot_bpb.value,
+        WandbMetrics.csqa_rc_5shot_bpb.value,
+        WandbMetrics.hellaswag_rc_5shot_bpb.value,
+        WandbMetrics.openbookqa_rc_5shot_bpb.value,
+        WandbMetrics.piqa_rc_5shot_bpb.value,
+        WandbMetrics.socialiqa_rc_5shot_bpb.value,
         WandbMetrics.winogrande_rc_5shot_bpb.value,
     ]
     validation_loss = [
