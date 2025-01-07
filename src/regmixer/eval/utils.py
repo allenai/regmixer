@@ -273,11 +273,11 @@ def simulate(
     cached_samples: np.ndarray,
     n_samples: int = 1_000_000,
     alpha: float = 1.0,
-    normalization: bool = False,
     min_entropy: float = 1e-3,
     output_dir: str = BASE_OUTPUT_DIR,
+    seed: int = 1337,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    np.random.seed(42)
+    np.random.seed(seed)
     all_samples = cached_samples
 
     if not cached_samples.shape[0] > 0:
@@ -288,17 +288,13 @@ def simulate(
         )
 
         for idx in tqdm(range(n_samples), desc="Generating candidates"):
-            min_strength_log = np.log10(1)
+            min_strength_log = np.log10(1e-3)
             max_strength_log = np.log10(alpha)
 
             for strength in np.logspace(
                 min_strength_log, max_strength_log, num_samples_per_strength
             ):
                 weights = np.random.dirichlet(prior_distributions * strength, 1)
-
-                if normalization:
-                    weights = (weights * 1.5 + prior_distributions) / 2.5
-
                 candidates.append(weights)
 
         all_samples = np.array(candidates).reshape(-1, len(prior_distributions))
