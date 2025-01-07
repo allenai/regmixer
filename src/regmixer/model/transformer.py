@@ -134,12 +134,16 @@ class TransformerConfigBuilder:
         self.dataset_dtype = NumpyDatasetDType[dtype]
         self.root_dir = f"/tmp/{self.run_name}"
 
+        self.checkpoint_dir = (
+            f"{self.data_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
+        )
+
         if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
             logger.info("Using Weka bucket as root dir")
-            self.root_dir = f"/weka/oe-training-default/ai2-llm/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
+            self.root_dir = f"/weka/oe-training-default/ai2-llm"
 
         self.dataset_cache = (
-            "./dataset-cache" if is_url(self.root_dir) else f"{self.root_dir}/dataset-cache"
+            f"{self.root_dir}/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
         )
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
@@ -273,7 +277,7 @@ class TransformerConfigBuilder:
         )
 
         trainer_config = TrainerConfig(
-            save_folder=self.root_dir,
+            save_folder=self.checkpoint_dir,
             work_dir=self.dataset_cache,
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
