@@ -3,6 +3,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional
+import time
 
 import click
 import yaml
@@ -10,6 +11,7 @@ from beaker import Beaker
 from beaker.services.job import JobClient
 from olmo_core.utils import generate_uuid, prepare_cli_environment
 from tqdm import tqdm
+from yaspin import yaspin
 
 from regmixer.aliases import ExperimentConfig, LaunchGroup
 from regmixer.model.transformer import TransformerConfigBuilder
@@ -66,7 +68,10 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
     experiment_config = ExperimentConfig(**data)
     group_uuid = generate_uuid()[:8]
 
-    logger.info("Building experiment group with the following config...")
+    beaker_user = (Beaker.from_env().account.whoami().name).upper()
+    logger.info(f"Launching experiment group '{group_uuid}' as user '{beaker_user}'")
+
+    logger.info("Generating experiment group from the following config...")
     logger.info(experiment_config)
 
     if not click.confirm("Proceed with this configuration?", default=False):
@@ -79,50 +84,60 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
 
         launch_group = LaunchGroup(
             instances=mk_launch_configs(
-                mk_experiment_group(
-                    experiment_config, mixes=predefined_mixes["mixes"], group_uuid=group_uuid
-                )
+                group=mk_experiment_group(
+                    config=experiment_config,
+                    mixes=predefined_mixes["mixes"],
+                    group_uuid=group_uuid,
+                ),
+                beaker_user=beaker_user,
             )
         )
     else:
         mixes = mk_mixes(config, use_cache=(no_cache == False))
 
         if click.confirm("Launch experiment with this set of mixtures?", default=False):
-            launch_group = LaunchGroup(
-                instances=mk_launch_configs(
-                    mk_experiment_group(experiment_config, mixes=mixes, group_uuid=group_uuid)
+            with yaspin(text="Building experiment group...", color="yellow") as spinner:
+                launch_group = LaunchGroup(
+                    instances=mk_launch_configs(
+                        group=mk_experiment_group(
+                            experiment_config, mixes=mixes, group_uuid=group_uuid
+                        ),
+                        beaker_user=beaker_user,
+                    )
                 )
-            )
+                spinner.ok("✔")
         else:
             logger.info("Launch cancelled!")
             return
 
-    logger.info("Launching experiment group...")
+    with yaspin(text="Launching experiment group...", color="yellow") as spinner:
+        try:
+            if dry_run:
+                logger.info("Dry run mode enabled. Printing experiment configurations...")
+                for experiment in launch_group.instances:
+                    logger.info(experiment.build_experiment_spec())
+                return
 
-    try:
-        if dry_run:
-            logger.info("Dry run mode enabled. Printing experiment configurations...")
-            for experiment in launch_group.instances:
-                logger.info(experiment.build_experiment_spec())
-            return
+            results = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                futures = [
+                    executor.submit(experiment.launch) for experiment in launch_group.instances
+                ]
 
-        results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(experiment.launch) for experiment in launch_group.instances]
+                for future in tqdm(
+                    concurrent.futures.as_completed(futures),
+                    total=len(futures),
+                    desc="Launching experiments",
+                ):
+                    results.append(future.result())
 
-            for future in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(futures),
-                desc="Launching experiments",
-            ):
-                results.append(future.result())
-
-        logger.info(results)
-        logger.info(f"Experiment group '{group_uuid}' launched successfully!")
-    except KeyboardInterrupt:
-        logger.warning(
-            "\nAborting experiment group launch! You may need to manually stop the launched experiments."
-        )
+            spinner.ok("✔")
+            logger.info(results)
+            logger.info(f"Experiment group '{group_uuid}' launched successfully!")
+        except KeyboardInterrupt:
+            logger.warning(
+                "\nAborting experiment group launch! You may need to manually stop the launched experiments."
+            )
 
 
 def status_for_group(path: Path, group_id: str):
@@ -199,9 +214,14 @@ def validate(config: Path):
 
     mixes = mk_mixes(config)
     experiment_group = mk_experiment_group(ExperimentConfig(**data), mixes, generate_uuid()[:8])
+    beaker_user = "validate-no-op"
 
     for experiment in experiment_group.instances:
-        logger.info(mk_instance_cmd(experiment, experiment_group.config, experiment_group.group_id))
+        logger.info(
+            mk_instance_cmd(
+                experiment, experiment_group.config, experiment_group.group_id, beaker_user
+            )
+        )
         transformer = TransformerConfigBuilder(
             cluster=experiment_group.config.cluster,
             beaker_user="validate-no-op",

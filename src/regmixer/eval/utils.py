@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 import re
 import warnings
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import torch
 from tqdm import tqdm
 from wandb.apis.public import Run
 
@@ -149,7 +151,7 @@ def plot_simulations(
         data=np.concatenate([np.array([prior_distributions]), samples], axis=0),
         columns=columns,
     )
-    df = df.sample(n=20, random_state=42)
+    # df = df.sample(n=20, random_state=42)
     df["sample"] = df.index
     melted_df = df.melt(id_vars=["sample"], var_name="Domain", value_name="Weight")
     g = sns.FacetGrid(melted_df, col="sample", col_wrap=4, aspect=2)
@@ -263,6 +265,101 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
     return weights
 
 
+def simulate2(
+    index: int,
+    predictor: list[lgb.LGBMRegressor],
+    prior_distributions: np.ndarray,
+    df_config: pd.DataFrame,
+    metric_name: str,
+    num_samples: int = 1_000_000,
+    alpha: float = 1.0,
+    output_dir: str = BASE_OUTPUT_DIR,
+    seed: int = 1337,
+    search_iterations: int = 10,
+) -> np.ndarray:
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    random.seed(seed)
+
+    def predict(weights, regressor, w_prior, target_prior) -> np.ndarray:
+        prior_pred = regressor.predict(w_prior[None])
+        preds = np.array([regressor.predict(weights) - prior_pred]).T
+
+        return (preds * target_prior).sum(-1)
+
+    min_weight = 1e-5
+    min_dirichlet = 1
+    max_dirichlet = 100
+    search_dirichlet_factor = 2.0
+
+    search_prior = prior_distributions
+    best_weights = np.zeros(len(prior_distributions))
+
+    # Multi-step search leveraging iterative prior results
+    for search_step in tqdm(
+        range(search_iterations), desc=f"Searching in {num_samples} candidate samples"
+    ):
+        offset = np.log(search_dirichlet_factor * (search_step + 1))
+        alphas = np.exp(
+            np.random.uniform(
+                low=np.log(min_dirichlet) + offset,
+                high=np.log(max_dirichlet) + offset,
+                size=num_samples,
+            )
+        )
+
+        simulations = (
+            torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
+            .sample()
+            .numpy()
+        )
+
+        # Filter out invalid simulations from the population
+        simulations = simulations[np.all(simulations <= 6.5 * prior_distributions, axis=1)]
+
+        preds = predict(
+            weights=simulations,
+            regressor=predictor[index],
+            w_prior=prior_distributions,
+            target_prior=prior_distributions,
+        )
+
+        # Take the best loss prediction as an index unless it's greater than 1e-3
+        best_mask = (preds - preds.min()) < 1e-3
+        best_weights = simulations[best_mask].mean(0)
+
+        # Zero out weights below min_weight threshold and normalize
+        best_weights[best_weights < min_weight] = 0.0
+        best_weights /= best_weights.sum()
+
+        search_prior = (best_weights + search_prior) / 2
+
+    if not type(best_weights) == np.ndarray:
+        raise ValueError(f"Simulation must be of type np.ndarray, got {type(best_weights)}")
+
+    logger.info(f":::::::::{metric_name}:::::::::")
+    logger.info("Predicted optimal weights:")
+
+    columns = df_config.columns[2:].to_list()
+    with open(f"{mk_output_prefix(output_dir, metric_name, alpha=alpha)}_optimal.json", "w") as f:
+        out = [
+            {"domain": columns[idx], "weight": weight} for idx, weight in enumerate(best_weights)
+        ]
+        logger.info(out)
+        f.write(json.dumps(out))
+
+    plot_weights(
+        prior=prior_distributions,
+        prediction=best_weights,
+        metric_name=metric_name,
+        alpha=alpha,
+        columns=columns,
+        output_dir=output_dir,
+    )
+
+    return best_weights
+
+
 def simulate(
     index: int,
     predictor: list[lgb.LGBMRegressor],
@@ -336,7 +433,7 @@ def simulate(
 
     k = 128
     top_k_simulations = np.argsort(simulation)[0:k]
-    # TODO: Make this conditional on the evaluation metric. ie: loss is min but downstream is max
+    # TODO: Make this conditional on the evaluation metric. ie: loss is min but downstream accuracy is max
     logger.info(f"Best prediction: {np.min(simulation)}")
     top_k_samples = samples[top_k_simulations]
     top_k_samples.shape
@@ -356,7 +453,7 @@ def simulate(
         logger.info(out)
         f.write(json.dumps(out))
 
-    plot_distributions(
+    plot_weights(
         prior=prior_distributions,
         prediction=top_k_mean_weights,
         metric_name=metric_name,
@@ -368,7 +465,7 @@ def simulate(
     return top_k_mean_weights, all_samples
 
 
-def plot_distributions(
+def plot_weights(
     prior: np.ndarray,
     prediction: np.ndarray,
     metric_name: str,

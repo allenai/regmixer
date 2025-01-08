@@ -18,6 +18,7 @@ dependencies = [
     "click",
     "pydantic",
     "s3fs",
+    "yaspin"
 ]
 [project.optional-dependencies]
 dev = [
