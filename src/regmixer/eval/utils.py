@@ -314,6 +314,7 @@ def simulate2(
             .numpy()
         )
 
+        # Filter out invalid simulations from the population
         simulations = simulations[np.all(simulations <= 6.5 * prior_distributions, axis=1)]
 
         preds = predict(
@@ -323,6 +324,7 @@ def simulate2(
             target_prior=prior_distributions,
         )
 
+        # Take the best loss prediction as an index unless it's greater than 1e-3
         best_mask = (preds - preds.min()) < 1e-3
         best_weights = simulations[best_mask].mean(0)
 
