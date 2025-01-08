@@ -9,13 +9,13 @@ preemptible: true
 max_tokens: 3_000_000_000 # 30_000_000 * 20 * 5 == 5xC
 allow_repetition: true
 sequence_length: 2048
-seed: 42
+seed: 1337
 temperature: 0.75
 proxy_model_id: "olmo_30m"
 tokenizer: "gpt_neox"
 dtype: "uint16"
 priority: high
-cluster: ai2/jupiter-cirrascale-2
+cluster: ai2/saturn-cirrascale
 sources:
   - name: adult_content
     paths:

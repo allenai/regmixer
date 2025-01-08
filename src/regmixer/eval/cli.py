@@ -22,8 +22,9 @@ from regmixer.eval.utils import (
     mk_weights_from_config,
     mk_output_prefix,
     plot_correlation,
-    plot_distributions,
+    plot_weights,
     simulate,
+    simulate2,
 )
 
 logger = logging.getLogger(__name__)
@@ -236,7 +237,6 @@ def fit(
         predictors.append(build_regression(idx, Y_train, Y_test, X_train, X_test))
 
     results = []
-    cached_samples = np.array([])
 
     for idx, metric in indexed_metrics:
         plot_correlation(
@@ -248,7 +248,7 @@ def fit(
             alpha=alpha,
             output_dir=output_dir,
         )
-        weights, samples = simulate(
+        weights = simulate2(
             index=idx,
             predictor=predictors,
             df_config=ratios,
@@ -256,12 +256,9 @@ def fit(
             metric_name=metric,
             alpha=alpha,
             output_dir=output_dir,
-            use_entropy=use_entropy,
-            cached_samples=cached_samples,
-            n_samples=simulation_samples,
+            num_samples=simulation_samples,
         )
 
-        cached_samples = samples
         results.append((metric, weights))
 
     if not group_average:
@@ -269,7 +266,7 @@ def fit(
         avg_name = f"avg_{eval_metric_group_name}"
         average = np.mean([result[1] for result in results], axis=0)
         columns = ratios.columns[2:].to_list()
-        plot_distributions(
+        plot_weights(
             prior=np.array(list(priors[0].values())),
             prediction=average,
             metric_name=avg_name,

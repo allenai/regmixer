@@ -126,7 +126,7 @@ class TransformerConfigBuilder:
         self.group_id = group_id
         self.seed = seed
         self.model_config = SupportedModels[model_identifier].value
-        self.beaker_user = beaker_user
+        self.beaker_user = beaker_user.strip()
         self.profile = profile
         self.s3 = s3
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)

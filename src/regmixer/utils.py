@@ -71,11 +71,10 @@ def mk_experiment_group(
 
 
 def mk_instance_cmd(
-    instance: ExperimentInstance, config: ExperimentConfig, group_id: str
+    instance: ExperimentInstance, config: ExperimentConfig, group_id: str, beaker_user: str
 ) -> List[str]:
     """Build a command for launching an experiment instance."""
 
-    beaker_user = (Beaker.from_env().account.whoami().name).lower()
     sources = []
 
     for source in instance.sources:
@@ -103,21 +102,19 @@ def mk_instance_cmd(
     ]
 
 
-def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
+def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLaunchConfig]:
     """Build a beaker launch config from an experiment group."""
 
     weka_buckets: List[BeakerWekaBucket] = []
     if group.config.weka:
         weka_buckets.append(BeakerWekaBucket("oe-training-default", "/weka/oe-training-default"))
 
-    beaker_user = (Beaker.from_env().account.whoami().name).upper()
-
     return [
         BeakerLaunchConfig(
             name=f"{experiment.name}",
             description=group.config.description,
             task_name=experiment.name,
-            cmd=mk_instance_cmd(experiment, group.config, group.group_id),
+            cmd=mk_instance_cmd(experiment, group.config, group.group_id, beaker_user),
             clusters=[group.config.cluster],
             num_nodes=group.config.nodes,
             num_gpus=group.config.gpus,
@@ -153,11 +150,6 @@ def mk_launch_configs(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
         )
         for experiment in group.instances
     ]
-
-
-def mk_launch_group(group: ExperimentGroup) -> list[BeakerLaunchConfig]:
-    """Build a launch group from an experiment group."""
-    return mk_launch_configs(group)
 
 
 def prettify_mixes(mixes: list[dict[str, Tuple[float, float]]]):
