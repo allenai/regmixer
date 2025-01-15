@@ -20,14 +20,38 @@ priority: high
 cluster: ai2/jupiter-cirrascale-2
 sources:
   - name: pes2o
+    paths:
+    - ""
   - name: dclm-baseline-pct-7-gt-2
+    paths:
+    - ""
   - name: flan-decontam
+    paths:
+    - ""
   - name: wiki
+    paths:
+    - ""
   - name: stack-exchange
+    paths:
+    - ""
   - name: tulu-math
+    paths:
+    - ""
   - name: dolmino-synth-math
+    paths:
+    - ""
   - name: tiny-gsm-mind
+    paths:
+    - ""
   - name: mathcoder2-synth
+    paths:
+    - ""
   - name: metamath
+    paths:
+    - ""
   - name: codesearchnet
+    paths:
+    - ""
   - name: gsm8k-train
+    paths:
+    - ""

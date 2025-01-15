@@ -57,23 +57,23 @@ class ExperimentConfig(BaseModel):
     shared_filesystem: bool = False
     weka: bool = False
 
-    @pydantic.field_validator("train_type")
-    def verify_checkpoint_exists(cls, value, values):
-        if value == TrainType.anneal:
-            if not values.get("weka"):
-                raise ValueError("Anneal training type requires weka to be enabled, exiting...")
-            if not values.get("cluster") in ["ai2/jupiter-cirrascale-2", "ai2/saturn-cirrascale"]:
-                raise ValueError(
-                    "Anneal training type requires a weka supported cluster, exiting..."
-                )
-            checkpoint_path = Path(values.get("checkpoint_path", ""))
-            if not checkpoint_path.exists():
-                # TODO(undfined): This needs to probably be before weka is mounted so we can fail fast
-                raise ValueError(
-                    f"Anneal checkpoint does not exist at path: {checkpoint_path}, exiting..."
-                )
+    # @pydantic.field_validator("train_type")
+    # def verify_checkpoint_exists(cls, value, values):
+    #     if value == TrainType.anneal:
+    #         if not values.get("weka"):
+    #             raise ValueError("Anneal training type requires weka to be enabled, exiting...")
+    #         if not values.get("cluster") in ["ai2/jupiter-cirrascale-2", "ai2/saturn-cirrascale"]:
+    #             raise ValueError(
+    #                 "Anneal training type requires a weka supported cluster, exiting..."
+    #             )
+    #         checkpoint_path = Path(values.get("checkpoint_path", ""))
+    #         if not checkpoint_path.exists():
+    #             # TODO(undfined): This needs to probably be before weka is mounted so we can fail fast
+    #             raise ValueError(
+    #                 f"Anneal checkpoint does not exist at path: {checkpoint_path}, exiting..."
+    #             )
 
-        return value
+    #     return value
 
 
 class ExperimentInstance(BaseModel):
