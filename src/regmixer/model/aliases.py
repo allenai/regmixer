@@ -69,7 +69,7 @@ class ModelConfig:
     @classmethod
     def olmo_1b(cls) -> "ModelConfig":
         """
-        OLMo-1b (1_336_035_328 parameters)
+        OLMo-1b
         """
         return ModelConfig(
             compile=True,
@@ -81,11 +81,27 @@ class ModelConfig:
             max_sequence_length=4096,
         )
 
+    @classmethod
+    def olmo_7b(cls) -> "ModelConfig":
+        """
+        OLMo-7b
+        """
+        return ModelConfig(
+            compile=True,
+            d_model=4096,
+            n_heads=32,
+            n_layers=32,
+            rope_theta=10_000,
+            flash_attention=True,
+            max_sequence_length=4096,
+        )
+
 
 class SupportedModels(Enum):
     olmo_190m = ModelConfig.olmo_190m()
     olmo_30m = ModelConfig.olmo_30m()
     olmo_1b = ModelConfig.olmo_1b()
+    olmo_7b = ModelConfig.olmo_7b()
 
 
 class SupportedTokenizers(Enum):

@@ -1,7 +1,7 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from olmo_core.config import DType
 from olmo_core.data import (
@@ -12,9 +12,14 @@ from olmo_core.data import (
     TokenizerConfig,
 )
 from olmo_core.data.types import NumpyDatasetDType
-from olmo_core.io import is_url
 from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
-from olmo_core.optim import AdamWConfig, CosWithWarmup, OptimGroupOverride
+from olmo_core.optim import (
+    AdamWConfig,
+    CosWithWarmup,
+    LinearWithWarmup,
+    OptimGroupOverride,
+    Scheduler,
+)
 from olmo_core.train import TrainerConfig
 from olmo_core.train.callbacks import (
     Callback,
@@ -29,7 +34,7 @@ from olmo_core.train.callbacks import (
     WandBCallback,
 )
 
-from regmixer.aliases import SourceInstance
+from regmixer.aliases import SourceInstance, TrainType
 from regmixer.data.dataset import MixtureBuilder
 from regmixer.model.aliases import (
     ModelConfig,
@@ -60,12 +65,14 @@ class TransformerConfigBuilder:
         seed (int): The random seed for reproducibility. Default is 42.
         tokenizer (TokenizerConfig): The tokenizer configuration.
         dtype (str): The data type for the dataset.
-        profile (bool): Whether to enable profiling. Default is False.
         weka (bool): Whether to use Weka buckets. Default is False.
+        train_type (TrainType): The training type. Default is TrainType.pretrain.
+        load_path (Optional[str]): The path to load a pre-trained model. Default is None.
+        profile (bool): Whether to enable profiling. Default is False.
 
     Methods:
         __init__(run_name, sources, sequence_length, max_tokens, group_id, cluster, beaker_user,
-                 tokenizer, dtype, model_identifier, seed=42, s3=True, profile=False):
+                 tokenizer, dtype, model_identifier, weka, train_type=TrainType.pretrain, load_path=None, seed=42, s3=True, profile=False):
             Initializes the TransformerConfigBuilder.
 
         get_tokenizer_config(tokenizer: str) -> TokenizerConfig:
@@ -79,6 +86,12 @@ class TransformerConfigBuilder:
 
         next_power_of_2(x: int) -> int:
             Returns the next power of 2 greater than or equal to x.
+
+        get_lr(model: TransformerConfig, tokenizer: TokenizerConfig) -> float:
+            Returns the learning rate based on the model and tokenizer configurations.
+
+        get_scheduler(model: TransformerConfig) -> Scheduler:
+            Returns the learning rate scheduler based on the model configuration.
 
         build_callbacks(model: TransformerConfig) -> Dict[str, Callback]:
             Builds and returns a dictionary of callbacks for the trainer.
@@ -100,7 +113,9 @@ class TransformerConfigBuilder:
     tokenizer: TokenizerConfig
     dtype: str
     weka: bool
+    load_path: Optional[str] = None
     profile: bool = False
+    train_type: TrainType = TrainType.pretrain
 
     def __init__(
         self,
@@ -115,6 +130,8 @@ class TransformerConfigBuilder:
         dtype: str,
         model_identifier: str,
         weka: bool,
+        train_type: TrainType = TrainType.pretrain,
+        load_path: Optional[str] = None,
         seed: int = 42,
         s3: bool = True,
         profile: bool = False,
@@ -129,22 +146,20 @@ class TransformerConfigBuilder:
         self.beaker_user = beaker_user.strip()
         self.profile = profile
         self.s3 = s3
+        self.train_type = train_type
+        self.load_path = load_path
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
         self.data_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
         self.root_dir = f"/tmp/{self.run_name}"
 
-        self.checkpoint_dir = (
-            f"{self.data_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
-        )
-
         if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
             logger.info("Using Weka bucket as root dir")
             self.root_dir = f"/weka/oe-training-default/ai2-llm"
 
-        self.dataset_cache = (
-            f"{self.root_dir}/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
-        )
+        self.checkpoint_save_dir = f"{self.root_dir if weka else self.data_dir}/checkpoints/{self.beaker_user.lower().strip()}/{self.run_name}"
+
+        self.dataset_cache = f"{self.root_dir}/{self.beaker_user.lower()}/dataset-cache"
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
@@ -154,6 +169,8 @@ class TransformerConfigBuilder:
             raise e
 
     def get_warmup_steps(self, parameters: int) -> int:
+        if self.train_type == TrainType.anneal:
+            return 0
         return round(
             parameters / (self.get_batch_size(parameters) * self.model_config.max_sequence_length)
         )
@@ -175,10 +192,24 @@ class TransformerConfigBuilder:
     def next_power_of_2(self, x: int) -> int:
         return 1 if x == 0 else 2 ** (x - 1).bit_length()
 
+    def get_lr(self, model: TransformerConfig, tokenizer: TokenizerConfig) -> float:
+        if self.train_type == TrainType.anneal:
+            return 6.1852e-5  # Magic number pulled from OLMo-core examples
+
+        return 4.7e-3 * (model.num_params / tokenizer.padded_vocab_size()) ** (-1 / 3)
+
+    def get_scheduler(self, model: TransformerConfig) -> Scheduler:
+        if self.train_type == TrainType.anneal:
+            return LinearWithWarmup(warmup_steps=0, t_max=self.max_tokens)
+
+        return CosWithWarmup(
+            warmup_steps=self.get_warmup_steps(model.num_params),
+        )
+
     def build_callbacks(self, model: TransformerConfig) -> Dict[str, Callback]:
         return {
             "lr_scheduler": SchedulerCallback(
-                scheduler=CosWithWarmup(warmup_steps=self.get_warmup_steps(model.num_params))
+                scheduler=self.get_scheduler(model),
             ),
             "gpu_monitor": GPUMemoryMonitorCallback(),
             "grad_clipper": GradClipperCallback(max_grad_norm=self.model_config.max_grad_norm),
@@ -234,7 +265,7 @@ class TransformerConfigBuilder:
         )
 
         global_batch_size = self.get_batch_size(model.num_params)
-        learning_rate = 4.7e-3 * (model.num_params / tokenizer.padded_vocab_size()) ** (-1 / 3)
+        learning_rate = self.get_lr(model, tokenizer)
 
         if self.sequence_length == 4096:
             learning_rate /= 4
@@ -277,12 +308,13 @@ class TransformerConfigBuilder:
         )
 
         trainer_config = TrainerConfig(
-            save_folder=self.checkpoint_dir,
+            save_folder=self.checkpoint_save_dir,
             work_dir=self.dataset_cache,
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
             metrics_collect_interval=10,
             cancel_check_interval=5,
+            load_path=self.load_path,
         )
 
         for callback_name, callback in self.build_callbacks(model).items():

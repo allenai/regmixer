@@ -1,0 +1,33 @@
+name: "olmo2-7b-anneal-1b"
+description: "Simulated anneal of olmo2-7b to 1B tokens"
+budget: "ai2/oe-data"
+workspace: "ai2/dolma2"
+nodes: 8
+gpus: 8
+variants: 1
+preemptible: true
+max_tokens: 1_000_000_000
+allow_repetition: false
+sequence_length: 2048
+seed: 1337
+train_type: "anneal"
+weka: true
+checkpoint_path: "/weka/oe-training-default/ai2-llm/checkpoints/OLMo-medium/peteish7/step928646"
+proxy_model_id: "olmo_7b"
+tokenizer: "dolma2"
+dtype: "uint32"
+priority: high
+cluster: ai2/jupiter-cirrascale-2
+sources:
+  - name: pes2o
+  - name: dclm-baseline-pct-7-gt-2
+  - name: flan-decontam
+  - name: wiki
+  - name: stack-exchange
+  - name: tulu-math
+  - name: dolmino-synth-math
+  - name: tiny-gsm-mind
+  - name: mathcoder2-synth
+  - name: metamath
+  - name: codesearchnet
+  - name: gsm8k-train

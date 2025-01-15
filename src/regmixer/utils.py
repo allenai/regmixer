@@ -98,6 +98,8 @@ def mk_instance_cmd(
         f"-T {config.tokenizer}",
         f"-m {config.proxy_model_id}",
         f"-w {config.weka}",
+        f"-y {config.train_type.value}",
+        f"-C {config.checkpoint_path}" if config.checkpoint_path else "",
         *sources,
     ]
 
