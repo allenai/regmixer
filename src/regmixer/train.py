@@ -154,8 +154,11 @@ def train(
             )
         )
 
-    if checkpoint_path and not os.path.exists(checkpoint_path):
-        raise FileNotFoundError(f"Checkpoint path {checkpoint_path} does not exist.")
+    if checkpoint_path:
+        checkpoint_path = checkpoint_path.strip()
+
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint path {checkpoint_path} does not exist.")
 
     config = TransformerConfigBuilder(
         beaker_user=beaker_user.strip(),
@@ -170,7 +173,7 @@ def train(
         tokenizer=tokenizer.strip(),
         model_identifier=model_identifier.strip(),
         weka=weka,
-        load_path=checkpoint_path.strip() if checkpoint_path else None,
+        load_path=checkpoint_path,
         train_type=TrainType[train_type.strip()],
     ).build()
     dataset = config.dataset.build()
