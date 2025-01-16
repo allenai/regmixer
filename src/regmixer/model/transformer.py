@@ -313,7 +313,6 @@ class TransformerConfigBuilder:
 
         trainer_config = TrainerConfig(
             save_folder=self.checkpoint_save_dir,
-            work_dir=self.dataset_cache,
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
             metrics_collect_interval=10,
