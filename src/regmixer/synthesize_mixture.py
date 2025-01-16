@@ -65,6 +65,9 @@ def generate_weights_dirichlet(
         prior_dist = prior_dist**temperature
         prior_dist = prior_dist / np.sum(prior_dist)
 
+    if not allow_repetition and weight_bounds:
+        logger.info("Limiting candidates to within bounds, repetition is disabled...")
+
     for _ in range(num_samples_out * ConfigDefaults.sample_multiplier):
         candidates = []
         if ConfigDefaults.min_strength == ConfigDefaults.max_strength:
@@ -81,7 +84,6 @@ def generate_weights_dirichlet(
 
         # If we don't allow repetition, we need to filter out candidates that are outside the bounds
         if weight_bounds and not allow_repetition:
-            logger.info("Limiting candidates to within bounds, repetition is disabled...")
             filtered_candidates = [
                 sample
                 for sample in candidates
@@ -154,12 +156,19 @@ def mk_mixtures(
 
     num_samples = config.variants
     sources = config.sources
-    source_dist, source_total = calculate_priors(sources, config.dtype, use_cache=use_cache)
+    source_dist, source_total, source_tokens = calculate_priors(
+        sources, config.dtype, use_cache=use_cache
+    )
 
     logger.info(f"Total tokens for config: {source_total:,}")
     logger.info(f"Using seed: {config.seed}")
+
     logger.info("Source distribution:")
     logger.info(source_dist)
+    logger.info("Source tokens:")
+
+    source_tokens = {k: f"{v:,}" for k, v in source_tokens.items() if v > 0}
+    logger.info(source_tokens)
 
     source_items = list(source_dist.items())
     prior_dist = [v for _, v in source_items]
@@ -204,7 +213,7 @@ def _count_tokens_for_file(path: PathOrStr, dtype: NumpyDatasetDType) -> int:
 
 def calculate_priors(
     source_configs: list[SourceConfig], dtype: NumpyDatasetDType, use_cache: bool
-) -> Tuple[dict[str, float], int]:
+) -> Tuple[dict[str, float], int, dict[str, int]]:
     config_hash = hashlib.md5(
         json.dumps(
             [(sc.name, sc.paths) for sc in source_configs],
@@ -220,7 +229,7 @@ def calculate_priors(
                     "Source distribution cache found, using cached values! This can be disabled by setting use_cache=False."
                 )
                 obj = json.load(f)
-                return (obj["relative_sizes"], obj["total_tokens"])
+                return (obj["relative_sizes"], obj["total_tokens"], obj["token_counts"])
         except FileNotFoundError:
             logger.info("No cache file found, calculating from source files...")
 
@@ -258,23 +267,30 @@ def calculate_priors(
                 result = future.result()
                 token_counts.update(result)
             except Exception as e:
-                logger.info(f"Error processing {source_config.name}: {str(e)}")
-                token_counts[source_config.name] = 0
+                logger.info(f"Error processing {source_config.name}: {str(e)}, exiting!")
+                raise e
 
     # Calculate relative sizes
     total_tokens = sum(token_counts.values())
 
     if total_tokens == 0:
-        raise Exception(f"Error processing config, no tokens found!")
+        raise Exception(f"Error processing config, no tokens found for sources!")
 
     relative_sizes = {path: count / total_tokens for path, count in token_counts.items()}
 
     if use_cache:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         with open(cache_path, "w") as f:
-            json.dump({"relative_sizes": relative_sizes, "total_tokens": total_tokens}, f)
+            json.dump(
+                {
+                    "relative_sizes": relative_sizes,
+                    "total_tokens": total_tokens,
+                    "token_counts": token_counts,
+                },
+                f,
+            )
 
-    return (relative_sizes, total_tokens)
+    return (relative_sizes, total_tokens, token_counts)
 
 
 def sort_and_deduplicate(
