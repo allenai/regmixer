@@ -180,7 +180,7 @@ def mk_mixtures(
     mixtures = generate_weights_dirichlet(
         domains=domains,
         prior_dist=prior_dist,
-        minimum_weight=ConfigDefaults.minimum_weight,
+        minimum_weight=config.minimum_weight or ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
         temperature=config.mix_temperature,
         allow_repetition=config.allow_repetition,
