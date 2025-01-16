@@ -167,7 +167,7 @@ def train(
         model_identifier=model_identifier.strip(),
         weka=weka,
         load_path=checkpoint_path,
-        train_type=TrainType[train_type],
+        train_type=TrainType[train_type.strip()],
     ).build()
     dataset = config.dataset.build()
 
