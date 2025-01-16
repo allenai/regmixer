@@ -21,6 +21,7 @@ from olmo_core.optim import (
     Scheduler,
 )
 from olmo_core.train import TrainerConfig
+from olmo_core.train.common import LoadStrategy
 from olmo_core.train.callbacks import (
     Callback,
     CheckpointerCallback,
@@ -318,6 +319,12 @@ class TransformerConfigBuilder:
             metrics_collect_interval=10,
             cancel_check_interval=5,
             load_path=self.load_path,
+            # We fail fast if an existing if we expect a checkpoint for annealing and one is not found.
+            load_strategy=(
+                LoadStrategy.always
+                if self.train_type == TrainType.anneal
+                else LoadStrategy.if_available
+            ),
         )
 
         for callback_name, callback in self.build_callbacks(model).items():

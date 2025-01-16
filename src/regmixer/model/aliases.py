@@ -93,6 +93,7 @@ class ModelConfig:
             n_layers=32,
             rope_theta=500_000,
             flash_attention=True,
+            device_batch_size=4,
             max_sequence_length=4096,
         )
 
