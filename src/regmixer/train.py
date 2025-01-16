@@ -1,5 +1,6 @@
 import ast
 import logging
+import os
 from typing import List, Optional, Tuple, cast
 
 import click
@@ -152,6 +153,9 @@ def train(
                 name=name, paths=paths, ratio=float(ratio), repetition_factor=float(repetition)
             )
         )
+
+    if checkpoint_path and not os.path.exists(checkpoint_path):
+        raise FileNotFoundError(f"Checkpoint path {checkpoint_path} does not exist.")
 
     config = TransformerConfigBuilder(
         beaker_user=beaker_user.strip(),
