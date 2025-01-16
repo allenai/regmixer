@@ -91,7 +91,7 @@ class ModelConfig:
             d_model=4096,
             n_heads=32,
             n_layers=32,
-            rope_theta=10_000,
+            rope_theta=500_000,
             flash_attention=True,
             max_sequence_length=4096,
         )

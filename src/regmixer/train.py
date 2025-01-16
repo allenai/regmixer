@@ -154,7 +154,7 @@ def train(
         )
 
     config = TransformerConfigBuilder(
-        beaker_user=beaker_user,
+        beaker_user=beaker_user.strip(),
         cluster=cluster,
         group_id=group_id.strip(),
         run_name=run_name.strip(),
@@ -166,7 +166,7 @@ def train(
         tokenizer=tokenizer.strip(),
         model_identifier=model_identifier.strip(),
         weka=weka,
-        load_path=checkpoint_path,
+        load_path=checkpoint_path.strip() if checkpoint_path else None,
         train_type=TrainType[train_type.strip()],
     ).build()
     dataset = config.dataset.build()

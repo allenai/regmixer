@@ -143,7 +143,7 @@ class TransformerConfigBuilder:
         self.group_id = group_id
         self.seed = seed
         self.model_config = SupportedModels[model_identifier].value
-        self.beaker_user = beaker_user.strip()
+        self.beaker_user = beaker_user
         self.profile = profile
         self.s3 = s3
         self.train_type = train_type
@@ -178,6 +178,9 @@ class TransformerConfigBuilder:
     def get_batch_size(self, parameters: int) -> int:
         if self.sequence_length != 2048:
             raise NotImplementedError("Only sequence length 2048 is supported right now")
+
+        if self.train_type == TrainType.anneal:
+            return 1024
 
         global_batch_size = 160 * (parameters / 108000000) ** (2 / 3)
         global_batch_size /= self.model_config.batch_divisor
