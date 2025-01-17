@@ -4,6 +4,7 @@ import os
 from typing import List, Optional, Tuple, cast
 
 import click
+from olmo_core.distributed.checkpoint import load_model_and_optim_state
 from olmo_core.train import prepare_training_environment, teardown_training_environment
 from olmo_core.train.callbacks import ConfigSaverCallback, WandBCallback
 from olmo_core.utils import get_default_device, seed_all
@@ -193,6 +194,10 @@ def train(
     config_dict = config.as_config_dict()
     cast(WandBCallback, trainer.callbacks["wandb"]).config = config_dict
     cast(ConfigSaverCallback, trainer.callbacks["config_saver"]).config = config_dict
+
+    # TODO(undfined): Add support in olmo-core to handle this
+    if checkpoint_path:
+        load_model_and_optim_state(checkpoint_path, model)
 
     trainer.fit()
 
