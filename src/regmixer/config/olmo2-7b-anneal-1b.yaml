@@ -13,7 +13,8 @@ seed: 1337
 minimum_weight: 8e-3
 train_type: "anneal"
 weka: true
-checkpoint_path: "/weka/oe-training-default/ai2-llm/checkpoints/ai2-tylerm/peteish7/step928646-olmo-core-1124"
+# checkpoint_path: "/weka/oe-training-default/ai2-llm/checkpoints/ai2-tylerm/peteish7/step928646-olmo-core-1124"
+checkpoint_path: "/weka/oe-training-default/ai2-llm/checkpoints/petew/OLMo-core-7B-float8/step1221"
 proxy_model_id: "olmo_7b"
 tokenizer: "dolma2"
 dtype: "uint32"
