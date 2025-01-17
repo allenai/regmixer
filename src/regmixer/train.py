@@ -197,7 +197,7 @@ def train(
 
     # TODO(undfined): Add support in olmo-core to handle this
     if checkpoint_path:
-        load_model_and_optim_state(checkpoint_path, model)
+        load_model_and_optim_state(dir=f"{checkpoint_path}/model_and_optim", model=model)
 
     trainer.fit()
 
