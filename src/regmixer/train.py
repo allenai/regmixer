@@ -195,9 +195,11 @@ def train(
     cast(WandBCallback, trainer.callbacks["wandb"]).config = config_dict
     cast(ConfigSaverCallback, trainer.callbacks["config_saver"]).config = config_dict
 
-    # TODO(undfined): Add support in olmo-core to handle this when no optimizer state is found
-    if checkpoint_path:
-        load_model_and_optim_state(dir=checkpoint_path, model=model, optim=optim)
+    # # TODO(undfined): Add support in olmo-core to handle this when no optimizer state is found
+    # if checkpoint_path:
+    #     load_model_and_optim_state(
+    #         dir=f"{checkpoint_path}/model_and_optim", model=model, optim=optim
+    #     )
 
     trainer.fit()
 
