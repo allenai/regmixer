@@ -19,7 +19,7 @@ proxy_model_id: "olmo_7b"
 tokenizer: "dolma2"
 dtype: "uint32"
 priority: high
-cluster: ai2/jupiter-cirrascale-2
+cluster: ai2/saturn-cirrascale
 sources:
   # X Tokens
   - name: dolmino-math
