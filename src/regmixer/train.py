@@ -1,14 +1,16 @@
 import ast
 import logging
-from typing import List, Tuple, cast
+import os
+from typing import List, Optional, Tuple, cast
 
 import click
+from olmo_core.distributed.checkpoint import load_model_and_optim_state
 from olmo_core.train import prepare_training_environment, teardown_training_environment
 from olmo_core.train.callbacks import ConfigSaverCallback, WandBCallback
 from olmo_core.utils import get_default_device, seed_all
 from torch.distributed.elastic.multiprocessing.errors import record
 
-from regmixer.aliases import SourceInstance
+from regmixer.aliases import SourceInstance, TrainType
 from regmixer.model.transformer import TransformerConfigBuilder
 
 logger = logging.getLogger(__name__)
@@ -110,6 +112,18 @@ def cli():
     default=False,
     help="Use Weka as root dir",
 )
+@click.option(
+    "-C",
+    "--checkpoint-path",
+    type=str,
+    help="Path to checkpoint",
+)
+@click.option(
+    "-y",
+    "--train-type",
+    type=str,
+    help="Type of training",
+)
 @record
 def train(
     run_name: str,
@@ -124,6 +138,8 @@ def train(
     tokenizer: str,
     model_identifier: str,
     weka: bool,
+    train_type: str,
+    checkpoint_path: Optional[str] = None,
 ):
     """
     Launch a training run with the given parameters.
@@ -139,8 +155,14 @@ def train(
             )
         )
 
+    if checkpoint_path:
+        checkpoint_path = checkpoint_path.strip()
+
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint path {checkpoint_path} does not exist.")
+
     config = TransformerConfigBuilder(
-        beaker_user=beaker_user,
+        beaker_user=beaker_user.strip(),
         cluster=cluster,
         group_id=group_id.strip(),
         run_name=run_name.strip(),
@@ -152,6 +174,8 @@ def train(
         tokenizer=tokenizer.strip(),
         model_identifier=model_identifier.strip(),
         weka=weka,
+        load_path=checkpoint_path,
+        train_type=TrainType[train_type.strip()],
     ).build()
     dataset = config.dataset.build()
 

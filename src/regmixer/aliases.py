@@ -1,13 +1,20 @@
+from enum import Enum
 from os import PathLike
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from beaker import Priority
 from olmo_core.data.types import NumpyDatasetDType
-from olmo_core.launch.beaker import BeakerLaunchConfig, BeakerWekaBucket
+from olmo_core.launch.beaker import BeakerLaunchConfig
 from pydantic import BaseModel
+import pydantic
 
 PathType = Union[Path, PathLike[Any], str]
+
+
+class TrainType(Enum):
+    pretrain = "pretrain"
+    anneal = "anneal"
 
 
 class SourceConfig(BaseModel):
@@ -41,12 +48,17 @@ class ExperimentConfig(BaseModel):
     sources: list[SourceConfig]
     tokenizer: str
     proxy_model_id: str
+    minimum_weight: Optional[float]
+    checkpoint_path: Optional[str]
+    train_type: TrainType = TrainType.pretrain
     allow_repetition: bool = True
     dtype: NumpyDatasetDType = NumpyDatasetDType.uint32
     mix_temperature: float = 1.0
     preemptible: bool = True
     shared_filesystem: bool = False
     weka: bool = False
+
+    # TODO(undfined): Add field validation for weka/cluster/train_type here
 
 
 class ExperimentInstance(BaseModel):
