@@ -10,7 +10,7 @@ max_tokens: 1_000_000_000
 allow_repetition: false
 sequence_length: 2048
 seed: 42
-minimum_weight: 0.01
+minimum_weight: 0.05
 train_type: "anneal"
 weka: true
 checkpoint_path: "/weka/oe-training-default/ai2-llm/checkpoints/ai2-tylerm/peteish7/olmo-core-7b-1124/step928646"
