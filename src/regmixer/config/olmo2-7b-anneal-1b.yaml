@@ -4,24 +4,22 @@ budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 8
-variants: 1
+variants: 32
 preemptible: true
 max_tokens: 1_000_000_000
 allow_repetition: false
 sequence_length: 2048
-seed: 1337
+seed: 42
 minimum_weight: 8e-3
 train_type: "anneal"
 weka: true
-# checkpoint_path: "/weka/oe-training-default/ai2-llm/checkpoints/ai2-tylerm/peteish7/step928646-olmo-core-1124"
 checkpoint_path: "/weka/oe-training-default/ai2-llm/checkpoints/ai2-tylerm/peteish7/olmo-core-7b-1124/step928646"
 proxy_model_id: "olmo_7b"
 tokenizer: "dolma2"
 dtype: "uint32"
 priority: high
-cluster: ai2/saturn-cirrascale
+cluster: ai2/jupiter-cirrascale-2
 sources:
-  # X Tokens
   - name: dolmino-math
     paths:
     - s3://ai2-llm/preprocessed/tulu_v3.9_personahub_math_interm_algebra_20k/dolma2-tokenizer/*.npy
@@ -37,7 +35,6 @@ sources:
     - s3://ai2-llm/preprocessed/owm-filtered-math/metamath/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/personahub_math_v5_regen_149960/dolma2-tokenizer/*.npy
 
-  # X Tokens
   - name: gsm-math
     paths:
     - s3://ai2-llm/preprocessed/gsm8k/v0_socratic_train/allenai/dolma2-tokenizer/*.npy
@@ -47,43 +44,38 @@ sources:
     - s3://ai2-llm/preprocessed/tinyGSM/mind-2students/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/tinyGSM/mind/dolma2-tokenizer/*.npy
 
-  # X Tokens
   - name: tulu-flan
     paths:
     - s3://ai2-llm/preprocessed/tulu_flan/v1-FULLDECON-HARD-TRAIN-60M-shots_all-upweight_1-dialog_false-sep_rulebased/allenai/dolma2-tokenizer/*.npy
 
-  # X Tokens
   - name: pes2o
     paths:
     - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/part-10-00000.npy
 
-  # X Tokens
   - name: wiki
     paths:
     - s3://ai2-llm/preprocessed/olmo-mix/danyh-compiled-v1_7/documents/wiki/allenai/dolma2-tokenizer/part-1-00000.npy
     - s3://ai2-llm/preprocessed/olmo-mix/danyh-compiled-v1_7/documents/wiki/allenai/dolma2-tokenizer/part-0-00000.npy
 
-  # X Tokens
   - name: stack-exchange
     paths:
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-14-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-02-00000.npy
     - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-00-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-11-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-05-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-12-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-15-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-03-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-13-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-09-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-06-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-10-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-08-00000.npy
-    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-04-00000.npy
     - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-01-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-02-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-03-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-04-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-05-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-06-00000.npy
     - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-07-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-08-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-09-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-10-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-11-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-12-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-13-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-14-00000.npy
+    - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-15-00000.npy
 
-  # X Tokens
   - name: dclm-baseline-ft7pct-fw2
     paths:
     - s3://ai2-llm/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0000/part-17-00000.npy
