@@ -28,7 +28,7 @@ dev = [
     "isort>=5.12,<5.13",
     "pytest",
 ]
-interacive = [
+interactive = [
     "ipykernel",
     "jupyter"
 ]
