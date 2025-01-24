@@ -77,20 +77,26 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
         logger.info("Launch cancelled!")
         return
 
+    launch_group = None
+
     if mixture_file:
         with open(mixture_file, "r") as f:
             predefined_mixes = json.load(f)
 
-        launch_group = LaunchGroup(
-            instances=mk_launch_configs(
-                group=mk_experiment_group(
-                    config=experiment_config,
-                    mixes=predefined_mixes["mixes"],
-                    group_uuid=group_uuid,
-                ),
-                beaker_user=beaker_user,
-            )
-        )
+        logger.info(predefined_mixes)
+        if click.confirm("Launch experiment with this set of mixtures?", default=False):
+            with yaspin(text="Building experiment group...", color="yellow") as spinner:
+                launch_group = LaunchGroup(
+                    instances=mk_launch_configs(
+                        group=mk_experiment_group(
+                            config=experiment_config,
+                            mixes=predefined_mixes["mixes"],
+                            group_uuid=group_uuid,
+                        ),
+                        beaker_user=beaker_user,
+                    )
+                )
+                spinner.ok("✔")
     else:
         mixes = mk_mixes(config, use_cache=(no_cache == False))
 
@@ -108,6 +114,10 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
         else:
             logger.info("Launch cancelled!")
             return
+
+    if not launch_group:
+        logger.info("Launch cancelled!")
+        return
 
     with yaspin(text="Launching experiment group...", color="yellow") as spinner:
         try:
