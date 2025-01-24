@@ -1,0 +1,44 @@
+{
+  "mixes": [
+    {
+      "dclm-baseline-ft7pct-fw2": [
+        1.0,
+        1.0
+      ],
+      "dolmino-math": [
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "dclm-baseline-ft7pct-fw2": [
+        0.0,
+        1.0
+      ],
+      "dolmino-math": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "dclm-baseline-ft7pct-fw2": [
+        0.25,
+        1.0
+      ],
+      "dolmino-math": [
+        0.75,
+        1.0
+      ]
+    },
+    {
+      "dclm-baseline-ft7pct-fw2": [
+        0.75,
+        1.0
+      ],
+      "dolmino-math": [
+        0.25,
+        1.0
+      ]
+    }
+  ]
+}
