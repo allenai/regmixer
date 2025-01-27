@@ -86,6 +86,7 @@ def fetch_wandb_runs(
                     # Create a dictionary with relevant run information
                     run_info = {
                         "id": batch_run.id,
+                        "author": batch_run.user.username,
                         "name": batch_run.name,
                         "state": batch_run.state,
                         "config": batch_run.config,
@@ -107,7 +108,9 @@ def fetch_wandb_runs(
                     elapsed_time = current_time - start_time
                     runs_per_second = processed_runs / elapsed_time
                     remaining_runs = total_runs - processed_runs
-                    estimated_remaining_time = remaining_runs / runs_per_second if runs_per_second > 0 else 0
+                    estimated_remaining_time = (
+                        remaining_runs / runs_per_second if runs_per_second > 0 else 0
+                    )
 
                     logging.info(
                         f"\nProgress update:\n"
@@ -134,7 +137,9 @@ def fetch_wandb_runs(
 
 @click.command()
 @click.option("--workspace", required=True, help='W&B workspace in format "entity/project"')
-@click.option("--output-dir", required=True, type=click.Path(), help="Directory to save output files")
+@click.option(
+    "--output-dir", required=True, type=click.Path(), help="Directory to save output files"
+)
 @click.option("--batch-size", default=50, help="Number of runs to process in each batch")
 @click.option("--finished-only", is_flag=True, help="Only include finished runs")
 def main(workspace: str, output_dir: str, batch_size: int, finished_only: bool):
@@ -146,7 +151,9 @@ def main(workspace: str, output_dir: str, batch_size: int, finished_only: bool):
     # Setup logging
     setup_logging(output_dir / "fetch_runs.log")
 
-    logging.info(f"Starting run collection from {workspace} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info(
+        f"Starting run collection from {workspace} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
     logging.info(f"Fetching {'only finished' if finished_only else 'all'} runs")
 
     # Fetch and organize runs
