@@ -160,7 +160,9 @@ class TransformerConfigBuilder:
 
         self.checkpoint_save_dir = f"{self.root_dir if weka else self.data_dir}/checkpoints/{self.beaker_user.lower().strip()}/{self.run_name}"
 
-        self.dataset_cache = f"{self.root_dir}/{self.beaker_user.lower()}/dataset-cache"
+        self.dataset_cache = (
+            f"{self.root_dir}/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
+        )
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:

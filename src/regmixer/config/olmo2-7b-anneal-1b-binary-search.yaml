@@ -1,12 +1,12 @@
-name: "olmo2-7b-anneal-1b"
+name: "olmo2-7b-anneal-1b-binary-search"
 description: "Simulated anneal of olmo2-7b to 1B tokens"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 8
-variants: 32
+variants: 4
 preemptible: true
-max_tokens: 1_000_000_000
+max_tokens: 10_000_000_000
 allow_repetition: false
 sequence_length: 2048
 seed: 42
@@ -34,31 +34,16 @@ sources:
     - s3://ai2-llm/preprocessed/basic_math_mj/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/owm-filtered-math/metamath/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/personahub_math_v5_regen_149960/dolma2-tokenizer/*.npy
-
-  - name: gsm-math
-    paths:
     - s3://ai2-llm/preprocessed/gsm8k/v0_socratic_train/allenai/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/gsm8k/v0_main_train/allenai/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/gsm8k-synth/resample_v1_6x/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/gsm_MIND/clean_stop/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/tinyGSM/mind-2students/dolma2-tokenizer/*.npy
     - s3://ai2-llm/preprocessed/tinyGSM/mind/dolma2-tokenizer/*.npy
-
-  - name: tulu-flan
-    paths:
     - s3://ai2-llm/preprocessed/tulu_flan/v1-FULLDECON-HARD-TRAIN-60M-shots_all-upweight_1-dialog_false-sep_rulebased/allenai/dolma2-tokenizer/*.npy
-
-  - name: pes2o
-    paths:
     - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/part-10-00000.npy
-
-  - name: wiki
-    paths:
     - s3://ai2-llm/preprocessed/olmo-mix/danyh-compiled-v1_7/documents/wiki/allenai/dolma2-tokenizer/part-1-00000.npy
     - s3://ai2-llm/preprocessed/olmo-mix/danyh-compiled-v1_7/documents/wiki/allenai/dolma2-tokenizer/part-0-00000.npy
-
-  - name: stack-exchange
-    paths:
     - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-00-00000.npy
     - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-01-00000.npy
     - s3://ai2-llm/preprocessed/stackexchange/v1_dedupe/allenai/dolma2-tokenizer/part-02-00000.npy
