@@ -104,7 +104,7 @@ def mk_instance_cmd(
     if config.checkpoint_path:
         cmd_list.append(f"-C {config.checkpoint_path}")
 
-    cmd_list.append(*sources)
+    cmd_list.extend(sources)
 
     return cmd_list
 
