@@ -49,7 +49,7 @@ class ExperimentConfig(BaseModel):
     tokenizer: str
     proxy_model_id: str
     minimum_weight: Optional[float]
-    checkpoint_path: Optional[str]
+    checkpoint_path: Optional[str] = None
     train_type: TrainType = TrainType.pretrain
     allow_repetition: bool = True
     dtype: NumpyDatasetDType = NumpyDatasetDType.uint32

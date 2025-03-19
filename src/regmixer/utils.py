@@ -84,7 +84,7 @@ def mk_instance_cmd(
         )
         sources.append(source_str)
 
-    return [
+    cmd_list = [
         "src/regmixer/train.py",
         "train",
         f"-n {instance.name}",
@@ -99,9 +99,14 @@ def mk_instance_cmd(
         f"-m {config.proxy_model_id}",
         f"-w {config.weka}",
         f"-y {config.train_type.value}",
-        f"-C {config.checkpoint_path}" if config.checkpoint_path else "",
-        *sources,
     ]
+
+    if config.checkpoint_path:
+        cmd_list.append(f"-C {config.checkpoint_path}")
+
+    cmd_list.extend(sources)
+
+    return cmd_list
 
 
 def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLaunchConfig]:
