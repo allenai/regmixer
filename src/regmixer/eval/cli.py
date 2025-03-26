@@ -3,6 +3,8 @@ import logging
 import pathlib
 import warnings
 from typing import Optional
+from copy import deepcopy 
+from sklearn.model_selection import train_test_split
 
 import click
 import numpy as np
@@ -117,6 +119,38 @@ def cli():
     help="Number of simulation samples to generate for each metric",
     required=False,
 )
+@click.option(
+    "-r",
+    "--regression-type",
+    type=str,
+    default="lightgbm",
+    help="Whether to use LightGBM or linear regression for fitting",
+    required=False,
+)
+@click.option(
+    "-t",
+    "--train-split",
+    type=float,
+    default=1.0,
+    help="Fraction of dataset used for training. Default = 1.0 means that train equals test.",
+    required=False,
+)
+@click.option(
+    "--n-test",
+    type=int,
+    default=0,
+    help="Number of test samples we evaluate regression model on, primarily used for analysis.",
+    required=False,
+)
+@click.option(
+    "--seed",
+    type=int,
+    default=0,
+    help="Random state for train-test split",
+    required=False,
+)
+
+
 def fit(
     experiment_groups: list[str],
     config: pathlib.Path,
@@ -128,6 +162,10 @@ def fit(
     workspace: str,
     no_cache: bool,
     use_entropy: bool,
+    regression_type: str,
+    train_split: float,
+    n_test: int,
+    seed: int 
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -150,7 +188,6 @@ def fit(
             with open(cache_path, "r") as f:
                 run_dict = json.load(f)
                 run_instances = [mk_run_from_json(run) for run in run_dict]
-
             logger.info(f"Loaded cached runs from {cache_path}")
 
         except FileNotFoundError:
@@ -210,19 +247,32 @@ def fit(
         }
         for idx, run in enumerate(run_instances)
     ]
-
     ratios = pd.DataFrame(run_ratios)
     metrics = pd.DataFrame(run_metrics)
 
-    # Domain weights
+
+    # X = Domain weights
     X_train = ratios[ratios.columns[2:]].values
-    X_test = ratios[ratios.columns[2:]].values
-
-    # Metric values
+    # Y = Metric values 
     Y_train = metrics[metrics.columns[2:]].values
-    Y_test = metrics[metrics.columns[2:]].values
 
-    np.random.seed(42)
+    if n_test == 0:
+        # if n_test is 0
+        X_test = deepcopy(X_train)
+        Y_test = deepcopy(Y_train)
+    else:
+        # If we want to evaluate on a fixed number of test samples
+        logger.info(f"Using {n_test} samples for test data")
+        X_train, X_test, Y_train, Y_test = train_test_split(X_train, Y_train, test_size=n_test / len(Y_train), random_state=seed)
+
+        if train_split != 1.0:
+            # If we also want to subsample the training_data to study the effect of number of proxy runs
+            logger.info(f"Subsampling training data to {train_split} of original size")
+            X_train, _, Y_train, _ = train_test_split(X_train, Y_train, train_size=train_split, random_state=seed)
+
+
+    logger.info(f"Number of train samples: {len(Y_train)}. Number of test samples: {len(Y_test)}.")
+
     predictors = []
     metrics_to_index = eval_metric_group.value
 
@@ -230,11 +280,11 @@ def fit(
         metrics_to_index = [eval_metric_group_name]
 
     indexed_metrics = list(enumerate(metrics_to_index))
-    logger.info(f"Fitting regression for metrics:")
+    logger.info(f"Fitting {regression_type} regression for metrics:")
     logger.info(indexed_metrics)
 
     for idx, metric in indexed_metrics:
-        predictors.append(build_regression(idx, Y_train, Y_test, X_train, X_test))
+        predictors.append(build_regression(idx, Y_train, Y_test, X_train, X_test, regression_type))
 
     results = []
 
@@ -242,9 +292,16 @@ def fit(
         plot_correlation(
             Y_test,
             X_test,
+            Y_train,
+            X_train,
             idx,
             predictors=predictors,
+            train_split=train_split,
             metric_name=metric,
+            regression_type=regression_type,
+            n_test=n_test,
+            split_seed=seed,
+            n_samples=num_samples,
             alpha=alpha,
             output_dir=output_dir,
         )
@@ -254,6 +311,11 @@ def fit(
             df_config=ratios,
             prior_distributions=np.array(list(priors[0].values())),
             metric_name=metric,
+            regression_type=regression_type,
+            train_split=train_split,
+            n_test=n_test,
+            split_seed=seed,
+            n_samples=num_samples,
             alpha=alpha,
             output_dir=output_dir,
             num_samples=simulation_samples,
@@ -270,13 +332,18 @@ def fit(
             prior=np.array(list(priors[0].values())),
             prediction=average,
             metric_name=avg_name,
+            regression_type=regression_type,
+            train_split=train_split,
+            n_test=n_test,
+            split_seed=seed,
+            n_samples=num_samples,
             alpha=alpha,
             columns=columns,
             output_dir=output_dir,
         )
 
         with open(
-            f"{mk_output_prefix(output_dir, avg_name, alpha=alpha)}_optimal.json",
+            f"{mk_output_prefix(output_dir, avg_name, regression_type, train_split, n_test, seed, num_samples, alpha=alpha)}_optimal.json",
             "w",
         ) as f:
             out = [{"domain": columns[idx], "weight": weight} for idx, weight in enumerate(average)]

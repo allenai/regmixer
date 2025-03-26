@@ -40,8 +40,8 @@ def prepare_from(source: str, dest: str):
         f"{user}_WANDB_API_KEY",
         f"{user}_AWS_CONFIG",
         f"{user}_AWS_CREDENTIALS",
-        "R2_ENDPOINT_URL",
-        "WEKA_ENDPOINT_URL",
+        #"R2_ENDPOINT_URL",
+        #"WEKA_ENDPOINT_URL",
     )
 
     for secret_name in required:

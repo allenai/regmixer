@@ -5,8 +5,8 @@ import re
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Tuple
-
+from typing import Any, Optional, Tuple, Union
+from sklearn.linear_model import LinearRegression
 import lightgbm as lgb
 import matplotlib.pyplot as plt
 import numpy as np
@@ -62,19 +62,23 @@ def build_regression(
     Y_test: np.ndarray,
     X_train: np.ndarray,
     X_test: np.ndarray,
-) -> lgb.LGBMRegressor:
+    regression_type: str
+) -> Union[lgb.LGBMRegressor, LinearRegression]:
     target = Y_train[:, idx]
     test_target = Y_test[:, idx]
 
-    gbm = lgb.LGBMRegressor(**LGBM_HPS)
-
-    regression = gbm.fit(
-        X_train,
-        target,
-        eval_set=[(X_test, test_target)],
-        eval_metric="l2",
-    )
-
+    if regression_type == "lightgbm":
+        gbm = lgb.LGBMRegressor(**LGBM_HPS)
+        regression = gbm.fit(
+            X_train,
+            target,
+            eval_set=[(X_train, target)],
+            eval_metric="l2",
+        )
+    elif regression_type == "linear":
+        regression = LinearRegression().fit(X_train, target)
+    else: 
+        raise NotImplementedError("Only LightGBM and linear regression are currently supported.")
     return regression
 
 
@@ -143,6 +147,11 @@ def plot_simulations(
     samples,
     columns: list[str],
     metric_name: str,
+    regression_type: str,
+    train_split: float,
+    n_test: int,
+    split_seed: int,
+    n_samples: int,
     alpha: float,
     output_dir: str = BASE_OUTPUT_DIR,
 ):
@@ -151,7 +160,6 @@ def plot_simulations(
         data=np.concatenate([np.array([prior_distributions]), samples], axis=0),
         columns=columns,
     )
-    # df = df.sample(n=20, random_state=42)
     df["sample"] = df.index
     melted_df = df.melt(id_vars=["sample"], var_name="Domain", value_name="Weight")
     g = sns.FacetGrid(melted_df, col="sample", col_wrap=4, aspect=2)
@@ -165,7 +173,7 @@ def plot_simulations(
         ax.yaxis.grid(True, linestyle="--", which="both", color="gray", alpha=0.7)
 
     plt.savefig(
-        f"{mk_output_prefix(output_dir, metric_name, alpha)}_sim_grid.png",
+        f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha)}_sim_grid.png",
         bbox_inches="tight",
         pad_inches=0.1,
     )
@@ -175,9 +183,115 @@ def plot_simulations(
 def plot_correlation(
     Y_test: np.ndarray,
     X_test: np.ndarray,
+    Y_train: np.ndarray,
+    X_train: np.ndarray,
     index: int,
-    predictors: list[lgb.LGBMRegressor],
+    predictors: list[Union[lgb.LGBMRegressor, LinearRegression]],
+    train_split: float,
+    n_test: int,
+    split_seed: int,
+    n_samples: int,
     metric_name: str,
+    regression_type: str,
+    alpha: Optional[float] = None,
+    output_dir: str = BASE_OUTPUT_DIR,
+):
+    plt.close()
+
+    # Predict train
+    y_pred_train = predictors[index].predict(X_train)
+    y_true_train = Y_train[:, index]
+
+
+    corr_results = {}
+
+    if train_split == 1 and n_test==0:
+        # Only plot train if train and test are the same
+        sns.regplot(
+            x=y_pred_train,
+            y=y_true_train,
+            scatter_kws={"s": 64, "color": "#105257"},
+            line_kws={"color": "#F0529C", "linewidth": 3, "linestyle": "dashed"},
+            label="Train"
+        )
+
+        corr_train = np.corrcoef(y_pred_train, y_true_train)[0, 1]
+        plt.legend(
+            title=f"{metric_name} correlation",
+            labels=[f"Train: {np.round(corr_train * 100, 2)}"],
+            fontsize=14,
+            title_fontsize=16,
+        )
+
+        corr_results['train'] = corr_train
+    else:
+        # Predict test
+        y_pred_test = predictors[index].predict(X_test)
+        y_true_test = Y_test[:, index]
+
+        # Plot test
+        sns.regplot(
+            x=y_pred_test,
+            y=y_true_test,
+            scatter_kws={"s": 64, "color": "#105257"},
+            line_kws={"color": "#F0529C", "linewidth": 3, "linestyle": "dashed"},
+            label="Test"
+        )
+
+        # Plot train
+        sns.regplot(
+            x=y_pred_train,
+            y=y_true_train,
+            scatter_kws={"s": 64, "color": "#B0C4DE"},
+            line_kws={"color": "#8888FF", "linewidth": 3, "linestyle": "dotted"},
+            label="Train"
+        )
+
+        corr_test = np.corrcoef(y_pred_test, y_true_test)[0, 1]
+        corr_train = np.corrcoef(y_pred_train, y_true_train)[0, 1]
+
+        import matplotlib.patches as mpatches
+
+        test_dot = mpatches.Patch(color="#105257", label=f"Test: {np.round(corr_test * 100, 2)}")
+        train_dot = mpatches.Patch(color="#B0C4DE", label=f"Train: {np.round(corr_train * 100, 2)}")
+
+        plt.legend(
+            handles=[test_dot, train_dot],
+            title=f"{metric_name} correlations",
+            fontsize=14,
+            title_fontsize=16,
+        )
+
+        corr_results['train'] = corr_train
+        corr_results['test'] = corr_test
+
+    # Common plot settings
+    plt.xlabel("Predicted", fontsize=18)
+    plt.ylabel("Actual", fontsize=18)
+    plt.grid(True, linestyle="dashed")
+    plt.tight_layout()
+
+    # Save figure
+    plt.savefig(
+        f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha)}_fit.png"
+    )
+    plt.close()
+
+    with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_correlations.json", "w") as f:
+        f.write(json.dumps(corr_results))
+
+
+def plot_correlation_old(
+    Y_test: np.ndarray,
+    X_test: np.ndarray,
+    index: int,
+    predictors: list[Union[lgb.LGBMRegressor, LinearRegression]],
+    metric_name: str,
+    regression_type: str,
+    train_split: float,
+    n_test: int,
+    split_seed: int,
+    n_samples: int,
     alpha: Optional[float] = None,
     output_dir: str = BASE_OUTPUT_DIR,
 ):
@@ -224,8 +338,9 @@ def plot_correlation(
     graph.ax_joint.spines[["right", "top"]].set_visible(True)
 
     graph.savefig(
-        f"{mk_output_prefix(output_dir, metric_name, alpha)}_fit.png", bbox_inches="tight"
+        f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha)}_fit.png", bbox_inches="tight"
     )
+
 
 
 def mk_run_metrics(
@@ -267,10 +382,15 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
 
 def simulate2(
     index: int,
-    predictor: list[lgb.LGBMRegressor],
+    predictor: list[Union[lgb.LGBMRegressor, LinearRegression]],
     prior_distributions: np.ndarray,
     df_config: pd.DataFrame,
     metric_name: str,
+    regression_type: str,
+    train_split: float,
+    n_test: int,
+    split_seed: int,
+    n_samples: int, 
     num_samples: int = 1_000_000,
     alpha: float = 1.0,
     output_dir: str = BASE_OUTPUT_DIR,
@@ -308,6 +428,7 @@ def simulate2(
             )
         )
 
+        # generate simulations by sampling from dirichlet distribution with parameter prior * alpha 
         simulations = (
             torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
             .sample()
@@ -341,7 +462,7 @@ def simulate2(
     logger.info("Predicted optimal weights:")
 
     columns = df_config.columns[2:].to_list()
-    with open(f"{mk_output_prefix(output_dir, metric_name, alpha=alpha)}_optimal.json", "w") as f:
+    with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json", "w") as f:
         out = [
             {"domain": columns[idx], "weight": weight} for idx, weight in enumerate(best_weights)
         ]
@@ -352,6 +473,11 @@ def simulate2(
         prior=prior_distributions,
         prediction=best_weights,
         metric_name=metric_name,
+        regression_type=regression_type,
+        train_split=train_split,
+        n_test=n_test,
+        split_seed=split_seed,
+        n_samples=n_samples,
         alpha=alpha,
         columns=columns,
         output_dir=output_dir,
@@ -362,12 +488,16 @@ def simulate2(
 
 def simulate(
     index: int,
-    predictor: list[lgb.LGBMRegressor],
+    predictor: list[Union[lgb.LGBMRegressor, LinearRegression]],
     prior_distributions: np.ndarray,
     df_config: pd.DataFrame,
     metric_name: str,
     use_entropy: bool,
     cached_samples: np.ndarray,
+    regression_type: str,
+    train_split: float,
+    n_test: int,
+    split_seed: int,
     n_samples: int = 1_000_000,
     alpha: float = 1.0,
     min_entropy: float = 1e-3,
@@ -414,6 +544,11 @@ def simulate(
         samples=samples,
         columns=columns.to_list(),
         metric_name=metric_name,
+        regression_type=regression_type,
+        train_split=train_split,
+        n_test=n_test,
+        split_seed=split_seed,
+        n_samples=10,
         alpha=alpha,
         output_dir=output_dir,
     )
@@ -426,7 +561,7 @@ def simulate(
     plt.xlabel("Predicted")
     plt.ylabel("Frequency")
     plt.savefig(
-        f"{mk_output_prefix(output_dir, metric_name, alpha)}_sim_dist.png",
+        f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, 10, alpha)}_sim_dist.png",
         bbox_inches="tight",
     )
     plt.close()
@@ -445,7 +580,7 @@ def simulate(
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
 
-    with open(f"{mk_output_prefix(output_dir, metric_name, alpha=alpha)}_optimal.json", "w") as f:
+    with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, 10, alpha=alpha)}_optimal.json", "w") as f:
         out = []
         for idx, weight in enumerate(top_k_mean_weights):
             out.append({"domain": columns[idx], "weight": weight})
@@ -457,6 +592,11 @@ def simulate(
         prior=prior_distributions,
         prediction=top_k_mean_weights,
         metric_name=metric_name,
+        regression_type=regression_type,
+        train_split=train_split,
+        n_test=n_test,
+        split_seed=split_seed,
+        n_samples=10,
         alpha=alpha,
         columns=columns.to_list(),
         output_dir=output_dir,
@@ -469,6 +609,11 @@ def plot_weights(
     prior: np.ndarray,
     prediction: np.ndarray,
     metric_name: str,
+    regression_type: str,
+    train_split: float,
+    n_test: int,
+    split_seed: int,
+    n_samples: int,
     alpha: float,
     columns: list[str],
     output_dir: str = BASE_OUTPUT_DIR,
@@ -537,16 +682,26 @@ def plot_weights(
     )
 
     plt.savefig(
-        f"{mk_output_prefix(output_dir, metric_name, alpha=alpha)}_optimal.png",
+        f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.png",
         bbox_inches="tight",
         pad_inches=0.1,
     )
 
 
-def mk_output_prefix(outout_dir: str, metric: str, alpha: Optional[float] = None) -> str:
+def mk_output_prefix(output_dir: str, metric: str, regression_type: str, train_split: float, n_test: int, split_seed: int, n_samples: int, alpha: Optional[float] = None) -> str:
     def sanitize(s: str) -> str:
         return re.sub(r"[^a-zA-Z0-9_\-]", "_", s)
 
-    return f"{outout_dir}{sanitize(metric)}" + (
+    return f"{output_dir}{sanitize(metric)}" + (
         f"_alpha_{str(alpha).replace('.', '_')}" if alpha and alpha != 1.0 else ""
-    )
+     ) + (
+        f"_{regression_type}_reg" if regression_type != "lightgbm" else ""
+     ) + (
+        f"_trainsplit_{train_split}" if train_split != 1.0 else "" 
+     ) + (
+        f"_ntest_{n_test}" if n_test != 0 else ""
+     ) + (
+        f"_seed_{split_seed}" if split_seed != 0 else ""
+     ) + (
+         f"_{n_samples}_samples" if n_samples != 10 else ""
+     )

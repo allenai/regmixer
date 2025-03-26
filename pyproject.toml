@@ -47,9 +47,10 @@ all = [
 
 [project.scripts]
 rmc = "regmixer.cli:cli"
-rmc-eval = "regmixer.eval.utils:cli"
+rmc-eval = "regmixer.eval.cli:cli"
 rmc-workspace = "regmixer.workspace:cli"
 rmc-internal = "regmixer.internal.cli:cli"
+rmc-convert = "regmixer.internal.convert_mixture:cli" 
 
 [tool.black]
 line-length = 100

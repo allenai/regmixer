@@ -6,7 +6,7 @@ nodes: 1
 gpus: 8
 variants: 256
 preemptible: true
-max_tokens: 30_000_000_000 # 30_000_000 * 20 * 5 == 5xC
+max_tokens: 3_000_000_000 # 30_000_000 * 20 * 5 == 5xC
 allow_repetition: true
 sequence_length: 2048
 seed: 42

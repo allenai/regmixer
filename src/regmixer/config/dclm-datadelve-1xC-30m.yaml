@@ -3,8 +3,8 @@ description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 1xC scale"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
-gpus: 8
-variants: 1
+gpus: 8 # 1, 8
+variants: 1 # 1, 5, 100
 preemptible: true
 max_tokens: 600_000_000 # 30_000_000 * 20
 sequence_length: 2048
@@ -14,8 +14,8 @@ minimum_weight: 0.05
 proxy_model_id: "olmo_30m"
 tokenizer: "gpt_neox"
 dtype: "uint16"
-priority: high
-cluster: ai2/saturn-cirrascale
+priority: high #normal, high
+cluster: ai2/saturn-cirrascale #ai2/saturn-cirrascale, ai2/neptune-cirrascale
 sources:
   - name: adult_content
     paths:
