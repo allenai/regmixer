@@ -16,7 +16,7 @@ from olmo_core.float8 import Float8Config
 from olmo_core.optim import CosWithWarmup, OptimGroupOverride, SkipStepAdamWConfig
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.nn.transformer import TransformerConfig
-from olmo_core.train.train_module import (
+from olmo_core.train.train_module.transformer import (
     TransformerDataParallelConfig,
     TransformerTrainModuleConfig,
 )
