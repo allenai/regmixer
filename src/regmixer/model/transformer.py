@@ -11,8 +11,15 @@ from olmo_core.data import (
     NumpyDatasetType,
     TokenizerConfig,
 )
+from olmo_core.distributed.parallel import DataParallelType
+from olmo_core.float8 import Float8Config
+from olmo_core.optim import CosWithWarmup, OptimGroupOverride, SkipStepAdamWConfig
 from olmo_core.data.types import NumpyDatasetDType
-from olmo_core.nn.transformer import TransformerConfig, TransformerDataParallelConfig
+from olmo_core.nn.transformer import TransformerConfig
+from olmo_core.train.train_module import (
+    TransformerDataParallelConfig,
+    TransformerTrainModuleConfig,
+)
 from olmo_core.optim import (
     AdamWConfig,
     CosWithWarmup,
@@ -28,10 +35,8 @@ from olmo_core.train.callbacks import (
     ConfigSaverCallback,
     DownstreamEvaluatorCallbackConfig,
     GPUMemoryMonitorCallback,
-    GradClipperCallback,
     LMEvaluatorCallbackConfig,
     ProfilerCallback,
-    SchedulerCallback,
     WandBCallback,
 )
 
@@ -214,11 +219,7 @@ class TransformerConfigBuilder:
 
     def build_callbacks(self, model: TransformerConfig) -> Dict[str, Callback]:
         return {
-            "lr_scheduler": SchedulerCallback(
-                scheduler=self.get_scheduler(model),
-            ),
             "gpu_monitor": GPUMemoryMonitorCallback(),
-            "grad_clipper": GradClipperCallback(max_grad_norm=self.model_config.max_grad_norm),
             "config_saver": ConfigSaverCallback(),
             "profiler": ProfilerCallback(enabled=self.profile),
             "checkpointer": CheckpointerCallback(
@@ -313,9 +314,31 @@ class TransformerConfigBuilder:
             num_workers=16,
         )
 
+        train_module_config = TransformerTrainModuleConfig(
+            rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
+            max_sequence_length=self.sequence_length,
+            optim=SkipStepAdamWConfig(
+                lr=4e-4,
+                weight_decay=0.033,
+                betas=(0.9, 0.95),
+                group_overrides=[
+                    OptimGroupOverride(params=["embeddings.weight"], opts=dict(weight_decay=0.0))
+                ],
+            ),
+            compile_model=True,
+            dp_config=TransformerDataParallelConfig(
+                name=DataParallelType.fsdp, param_dtype=DType.bfloat16, reduce_dtype=DType.float32
+            ),
+            float8_config=Float8Config(enabled=False),
+            z_loss_multiplier=1e-5,
+            max_grad_norm=1.0,
+            scheduler=CosWithWarmup(
+                warmup_steps=2000, t_max=int(5e12 / global_batch_size * self.sequence_length)
+            ),
+        )
+
         trainer_config = TrainerConfig(
             save_folder=self.checkpoint_save_dir,
-            rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             save_overwrite=True,
             metrics_collect_interval=10,
             cancel_check_interval=5,
@@ -337,4 +360,5 @@ class TransformerConfigBuilder:
             dataset=dataset_config,
             data_loader=data_loader_config,
             trainer=trainer_config,
+            train_module=train_module_config,
         )
