@@ -264,11 +264,6 @@ class TransformerConfigBuilder:
             layer_norm_eps=self.model_config.layer_norm_eps,
             qk_norm=self.model_config.qk_norm,
             block_name=self.model_config.block_type,
-            dp_config=tm.TransformerDataParallelConfig(
-                name=self.model_config.dp_type,
-                param_dtype=DType.bfloat16,
-                reduce_dtype=DType.float32,
-            ),
         )
 
         global_batch_size = self.get_batch_size(model.num_params)
@@ -277,18 +272,6 @@ class TransformerConfigBuilder:
         if self.sequence_length == 4096:
             learning_rate /= 4
             raise NotImplementedError("Only sequence length 2048 is supported right now")
-
-        optim_config = AdamWConfig(
-            lr=learning_rate,
-            eps=self.model_config.eps,
-            betas=self.model_config.betas,
-            group_overrides=[
-                OptimGroupOverride(
-                    params=["embeddings.weight"],
-                    opts=dict(weight_decay=self.model_config.weight_decay),
-                )
-            ],
-        )
 
         mixture_config = MixtureBuilder(
             sources=self.sources,
@@ -318,7 +301,7 @@ class TransformerConfigBuilder:
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             max_sequence_length=self.sequence_length,
             optim=SkipStepAdamWConfig(
-                lr=4e-4,
+                lr=learning_rate,
                 weight_decay=0.033,
                 betas=(0.9, 0.95),
                 group_overrides=[
@@ -327,7 +310,7 @@ class TransformerConfigBuilder:
             ),
             compile_model=True,
             dp_config=tm.TransformerDataParallelConfig(
-                name=DataParallelType.fsdp, param_dtype=DType.bfloat16, reduce_dtype=DType.float32
+                name=DataParallelType.hsdp, param_dtype=DType.bfloat16, reduce_dtype=DType.float32
             ),
             float8_config=Float8Config(enabled=False),
             z_loss_multiplier=1e-5,
@@ -356,7 +339,6 @@ class TransformerConfigBuilder:
 
         return ModelTrainConfig(
             model=model,
-            optim=optim_config,
             dataset=dataset_config,
             data_loader=data_loader_config,
             trainer=trainer_config,
