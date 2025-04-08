@@ -16,10 +16,11 @@ from olmo_core.float8 import Float8Config
 from olmo_core.optim import CosWithWarmup, OptimGroupOverride, SkipStepAdamWConfig
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.nn.transformer import TransformerConfig
-from olmo_core.train.train_module.transformer import (
-    TransformerDataParallelConfig,
-    TransformerTrainModuleConfig,
-)
+import olmo_core.train.train_module as tm
+
+#     TransformerDataParallelConfig,
+#     TransformerTrainModuleConfig,
+# )
 from olmo_core.optim import (
     AdamWConfig,
     CosWithWarmup,
@@ -264,7 +265,7 @@ class TransformerConfigBuilder:
             layer_norm_eps=self.model_config.layer_norm_eps,
             qk_norm=self.model_config.qk_norm,
             block_name=self.model_config.block_type,
-            dp_config=TransformerDataParallelConfig(
+            dp_config=tm.TransformerDataParallelConfig(
                 name=self.model_config.dp_type,
                 param_dtype=DType.bfloat16,
                 reduce_dtype=DType.float32,
@@ -314,7 +315,7 @@ class TransformerConfigBuilder:
             num_workers=16,
         )
 
-        train_module_config = TransformerTrainModuleConfig(
+        train_module_config = tm.TransformerTrainModuleConfig(
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             max_sequence_length=self.sequence_length,
             optim=SkipStepAdamWConfig(
@@ -326,7 +327,7 @@ class TransformerConfigBuilder:
                 ],
             ),
             compile_model=True,
-            dp_config=TransformerDataParallelConfig(
+            dp_config=tm.TransformerDataParallelConfig(
                 name=DataParallelType.fsdp, param_dtype=DType.bfloat16, reduce_dtype=DType.float32
             ),
             float8_config=Float8Config(enabled=False),

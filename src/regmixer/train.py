@@ -180,11 +180,9 @@ def train(
     dataset = config.dataset.build()
 
     seed_all(config.init_seed)
-    model = config.model.build(
-        init_device="meta",
-    )
+    model = config.model.build(init_device="meta")
     train_module = config.train_module.build(model)
-    data_loader = config.data_loader.build(dataset)
+    data_loader = config.data_loader.build(dataset, dp_process_group=train_module.dp_process_group)
     trainer = config.trainer.build(train_module, data_loader)
     config_dict = config.as_config_dict()
     cast(WandBCallback, trainer.callbacks["wandb"]).config = config_dict

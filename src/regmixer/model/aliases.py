@@ -7,13 +7,13 @@ from olmo_core.distributed.parallel import DataParallelType
 from olmo_core.nn.transformer import TransformerBlockType, TransformerConfig
 from olmo_core.optim import AdamWConfig
 from olmo_core.train import TrainerConfig
-from olmo_core.train.train_module import TransformerTrainModuleConfig
+import olmo_core.train.train_module as tm
 
 
 @dataclass
 class ModelTrainConfig(Config):
     model: TransformerConfig
-    train_module: TransformerTrainModuleConfig
+    train_module: tm.TransformerTrainModuleConfig
     optim: AdamWConfig
     dataset: NumpyDatasetConfig
     data_loader: NumpyDataLoaderConfig
