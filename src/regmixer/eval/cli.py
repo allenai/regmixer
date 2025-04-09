@@ -10,6 +10,7 @@ import click
 import numpy as np
 import pandas as pd
 import wandb
+import torch 
 from olmo_core.utils import prepare_cli_environment
 
 from regmixer.eval.constants import GroupedWandbMetrics
@@ -22,11 +23,12 @@ from regmixer.eval.utils import (
     mk_run_from_json,
     mk_run_metrics,
     mk_weights_from_config,
-    mk_output_prefix,
     plot_correlation,
-    plot_weights,
-    simulate,
+    plot_and_log_weights,
     simulate2,
+    save_eval_config,
+    solve_log_linear,
+    PROPOSER_TYPES
 )
 
 logger = logging.getLogger(__name__)
@@ -149,7 +151,22 @@ def cli():
     help="Random state for train-test split",
     required=False,
 )
+@click.option(
+    "--opt-avg-metric",
+    is_flag=True,
+    help="If set, each metric is fit separately, and then a mixture is selected to minimize the average of all metrics",
+    required=False,
+    default=False,
 
+
+)
+@click.option(
+    "--proposer-type",
+    type=str,
+    help="Proposer type: either simulation or search",
+    required=False,
+    default="simulation",
+)
 
 def fit(
     experiment_groups: list[str],
@@ -165,22 +182,63 @@ def fit(
     regression_type: str,
     train_split: float,
     n_test: int,
-    seed: int 
+    seed: int,
+    opt_avg_metric: bool,
+    proposer_type: str,
 ):
+
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
     pathlib.Path(BASE_CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
     if group_average and group_metrics:
         raise ValueError("Cannot provide both group-average and group-metrics")
+    
+    if proposer_type == "search" and regression_type != "search":
+        raise ValueError("Proposer type search only works with regression type search")
+    
+    eval_config = {
+        "config": config,
+        "alpha": alpha,
+        "num_samples": num_samples,
+        "simulation_samples": simulation_samples,
+        "group_average": group_average,
+        "group_metrics": group_metrics,
+        "workspace": workspace,
+        "regression_type": regression_type,
+        "train_split": train_split,
+        "n_test": n_test,
+        "seed": seed,
+        "opt_avg_metric": opt_avg_metric,
+    }
+    if proposer_type != "simulation":
+        eval_config["proposer_type"] = proposer_type
+
+    output_dir = save_eval_config(eval_config, output_dir)
+
+
 
     api = wandb.Api()
-    cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_runs_cache.json"
+
+
+    eval_metric_group = GroupedWandbMetrics.all_metrics
+    eval_metric_group_name = eval_metric_group.name
+
+    if group_average:
+        eval_metric_group = GroupedWandbMetrics[group_average]
+        eval_metric_group_name = f"avg_{group_average}"
+
+    if group_metrics:
+        eval_metric_group = GroupedWandbMetrics[group_metrics]
+        eval_metric_group_name = group_metrics
+
+    cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group}_runs_cache.json"
+
 
     if no_cache:
         logger.info(f"Cache disabled, will not use cache for run samples...")
         run_instances = get_runs_from_api(
-            api, workspace, experiment_groups, cache_path, no_cache, num_samples
+            api, workspace, experiment_groups, cache_path, no_cache, num_samples, eval_metric_group
         )
     else:
         try:
@@ -193,7 +251,7 @@ def fit(
         except FileNotFoundError:
             logger.warning(f"Failed to load cache from {cache_path}, fetching runs from API...")
             run_instances = get_runs_from_api(
-                api, workspace, experiment_groups, cache_path, no_cache, num_samples
+                api, workspace, experiment_groups, cache_path, no_cache, num_samples, eval_metric_group
             )
 
     # Filter out failed runs or runs without evals
@@ -202,16 +260,6 @@ def fit(
     logger.info(
         f"Found {len(run_instances)} runs in {workspace} that match group id filter, gathering samples..."
     )
-    eval_metric_group = GroupedWandbMetrics.all_metrics
-    eval_metric_group_name = eval_metric_group.name
-
-    if group_average:
-        eval_metric_group = GroupedWandbMetrics[group_average]
-        eval_metric_group_name = f"avg_{group_average}"
-
-    if group_metrics:
-        eval_metric_group = GroupedWandbMetrics[group_metrics]
-        eval_metric_group_name = group_metrics
 
     logger.info(f"Building correlation for metric group: {eval_metric_group_name}")
     logger.info(
@@ -245,11 +293,10 @@ def fit(
                 average=group_average != None,
             ),
         }
-        for idx, run in enumerate(run_instances)
+        for idx, run in enumerate(run_instances) if len(run.samples) > 0
     ]
     ratios = pd.DataFrame(run_ratios)
     metrics = pd.DataFrame(run_metrics)
-
 
     # X = Domain weights
     X_train = ratios[ratios.columns[2:]].values
@@ -283,8 +330,9 @@ def fit(
     logger.info(f"Fitting {regression_type} regression for metrics:")
     logger.info(indexed_metrics)
 
+
     for idx, metric in indexed_metrics:
-        predictors.append(build_regression(idx, Y_train, Y_test, X_train, X_test, regression_type))
+        predictors.append(build_regression(idx, Y_train, X_train, regression_type))
 
     results = []
 
@@ -305,30 +353,111 @@ def fit(
             alpha=alpha,
             output_dir=output_dir,
         )
-        weights = simulate2(
-            index=idx,
+
+        if not opt_avg_metric and n_test == 0:
+
+            weights = PROPOSER_TYPES[proposer_type]().propose(
+                index=idx,
+                predictor=predictors,
+                prior_distributions=np.array(list(priors[0].values())),
+                num_samples=simulation_samples,
+                opt_avg_metric=opt_avg_metric
+            )
+
+            plot_and_log_weights(
+                prior=np.array(list(priors[0].values())),
+                prediction=weights,
+                metric_name=metric,
+                regression_type=regression_type,
+                train_split=train_split,
+                n_test=n_test,
+                split_seed=seed,
+                n_samples=num_samples,
+                alpha=alpha,
+                df_config=ratios,
+                output_dir=output_dir,
+            )
+
+            """weights = simulate2(
+                index=idx,
+                predictor=predictors,
+                df_config=ratios,
+                prior_distributions=np.array(list(priors[0].values())),
+                metric_name=metric,
+                regression_type=regression_type,
+                train_split=train_split,
+                n_test=n_test,
+                split_seed=seed,
+                n_samples=num_samples,
+                alpha=alpha,
+                output_dir=output_dir,
+                num_samples=simulation_samples,
+            )"""
+
+            results.append((metric, weights))
+
+    if opt_avg_metric and n_test == 0:
+        assert group_metrics is not None and group_average is None # need to have this set
+        weights = PROPOSER_TYPES[proposer_type]().propose(
+            index=-1,
             predictor=predictors,
-            df_config=ratios,
             prior_distributions=np.array(list(priors[0].values())),
-            metric_name=metric,
+            num_samples=simulation_samples,
+            opt_avg_metric=opt_avg_metric
+        )
+        plot_and_log_weights(
+            prior=np.array(list(priors[0].values())),
+            prediction=weights,
+            metric_name=group_metrics,
             regression_type=regression_type,
             train_split=train_split,
             n_test=n_test,
             split_seed=seed,
             n_samples=num_samples,
             alpha=alpha,
+            df_config=ratios,
             output_dir=output_dir,
-            num_samples=simulation_samples,
         )
 
-        results.append((metric, weights))
 
-    if not group_average:
+        """        if regression_type in ["lightgbm", "linear", "log_linear"]:
+                    weights = simulate2(
+                            index=-1,
+                            predictor=predictors,
+                            df_config=ratios,
+                            prior_distributions=np.array(list(priors[0].values())),
+                            metric_name="opt_avg",
+                            regression_type=regression_type,
+                            train_split=train_split,
+                            n_test=n_test,
+                            split_seed=seed,
+                            n_samples=num_samples,
+                            alpha=alpha,
+                            output_dir=output_dir,
+                            num_samples=simulation_samples,
+                    )
+                elif regression_type == "log_linear":
+                    weights = solve_log_linear(
+                        predictor=predictors,
+                        prior_distributions=np.array(list(priors[0].values())),
+                        df_config=ratios,
+                        metric_name="opt_avg",
+                        regression_type=regression_type,
+                        train_split=train_split,
+                        n_test=n_test,
+                        split_seed=seed,
+                        n_samples=num_samples,
+                        alpha=alpha,
+                        output_dir=output_dir,
+                    )
+        """
+
+
+    elif not group_average:
         # If we're not optimizing for the average of the metric group, then we average the reweighted distributions after fitting
         avg_name = f"avg_{eval_metric_group_name}"
         average = np.mean([result[1] for result in results], axis=0)
-        columns = ratios.columns[2:].to_list()
-        plot_weights(
+        plot_and_log_weights(
             prior=np.array(list(priors[0].values())),
             prediction=average,
             metric_name=avg_name,
@@ -338,18 +467,18 @@ def fit(
             split_seed=seed,
             n_samples=num_samples,
             alpha=alpha,
-            columns=columns,
+            df_config=ratios,
             output_dir=output_dir,
         )
 
-        with open(
-            f"{mk_output_prefix(output_dir, avg_name, regression_type, train_split, n_test, seed, num_samples, alpha=alpha)}_optimal.json",
-            "w",
-        ) as f:
-            out = [{"domain": columns[idx], "weight": weight} for idx, weight in enumerate(average)]
-            logger.info("Average of optimized weights:")
-            logger.info(out)
-            f.write(json.dumps(out))
+
+    for i, result in enumerate(results):
+        metric, weights = result
+        if n_test == 0:
+            predicted_performance = predictors[i].predict(weights[None])
+            logger.info(f"Metric: {metric}. Predicted performance using regression model: {predicted_performance}")
+
+    logger.info(f"Results saved to {output_dir}")
 
 
 if __name__ == "main":

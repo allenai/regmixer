@@ -51,6 +51,7 @@ rmc-eval = "regmixer.eval.cli:cli"
 rmc-workspace = "regmixer.workspace:cli"
 rmc-internal = "regmixer.internal.cli:cli"
 rmc-convert = "regmixer.internal.convert_mixture:cli" 
+rmc-convert-cookbook = "regmixer.internal.convert_cookbook_mixture:cli" 
 
 [tool.black]
 line-length = 100

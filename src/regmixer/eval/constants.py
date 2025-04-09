@@ -11,6 +11,8 @@ class WandbMetrics(Enum):
     arc_challenge_rc_5shot_len_norm = (
         "eval/downstream/arc_challenge_rc_5shot (length-normalized accuracy)"
     )
+    arc_challenge_test_rc_5shot_bpb = "eval/downstream/arc_challenge_test_rc_5shot (BPB)"
+    arc_easy_test_rc_5shot_bpb = "eval/downstream/arc_easy_test_rc_5shot (BPB)"
     arc_easy_accuracy = "eval/downstream/arc_easy (accuracy)"
     arc_easy_mc_5shot_accuracy = "eval/downstream/arc_easy_mc_5shot (accuracy)"
     arc_easy_mc_5shot_bpb = "eval/downstream/arc_easy_mc_5shot_bpb (BPB)"
@@ -25,12 +27,15 @@ class WandbMetrics(Enum):
     boolq_rc_5shot_bpb = "eval/downstream/boolq_rc_5shot_bpb (BPB)"
     c4_en_validation_ce_loss = "eval/lm/c4_en-validation/CE loss"
     c4_en_validation_ppl = "eval/lm/c4_en-validation/PPL"
+    codex_humaneval_gold_bpb_0shot = "eval/downstream/codex_humaneval_gold_bpb_0shot (BPB)"
+    codex_mbpp_gold_bpb_0shot = "eval/downstream/codex_mbpp_gold_bpb_0shot (BPB)"
     commonsense_qa_len_norm = "eval/downstream/commonsense_qa (length-normalized accuracy)"
     copa_accuracy = "eval/downstream/copa (accuracy)"
     csqa_mc_5shot_accuracy = "eval/downstream/csqa_mc_5shot (accuracy)"
     csqa_mc_5shot_bpb = "eval/downstream/csqa_mc_5shot_bpb (BPB)"
     csqa_rc_5shot_bpb = "eval/downstream/csqa_rc_5shot_bpb (BPB)"
     csqa_rc_5shot_len_norm = "eval/downstream/csqa_rc_5shot (length-normalized accuracy)"
+    csqa_val_rc_5shot_bpb = "eval/downstream/csqa_val_rc_5shot (BPB)"
     dolma_books_validation_ce_loss = "eval/lm/dolma_books-validation/CE loss"
     dolma_books_validation_ppl = "eval/lm/dolma_books-validation/PPL"
     dolma_common_crawl_validation_ce_loss = "eval/lm/dolma_common-crawl-validation/CE loss"
@@ -43,17 +48,26 @@ class WandbMetrics(Enum):
     dolma_stack_validation_ppl = "eval/lm/dolma_stack-validation/PPL"
     dolma_wiki_validation_ce_loss = "eval/lm/dolma_wiki-validation/CE loss"
     dolma_wiki_validation_ppl = "eval/lm/dolma_wiki-validation/PPL"
+    gsm8k_gold_bpb_5shot = "eval/downstream/gsm8k_gold_bpb_5shot (BPB)"
     hellaswag_len_norm = "eval/downstream/hellaswag (length-normalized accuracy)"
     hellaswag_len_norm_accuracy = "eval/downstream/hellaswag (length-normalized accuracy)"
     hellaswag_mc_5shot_accuracy = "eval/downstream/hellaswag_mc_5shot (accuracy)"
     hellaswag_mc_5shot_bpb = "eval/downstream/hellaswag_mc_5shot_bpb (BPB)"
-    hellaswag_rc_5shot_bpb = "eval/downstream/hellaswag_rc_5shot_bpb (BPB)"
+    hellaswag_rc_5shot_bpb = "eval/downstream/hellaswag_rc_5shot (BPB)"
     hellaswag_rc_5shot_len_norm = "eval/downstream/hellaswag_rc_5shot (length-normalized accuracy)"
     ice_validation_ce_loss = "eval/lm/ice-validation/CE loss"
     ice_validation_ppl = "eval/lm/ice-validation/PPL"
     m2d2_s2orc_validation_ce_loss = "eval/lm/m2d2_s2orc-validation/CE loss"
     m2d2_s2orc_validation_ppl = "eval/lm/m2d2_s2orc-validation/PPL"
+    minerva_math_precalculus_gold_bpb_0shot = "eval/downstream/minerva_math_precalculus_gold_bpb_0shot (BPB)"
+    minerva_math_prealgebra_gold_bpb_0shot = "eval/downstream/minerva_math_prealgebra_gold_bpb_0shot (BPB)"
+    minerva_math_number_theory_gold_0shot = "eval/downstream/minerva_math_number_theory_gold_bpb_0shot (BPB)"
+    minerva_math_intermediate_algebra_gold_bpb_0shot = "eval/downstream/minerva_math_intermediate_algebra_gold_bpb_0shot (BPB)"
+    minerva_math_geometry_gold_bpb_0shot = "eval/downstream/minerva_math_geometry_gold_bpb_0shot (BPB)"
+    minerva_math_counting_and_probability_gold_bpb_0shot = "eval/downstream/minerva_math_counting_and_probability_gold_bpb_0shot (BPB)"
+    minerva_math_algebra_gold_bpb_0shot = "eval/downstream/minerva_math_algebra_gold_bpb_0shot (BPB)"
     mmlu_humanities_bpb = "eval/downstream/mmlu_humanities_bpb (BPB)"
+    mmlu_humanities_test_rc_5shot_bpb = "eval/downstream/mmlu_humanities_test_rc_5shot (BPB)"
     mmlu_humanities_mc_5shot_len_norm = (
         "eval/downstream/mmlu_humanities_mc_5shot (length-normalized accuracy)"
     )
@@ -65,6 +79,7 @@ class WandbMetrics(Enum):
         "eval/downstream/mmlu_humanities_var (length-normalized accuracy)"
     )
     mmlu_other_bpb = "eval/downstream/mmlu_other_bpb (BPB)"
+    mmlu_other_test_rc_5shot_bpb = "eval/downstream/mmlu_other_test_rc_5shot (BPB)"
     mmlu_other_mc_5shot_len_norm = (
         "eval/downstream/mmlu_other_mc_5shot (length-normalized accuracy)"
     )
@@ -74,6 +89,7 @@ class WandbMetrics(Enum):
     mmlu_other_var_bpb = "eval/downstream/mmlu_other_var_bpb (BPB)"
     mmlu_other_var_len_norm = "eval/downstream/mmlu_other_var (length-normalized accuracy)"
     mmlu_social_sciences_bpb = "eval/downstream/mmlu_social_sciences_bpb (BPB)"
+    mmlu_social_sciences_test_rc_5shot_bpb = "eval/downstream/mmlu_social_sciences_test_rc_5shot (BPB)"
     mmlu_social_sciences_mc_5shot_len_norm = (
         "eval/downstream/mmlu_social_sciences_mc_5shot (length-normalized accuracy)"
     )
@@ -85,6 +101,7 @@ class WandbMetrics(Enum):
         "eval/downstream/mmlu_social_sciences_var (length-normalized accuracy)"
     )
     mmlu_stem_bpb = "eval/downstream/mmlu_stem_bpb (BPB)"
+    mmlu_stem_test_rc_5shot_bpb = "eval/downstream/mmlu_stem_test_rc_5shot (BPB)"
     mmlu_stem_mc_5shot_len_norm = "eval/downstream/mmlu_stem_mc_5shot (length-normalized accuracy)"
     mmlu_stem_mc_5shot_test_len_norm = (
         "eval/downstream/mmlu_stem_mc_5shot_test (length-normalized accuracy)"
@@ -106,11 +123,13 @@ class WandbMetrics(Enum):
     piqa_mc_5shot_bpb = "eval/downstream/piqa_mc_5shot_bpb (BPB)"
     piqa_rc_5shot_bpb = "eval/downstream/piqa_rc_5shot_bpb (BPB)"
     piqa_rc_5shot_len_norm = "eval/downstream/piqa_rc_5shot (length-normalized accuracy)"
+    piqa_val_rc_5shot_bpb = "eval/downstream/piqa_val_rc_5shot (BPB)"
     sciq_accuracy = "eval/downstream/sciq (accuracy)"
     social_iqa_len_norm = "eval/downstream/social_iqa (length-normalized accuracy)"
     socialiqa_mc_5shot_accuracy = "eval/downstream/socialiqa_mc_5shot (accuracy)"
     socialiqa_mc_5shot_bpb = "eval/downstream/socialiqa_mc_5shot_bpb (BPB)"
     socialiqa_rc_5shot_bpb = "eval/downstream/socialiqa_rc_5shot_bpb (BPB)"
+    socialiqa_val_rc_5shot_bpb = "eval/downstream/socialiqa_val_rc_5shot (BPB)"
     socialiqa_rc_5shot_len_norm = "eval/downstream/socialiqa_rc_5shot (length-normalized accuracy)"
     throughput_device_bps = "throughput/device/BPS"
     train_ppl = "train/PPL"
@@ -122,10 +141,35 @@ class WandbMetrics(Enum):
     winogrande_mc_5shot_accuracy = "eval/downstream/winogrande_mc_5shot (accuracy)"
     winogrande_mc_5shot_bpb = "eval/downstream/winogrande_mc_5shot_bpb (BPB)"
     winogrande_rc_5shot_accuracy = "eval/downstream/winogrande_rc_5shot (accuracy)"
-    winogrande_rc_5shot_bpb = "eval/downstream/winogrande_rc_5shot_bpb (BPB)"
+    winogrande_val_rc_5shot_bpb = "eval/downstream/winogrande_val_rc_5shot (BPB)"
 
 
 class GroupedWandbMetrics(Enum):
+    val_loss = [
+        WandbMetrics.wikitext_103_validation_ce_loss.value,
+        WandbMetrics.pile_validation_ce_loss.value,
+        WandbMetrics.m2d2_s2orc_validation_ce_loss.value,
+        WandbMetrics.ice_validation_ce_loss.value,
+        WandbMetrics.dolma_wiki_validation_ce_loss.value,
+        WandbMetrics.dolma_stack_validation_ce_loss.value,
+        WandbMetrics.dolma_reddit_validation_ce_loss.value,
+        WandbMetrics.dolma_pes2o_validation_ce_loss.value,
+        WandbMetrics.dolma_common_crawl_validation_ce_loss.value,
+        WandbMetrics.dolma_books_validation_ce_loss.value,
+        WandbMetrics.c4_en_validation_ce_loss.value,
+    ]
+    books = [
+        WandbMetrics.dolma_books_validation_ce_loss.value
+    ]
+    c4 = [
+        WandbMetrics.c4_en_validation_ce_loss.value
+    ]
+    hellaswag = [
+        WandbMetrics.hellaswag_rc_5shot_bpb.value,
+    ]
+    winogrande = [
+        WandbMetrics.winogrande_val_rc_5shot_bpb.value,
+    ]
     arc_challenge = [
         WandbMetrics.arc_challenge_len_norm.value,
         WandbMetrics.arc_challenge_mc_5shot_accuracy.value,
@@ -141,6 +185,9 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.arc_easy_ppl_ce_loss.value,
         WandbMetrics.arc_easy_rc_5shot_accuracy.value,
     ]
+    arc_easy_new = [
+        WandbMetrics.arc_easy_test_rc_5shot_bpb.value
+    ]
     arc_easy_bpb = [
         WandbMetrics.arc_easy_mc_5shot_bpb.value,
         WandbMetrics.arc_easy_rc_5shot_bpb.value,
@@ -154,6 +201,12 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.mmlu_social_sciences_var_bpb.value,
         WandbMetrics.mmlu_stem_bpb.value,
         WandbMetrics.mmlu_stem_var_bpb.value,
+    ]
+    mmlu_bpb_new = [
+        WandbMetrics.mmlu_humanities_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_other_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_social_sciences_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_stem_test_rc_5shot_bpb.value,
     ]
     mmlu_len_norm = [
         WandbMetrics.mmlu_humanities_mc_5shot_len_norm.value,
@@ -217,7 +270,7 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.openbookqa_rc_5shot_bpb.value,
         WandbMetrics.piqa_rc_5shot_bpb.value,
         WandbMetrics.socialiqa_rc_5shot_bpb.value,
-        WandbMetrics.winogrande_rc_5shot_bpb.value,
+        WandbMetrics.winogrande_val_rc_5shot_bpb.value,
     ]
     validation_loss = [
         WandbMetrics.c4_en_validation_ce_loss.value,
@@ -233,6 +286,29 @@ class GroupedWandbMetrics(Enum):
     ]
     train_loss = [WandbMetrics.train_loss.value]
     all_metrics = [metric.value for metric in WandbMetrics]
+    all_bpb = [
+        WandbMetrics.mmlu_social_sciences_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_humanities_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_other_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_stem_test_rc_5shot_bpb.value,
+        WandbMetrics.winogrande_val_rc_5shot_bpb.value,
+        WandbMetrics.socialiqa_val_rc_5shot_bpb.value,
+        WandbMetrics.piqa_val_rc_5shot_bpb.value,
+        WandbMetrics.minerva_math_algebra_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_counting_and_probability_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_geometry_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_intermediate_algebra_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_number_theory_gold_0shot.value,
+        WandbMetrics.minerva_math_prealgebra_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_precalculus_gold_bpb_0shot.value,
+        WandbMetrics.gsm8k_gold_bpb_5shot.value,
+        WandbMetrics.hellaswag_rc_5shot_bpb.value, 
+        WandbMetrics.csqa_val_rc_5shot_bpb.value,
+        WandbMetrics.codex_mbpp_gold_bpb_0shot.value,
+        WandbMetrics.codex_humaneval_gold_bpb_0shot.value,
+        WandbMetrics.arc_easy_test_rc_5shot_bpb.value,
+        WandbMetrics.arc_challenge_test_rc_5shot_bpb.value,
+    ]
 
 
 AUS_CLUSTERS = "ai2/jupiter-cirrascale-2,ai2/saturn-cirrascale,ai2/neptune-cirrascale"

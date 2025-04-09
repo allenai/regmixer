@@ -184,6 +184,15 @@ def mk_mixes(
             f.write(mix_string)
 
         logger.info(f"Mixes saved to {output}:")
-    logger.info(mixes)
+
+    from copy import deepcopy 
+    display_mixes = deepcopy(mixes)
+
+    for mix in display_mixes:
+        keys_to_remove = [k for k, v in mix.items() if v[0] == 0]
+        for k in keys_to_remove:
+            mix.pop(k)
+
+    logger.info(display_mixes)
 
     return mixes

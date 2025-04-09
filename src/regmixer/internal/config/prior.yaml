@@ -1,92 +1,97 @@
-name: "dclm-datadelve-1xC-30m"
-description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 1xC scale"
-budget: "ai2/oe-data"
-workspace: "ai2/dolma2"
-nodes: 1
-gpus: 8 # 1, 8
-variants: 128 # 1, 5, 100
-preemptible: true
-max_tokens: 3_000_000_000 # 30_000_000 * 20
-allow_repetition: false 
-sequence_length: 2048
-seed: 42
-temperature: 0.75
-minimum_weight: 0.05
-proxy_model_id: "olmo_30m"
-tokenizer: "dolma2"
-dtype: "uint16"
-priority: low #high #normal, high
-cluster: ai2/saturn-cirrascale #ai2/saturn-cirrascale, ai2/neptune-cirrascale
 sources:
-  - name: adult_content
+  - domain: adult_content
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/adult_content/**/*.npy
-  - name: art_and_design
+    weight: 0.011426145559378242
+  - domain: art_and_design
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/art_and_design/**/*.npy
-  - name: software_development
-    paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software_development/**/*.npy
-  - name: education_and_jobs
-    paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
-  - name: electronics_and_hardware
-    paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
-  - name: entertainment
-    paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/entertainment/**/*.npy
-  - name: crime_and_law
+    weight: 0.017115279947642753
+  - domain: crime_and_law
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
-  - name: social_life
+    weight: 0.03760251381333424
+  - domain: education_and_jobs
     paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/social_life/**/*.npy
-  - name: fashion_and_beauty
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+    weight: 0.03819063764260111
+  - domain: electronics_and_hardware
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+    weight: 0.02252846927808186
+  - domain: entertainment
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/entertainment/**/*.npy
+    weight: 0.09499472729589659
+  - domain: fashion_and_beauty
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/fashion_and_beauty/**/*.npy
-  - name: finance_and_business
+    weight: 0.009181677850877463
+  - domain: finance_and_business
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
-  - name: food_and_dining
+    weight: 0.06572786800235751
+  - domain: food_and_dining
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/food_and_dining/**/*.npy
-  - name: games
+    weight: 0.020291659593193807
+  - domain: games
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/games/**/*.npy
-  - name: health
+    weight: 0.0510904592313224
+  - domain: health
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/health/**/*.npy
-  - name: history_and_geography
+    weight: 0.10085821548021548
+  - domain: history_and_geography
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
-  - name: home_and_hobbies
+    weight: 0.028007795295185975
+  - domain: home_and_hobbies
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/home_and_hobbies/**/*.npy
-  - name: industrial
+    weight: 0.034621890011029464
+  - domain: industrial
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/industrial/**/*.npy
-  - name: literature
+    weight: 0.010640504851475604
+  - domain: literature
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/literature/**/*.npy
-  - name: politics
+    weight: 0.05367136256765137
+  - domain: politics
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/politics/**/*.npy
-  - name: religion
+    weight: 0.09838421860766539
+  - domain: religion
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/religion/**/*.npy
-  - name: science_math_and_technology
+    weight: 0.04030199076983852
+  - domain: science_math_and_technology
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
-  - name: software
+    weight: 0.06933979163830614
+  - domain: social_life
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/social_life/**/*.npy
+    weight: 0.04443687756758139
+  - domain: software
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software/**/*.npy
-  - name: sports_and_fitness
+    weight: 0.025134154331657502
+  - domain: software_development
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software_development/**/*.npy
+    weight: 0.04835767747466825
+  - domain: sports_and_fitness
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
-  - name: transportation
+    weight: 0.03455368961865927
+  - domain: transportation
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/transportation/**/*.npy
-  - name: travel_and_tourism
+    weight: 0.02686612455867175
+  - domain: travel_and_tourism
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
+    weight: 0.01667626901270792

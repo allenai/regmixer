@@ -221,7 +221,8 @@ def calculate_priors(
         ).encode("utf-8")
     ).hexdigest()
 
-    cache_path = pathlib.Path(f"/tmp/regmixer/priors_cache_{config_hash}.json")
+    pathlib.Path("cache/").mkdir(parents=True, exist_ok=True)
+    cache_path = pathlib.Path(f"cache/priors_cache_{config_hash}.json")
     if use_cache:
         try:
             with open(cache_path, "r") as f:
@@ -272,6 +273,8 @@ def calculate_priors(
 
     # Calculate relative sizes
     total_tokens = sum(token_counts.values())
+
+    token_counts = dict(sorted(token_counts.items()))
 
     if total_tokens == 0:
         raise Exception(f"Error processing config, no tokens found for sources!")

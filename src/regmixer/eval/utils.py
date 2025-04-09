@@ -13,10 +13,14 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
+import torch.optim as optim
 from tqdm import tqdm
 from wandb.apis.public import Run
+import hashlib 
+import os 
 
-from regmixer.eval.constants import WandbMetrics
+from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics
+from regmixer.eval.law import ScalingLaw
 
 logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning, module="lightgbm")
@@ -35,6 +39,218 @@ LGBM_HPS = {
     "early_stopping_round": 3,
 }
 
+"""def mixing_law(x, param):
+    log_c_i, b_i = param[0], param[1]
+    t_i = param[2:]
+    result = torch.exp(log_c_i) + torch.exp(b_i + torch.matmul(x[:, :-1], t_i))
+    return result
+
+def init_params_law(idx, num_domains=3):
+    for log_c_i in np.linspace(-2, 1.5, 10):
+        for b_i in np.linspace(-10, 1, 20):
+            for _ in range(30):
+                ts = [-np.random.rand() if i == idx else np.random.rand() * 0.1 for i in range(num_domains-1)]
+                yield [log_c_i, b_i] + ts
+"""
+
+
+class Regressor():
+    def fit(self, x, y, idx):
+        raise NotImplementedError("Subclasses must implement this method")
+
+    def predict(self, x):
+        if not hasattr(self, "model"):
+            raise AttributeError("Subclasses must define self.model before calling predict()")
+        return self.model.predict(x)
+
+
+class LightGBMRegressor(Regressor):
+    def __init__(self):
+        self.model = lgb.LGBMRegressor(**LGBM_HPS)
+
+    def fit(self, x, y, idx):
+        target = y[:, idx]
+        self.model = self.model.fit(
+            x,
+            target,
+            eval_set=[(x, target)],
+            eval_metric="l2",
+        )
+    
+
+class LinearRegressor(Regressor):
+    def __init__(self):
+        self.model = LinearRegression()
+
+    def fit(self, x, y, idx):
+        target = y[:, idx]
+        self.model = self.model.fit(x, target)
+
+    
+class LogLinearRegressor(Regressor):
+    def __init__(self):
+        np.random.seed(42)
+        random.seed(42)
+        self.model = ScalingLaw(mixing_law)
+
+    def fit(self, x, y, idx, max_step=100, delta=0.02):
+        target = y[:, idx]
+        self.model = self.model.fit(
+            x,
+            target,
+            init_params_law(idx, num_domains = x.shape[-1]),
+            max_step=max_step,
+            delta=delta
+        )
+
+    def predict(self, x):
+        return mixing_law(torch.tensor(x, dtype=torch.float), torch.tensor(self.model, dtype=torch.float)).numpy()
+    
+class SearchRegressor(Regressor):
+    def __init__(self):
+        pass 
+
+    def fit(self, x, y, idx):
+        target = y[:, idx]
+        self.model = {tuple(row): target[i] for i, row in enumerate(x)}
+
+    def predict(self, x):
+        preds = []
+        for row in x:
+            if tuple(row) in self.model:
+                preds.append(self.model[tuple(row)])
+            else:
+                preds.append(np.inf)
+        return preds
+
+        
+    def get_searched_weights(self):
+        return [np.array(weight) for weight, _ in self.model.items()]
+
+
+def mixing_law(x, param):
+    log_c_i = param[0]
+    t_i = param[1:]
+    result = torch.exp(log_c_i) + torch.exp(torch.matmul(x, t_i))
+    return result
+
+def init_params_law(idx, num_domains=3):
+    for log_c_i in np.linspace(-2, 1.5, 10): # originally (-2, 1.5, 10)
+        for _ in range(30):
+            ts = [-np.random.rand() if i == idx else np.random.rand() * 0.1 for i in range(num_domains)]
+            yield [log_c_i] + ts
+
+
+REGRESSION_TYPES = {
+    "lightgbm": LightGBMRegressor,
+    "linear": LinearRegressor,
+    "log_linear": LogLinearRegressor,
+    "search": SearchRegressor 
+}
+
+
+
+
+class Proposer():
+    def __init__(self):
+        pass
+
+    def propose(self, **kwargs):
+        raise NotImplementedError("Subclasses must implement this method")
+    
+
+class SimulationProposer(Proposer):
+    def propose(self,
+        index: int,
+        predictor: list[Regressor],
+        prior_distributions: np.ndarray,
+        num_samples: int = 1_000_000,
+        seed: int = 1337,
+        search_iterations: int = 10,
+        opt_avg_metric: bool = False
+    ) -> np.ndarray:
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        random.seed(seed)
+
+        min_weight = 1e-5
+        min_dirichlet = 1
+        max_dirichlet = 100
+        search_dirichlet_factor = 2.0
+
+        search_prior = prior_distributions
+        best_weights = np.zeros(len(prior_distributions))
+
+        # Multi-step search leveraging iterative prior results
+        for search_step in tqdm(
+            range(search_iterations), desc=f"Searching in {num_samples} candidate samples"
+        ):
+            offset = np.log(search_dirichlet_factor * (search_step + 1))
+            alphas = np.exp(
+                np.random.uniform(
+                    low=np.log(min_dirichlet) + offset,
+                    high=np.log(max_dirichlet) + offset,
+                    size=num_samples,
+                )
+            )
+
+            # generate simulations by sampling from dirichlet distribution with parameter prior * alpha 
+            simulations = (
+                torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
+                .sample()
+                .numpy()
+            )
+
+            # Filter out invalid simulations from the population
+            simulations = simulations[np.all(simulations <= 6.5 * prior_distributions, axis=1)]
+
+            if opt_avg_metric:
+                preds = np.array([reg.predict(simulations) for reg in predictor]).mean(axis=0)
+            else:
+                preds = predictor[index].predict(simulations)
+
+            # Take the best loss prediction as an index unless it's greater than 1e-3
+            print(preds.min())
+            best_mask = (preds - preds.min()) < 1e-3
+            best_weights = simulations[best_mask].mean(0)
+
+            # Zero out weights below min_weight threshold and normalize
+            best_weights[best_weights < min_weight] = 0.0
+            best_weights /= best_weights.sum()
+
+            search_prior = (best_weights + search_prior) / 2
+
+        return best_weights
+
+
+
+class SearchProposer(Proposer):
+    def propose(self,
+        index:int,
+        predictor: list[SearchRegressor],
+        opt_avg_metric: bool = False,
+        **kwargs
+    ):
+        searched_weights = predictor[0].get_searched_weights()
+        best_performance = np.inf 
+        best_weights = np.zeros(len(searched_weights[0]))
+        for weight in searched_weights:
+            if opt_avg_metric:
+                pred = np.array([reg.predict(weight[None]) for reg in predictor]).mean(axis=0)[0]
+            else:
+                pred = predictor[index].predict(weight[None])[0]
+            if pred < best_performance:
+                best_performance = pred
+                best_weights = weight
+
+        return best_weights
+
+
+PROPOSER_TYPES = {
+    "simulation": SimulationProposer,
+    "search": SearchProposer,
+}
+
 
 @dataclass
 class RunInstance:
@@ -42,6 +258,7 @@ class RunInstance:
     display_name: str
     config: dict
     samples: pd.DataFrame
+    state: str 
 
     def as_dict(self) -> dict:
         return {
@@ -49,6 +266,7 @@ class RunInstance:
             "display_name": self.display_name,
             "config": self.config,
             "samples": self.samples.to_dict(),
+            "state": self.state
         }
 
 
@@ -59,31 +277,17 @@ def get_output_dir(groups: list[str]) -> str:
 def build_regression(
     idx: int,
     Y_train: np.ndarray,
-    Y_test: np.ndarray,
     X_train: np.ndarray,
-    X_test: np.ndarray,
-    regression_type: str
-) -> Union[lgb.LGBMRegressor, LinearRegression]:
-    target = Y_train[:, idx]
-    test_target = Y_test[:, idx]
-
-    if regression_type == "lightgbm":
-        gbm = lgb.LGBMRegressor(**LGBM_HPS)
-        regression = gbm.fit(
-            X_train,
-            target,
-            eval_set=[(X_train, target)],
-            eval_metric="l2",
-        )
-    elif regression_type == "linear":
-        regression = LinearRegression().fit(X_train, target)
-    else: 
-        raise NotImplementedError("Only LightGBM and linear regression are currently supported.")
-    return regression
+    regression_type: str,
+) -> Regressor:
+    logger.info(f"Building regression model, index: {idx}")
+    reg = REGRESSION_TYPES[regression_type]()
+    reg.fit(X_train, Y_train, idx)
+    return reg
 
 
 def get_runs_from_api(
-    api, workspace: str, groups: list[str], cache_path: Path, no_cache: bool, num_samples: int
+    api, workspace: str, groups: list[str], cache_path: Path, no_cache: bool, num_samples: int, eval_metric_group: GroupedWandbMetrics
 ) -> list[RunInstance]:
 
     wandb_runs = []
@@ -102,7 +306,7 @@ def get_runs_from_api(
         memo[run.display_name] = run
 
     all_runs: list[RunInstance] = sorted(
-        [mk_run_history(run, num_samples) for run in memo.values() if run is not None],
+        [mk_run_history(run, num_samples, eval_metric_group) for run in memo.values() if run is not None and run.state == "finished"],
         key=lambda run: run.display_name.lower(),
     )
 
@@ -113,11 +317,26 @@ def get_runs_from_api(
     return all_runs
 
 
-def mk_run_history(run: Run, samples: int) -> Any:
-    return mk_run_instance(
-        run,
-        run.history(samples=samples, pandas=False, keys=[metric.value for metric in WandbMetrics]),
-    )
+def mk_run_history(run: Run, samples: int, eval_metric_group: GroupedWandbMetrics) -> Any:
+    if samples == 1:
+        print(run.state)
+        try:
+            summary = [{metric: run.summary[metric] for metric in eval_metric_group.value}]
+        except KeyError:
+            print(run.id)
+            print(run.summary.keys())
+            breakpoint()
+        return mk_run_instance(
+            run, 
+            summary,
+            samples
+        )
+    else:
+        return mk_run_instance(
+            run,
+            run.scan_history(keys=eval_metric_group.value),
+            samples
+        )
 
 
 def mk_run_from_json(run: dict) -> RunInstance:
@@ -126,11 +345,12 @@ def mk_run_from_json(run: dict) -> RunInstance:
         display_name=run["display_name"],
         config=run["config"],
         samples=pd.DataFrame(run["samples"]),
+        state=run["state"]
     )
 
 
-def mk_run_instance(run: Run, history: list[Any]) -> RunInstance:
-    samples = pd.DataFrame.from_records(history)
+def mk_run_instance(run: Run, history: list[Any], n_samples: int) -> RunInstance:
+    samples = pd.DataFrame.from_records(history).tail(n_samples)
     logger.info(
         f"Collected RunInstance for {run.display_name}:{run.id} with samples: {samples.shape}"
     )
@@ -139,6 +359,7 @@ def mk_run_instance(run: Run, history: list[Any]) -> RunInstance:
         display_name=run.display_name,
         config=run.config,
         samples=samples,
+        state=run.state
     )
 
 
@@ -186,7 +407,7 @@ def plot_correlation(
     Y_train: np.ndarray,
     X_train: np.ndarray,
     index: int,
-    predictors: list[Union[lgb.LGBMRegressor, LinearRegression]],
+    predictors: list[Regressor],
     train_split: float,
     n_test: int,
     split_seed: int,
@@ -281,67 +502,6 @@ def plot_correlation(
         f.write(json.dumps(corr_results))
 
 
-def plot_correlation_old(
-    Y_test: np.ndarray,
-    X_test: np.ndarray,
-    index: int,
-    predictors: list[Union[lgb.LGBMRegressor, LinearRegression]],
-    metric_name: str,
-    regression_type: str,
-    train_split: float,
-    n_test: int,
-    split_seed: int,
-    n_samples: int,
-    alpha: Optional[float] = None,
-    output_dir: str = BASE_OUTPUT_DIR,
-):
-    plt.close()
-    keys = {"pred": "Predicted", "true": "Actual"}
-    data = {keys["true"]: Y_test[:, index], keys["pred"]: predictors[index].predict(X_test)}
-    graph = sns.jointplot(
-        data,
-        x=keys["pred"],
-        y=keys["true"],
-        kind="reg",
-        height=10,
-        scatter_kws={"s": 64, "color": "#105257"},
-        joint_kws={
-            "line_kws": {
-                "color": "#F0529C",
-                "linewidth": 4,
-                "linestyle": "dashed",
-            }
-        },
-        marginal_kws={"line_kws": {"color": "#5969CB", "linewidth": 6}},
-    )
-
-    corr = np.corrcoef(data[keys["pred"]], data[keys["true"]])[0, 1]
-    (phantom,) = graph.ax_joint.plot([], [], linestyle="", alpha=0)
-
-    graph.ax_joint.legend(
-        [phantom],
-        # [f"{metric_name} correlation: {}"],  # noqa
-        [f"{metric_name} correlation: {np.round(corr * 100, decimals=2)}"],  # noqa
-        edgecolor="black",
-        fancybox=False,
-        prop={
-            "size": 18,
-        },
-        handlelength=-0.5,
-    )
-
-    graph.ax_joint.set_ylabel(keys["true"], fontdict={"size": 24})
-    graph.ax_joint.set_xlabel(keys["pred"], fontdict={"size": 24})
-    graph.ax_marg_x.remove()
-    graph.ax_marg_y.remove()
-    graph.ax_joint.grid(True, ls="dashed")
-    graph.ax_joint.spines[["right", "top"]].set_visible(True)
-
-    graph.savefig(
-        f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha)}_fit.png", bbox_inches="tight"
-    )
-
-
 
 def mk_run_metrics(
     history,
@@ -380,9 +540,95 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
     return weights
 
 
+def solve_log_linear(
+    predictor: list[Regressor],
+    prior_distributions: np.ndarray,
+    df_config: pd.DataFrame,
+    metric_name: str,
+    regression_type: str,
+    train_split: float,
+    n_test: int,
+    split_seed: int,
+    n_samples: int, 
+    alpha: float = 1.0,
+    output_dir: str = BASE_OUTPUT_DIR,
+    seed: int = 1337,
+) -> np.ndarray:
+
+    torch.manual_seed(seed)
+
+    # Split params into biases (b) and t values
+    t = [p[2:] for p in predictor]
+    b = [p[1] for p in predictor]
+
+    t = torch.tensor(t, dtype=torch.float32)
+    b = torch.tensor(b, dtype=torch.float32)
+
+    # Initialize weights as a probability vector
+    weights = torch.rand(len(t[0])-1, requires_grad=True)
+    assert weights.sum() <= 1
+    #weights = torch.nn.Parameter(raw_weights / raw_weights.sum())
+
+    def objective(weights):
+        return torch.sum(torch.exp(b + t @ weights))
+
+    def project(w):
+        """
+        Projects a vector w (length n-1) so that:
+        - Each entry is in [0, 1]
+        - Sum of entries <= 1
+        Returns the full probability vector (length n), where the last element is 1 - sum(w)
+        """
+        w.data.clamp_(0, 1)  # clamp each entry between 0 and 1
+
+        total = w.sum()
+        if total > 1:
+            w.data.mul_(1 / total)  # rescale to make sum <= 1
+
+        last = 1.0 - w.sum()
+        last = torch.clamp(last, min=0.0, max=1.0)  # ensure numerical safety
+
+        return torch.cat([w, last.unsqueeze(0)], dim=0)  # final full probability vector
+
+    # Optimization
+    optimizer = optim.Adam([weights], lr=0.001)
+    n_iterations = 1000
+    for i in range(n_iterations):
+        optimizer.zero_grad()
+        loss = objective(weights)
+        loss.backward()
+        optimizer.step()
+
+        # Project onto the probability simplex
+        with torch.no_grad():
+            weights.data = project(weights.data)
+
+        if (i + 1) % 100 == 0:
+            print(f'Iteration {i+1}/{n_iterations}, Loss: {loss.item():.4f}')
+
+    best_weights = weights.detach().cpu().numpy()
+
+    plot_and_log_weights(
+        prior=prior_distributions,
+        prediction=best_weights,
+        metric_name=metric_name,
+        regression_type=regression_type,
+        train_split=train_split,
+        n_test=n_test,
+        split_seed=split_seed,
+        n_samples=n_samples,
+        alpha=alpha,
+        df_config=df_config,
+        output_dir=output_dir,
+    )
+
+    return best_weights
+
+
+
 def simulate2(
     index: int,
-    predictor: list[Union[lgb.LGBMRegressor, LinearRegression]],
+    predictor: list[Regressor],
     prior_distributions: np.ndarray,
     df_config: pd.DataFrame,
     metric_name: str,
@@ -401,11 +647,14 @@ def simulate2(
     torch.manual_seed(seed)
     random.seed(seed)
 
-    def predict(weights, regressor, w_prior, target_prior) -> np.ndarray:
-        prior_pred = regressor.predict(w_prior[None])
-        preds = np.array([regressor.predict(weights) - prior_pred]).T
 
-        return (preds * target_prior).sum(-1)
+    def predict_average(weights, regressors) -> np.ndarray:
+        if regression_type in ["linear", "lightgbm"]:
+            return np.array([regressor.predict(weights) for regressor in regressors]).mean(axis=0)
+        elif regression_type == "log_linear":
+            return np.array([mixing_law(torch.tensor(weights, dtype=torch.float), torch.tensor(p, dtype=torch.float)).numpy() for p in regressors]).mean(axis=0)
+        else:
+            raise NotImplementedError(f"Regression type {regression_type} not supported.")
 
     min_weight = 1e-5
     min_dirichlet = 1
@@ -438,14 +687,16 @@ def simulate2(
         # Filter out invalid simulations from the population
         simulations = simulations[np.all(simulations <= 6.5 * prior_distributions, axis=1)]
 
-        preds = predict(
-            weights=simulations,
-            regressor=predictor[index],
-            w_prior=prior_distributions,
-            target_prior=prior_distributions,
-        )
+        if index != -1:
+            preds = predictor[index].predict(simulations)
+        else:
+            preds = predict_average(
+                weights=simulations,
+                regressors=predictor
+            )
 
         # Take the best loss prediction as an index unless it's greater than 1e-3
+        print(preds.min())
         best_mask = (preds - preds.min()) < 1e-3
         best_weights = simulations[best_mask].mean(0)
 
@@ -458,18 +709,7 @@ def simulate2(
     if not type(best_weights) == np.ndarray:
         raise ValueError(f"Simulation must be of type np.ndarray, got {type(best_weights)}")
 
-    logger.info(f":::::::::{metric_name}:::::::::")
-    logger.info("Predicted optimal weights:")
-
-    columns = df_config.columns[2:].to_list()
-    with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json", "w") as f:
-        out = [
-            {"domain": columns[idx], "weight": weight} for idx, weight in enumerate(best_weights)
-        ]
-        logger.info(out)
-        f.write(json.dumps(out))
-
-    plot_weights(
+    plot_and_log_weights(
         prior=prior_distributions,
         prediction=best_weights,
         metric_name=metric_name,
@@ -479,133 +719,18 @@ def simulate2(
         split_seed=split_seed,
         n_samples=n_samples,
         alpha=alpha,
-        columns=columns,
+        df_config=df_config,
         output_dir=output_dir,
     )
 
     return best_weights
 
 
-def simulate(
-    index: int,
-    predictor: list[Union[lgb.LGBMRegressor, LinearRegression]],
-    prior_distributions: np.ndarray,
-    df_config: pd.DataFrame,
-    metric_name: str,
-    use_entropy: bool,
-    cached_samples: np.ndarray,
-    regression_type: str,
-    train_split: float,
-    n_test: int,
-    split_seed: int,
-    n_samples: int = 1_000_000,
-    alpha: float = 1.0,
-    min_entropy: float = 1e-3,
-    output_dir: str = BASE_OUTPUT_DIR,
-    seed: int = 1337,
-) -> Tuple[np.ndarray, np.ndarray]:
-    np.random.seed(seed)
-    all_samples = cached_samples
-
-    if not cached_samples.shape[0] > 0:
-        candidates = []
-        num_samples_per_strength = 10
-        logger.info(
-            f"Generating {n_samples * num_samples_per_strength:,} ({num_samples_per_strength} per strength) sample candidates..."
-        )
-
-        for idx in tqdm(range(n_samples), desc="Generating candidates"):
-            min_strength_log = np.log10(1e-3)
-            max_strength_log = np.log10(alpha)
-
-            for strength in np.logspace(
-                min_strength_log, max_strength_log, num_samples_per_strength
-            ):
-                weights = np.random.dirichlet(prior_distributions * strength, 1)
-                candidates.append(weights)
-
-        all_samples = np.array(candidates).reshape(-1, len(prior_distributions))
-        all_samples = all_samples[~np.isnan(all_samples).any(axis=1)]
-        logger.info(f"Generated {all_samples.shape[0]:,} valid samples...")
-
-    if use_entropy:
-        entropy = -np.sum(all_samples * np.log(all_samples + min_entropy), axis=1)
-        high_entropy_indices = np.argsort(entropy)[-n_samples:]
-        samples = all_samples[high_entropy_indices]
-    else:
-        samples = all_samples[np.random.choice(all_samples.shape[0], n_samples, replace=False)]
-
-    logger.info(f"Simulating with {samples.shape[0]:,} samples for {metric_name}...")
-    simulation = predictor[index].predict(samples)
-
-    columns = df_config.columns[2:]
-    plot_simulations(
-        prior_distributions=prior_distributions,
-        samples=samples,
-        columns=columns.to_list(),
-        metric_name=metric_name,
-        regression_type=regression_type,
-        train_split=train_split,
-        n_test=n_test,
-        split_seed=split_seed,
-        n_samples=10,
-        alpha=alpha,
-        output_dir=output_dir,
-    )
-
-    if not type(simulation) == np.ndarray:
-        raise ValueError(f"Simulation must be of type np.ndarray, got {type(simulation)}")
-
-    plt.close()
-    plt.hist(simulation, bins=32, color="#F0529C")
-    plt.xlabel("Predicted")
-    plt.ylabel("Frequency")
-    plt.savefig(
-        f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, 10, alpha)}_sim_dist.png",
-        bbox_inches="tight",
-    )
-    plt.close()
-
-    k = 128
-    top_k_simulations = np.argsort(simulation)[0:k]
-    # TODO: Make this conditional on the evaluation metric. ie: loss is min but downstream accuracy is max
-    logger.info(f"Best prediction: {np.min(simulation)}")
-    top_k_samples = samples[top_k_simulations]
-    top_k_samples.shape
-
-    top_k_mean_weights = np.mean(top_k_samples, axis=0)
-    top_k_predicted_loss = predictor[index].predict([top_k_mean_weights])
-
-    logger.info(f"Predicted loss (top_k): {top_k_predicted_loss}\n")
-    logger.info(f":::::::::{metric_name}:::::::::")
-    logger.info("Predicted optimal weights:")
-
-    with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, 10, alpha=alpha)}_optimal.json", "w") as f:
-        out = []
-        for idx, weight in enumerate(top_k_mean_weights):
-            out.append({"domain": columns[idx], "weight": weight})
-
-        logger.info(out)
-        f.write(json.dumps(out))
-
-    plot_weights(
-        prior=prior_distributions,
-        prediction=top_k_mean_weights,
-        metric_name=metric_name,
-        regression_type=regression_type,
-        train_split=train_split,
-        n_test=n_test,
-        split_seed=split_seed,
-        n_samples=10,
-        alpha=alpha,
-        columns=columns.to_list(),
-        output_dir=output_dir,
-    )
-
-    return top_k_mean_weights, all_samples
 
 
-def plot_weights(
+
+
+def plot_and_log_weights(
     prior: np.ndarray,
     prediction: np.ndarray,
     metric_name: str,
@@ -615,9 +740,22 @@ def plot_weights(
     split_seed: int,
     n_samples: int,
     alpha: float,
-    columns: list[str],
+    df_config: pd.DataFrame,
     output_dir: str = BASE_OUTPUT_DIR,
 ):
+    
+    logger.info(f":::::::::{metric_name}:::::::::")
+    logger.info("Predicted optimal weights:")
+
+    columns = df_config.columns[2:].to_list()
+    with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json", "w") as f:
+        out = [
+            {"domain": columns[idx], "weight": weight} for idx, weight in enumerate(prediction)
+        ]
+        logger.info(out)
+        f.write(json.dumps(out))
+
+
     df = pd.DataFrame(
         data=np.concatenate(
             [
@@ -692,7 +830,7 @@ def mk_output_prefix(output_dir: str, metric: str, regression_type: str, train_s
     def sanitize(s: str) -> str:
         return re.sub(r"[^a-zA-Z0-9_\-]", "_", s)
 
-    return f"{output_dir}{sanitize(metric)}" + (
+    return os.path.join(output_dir, sanitize(metric)) + (
         f"_alpha_{str(alpha).replace('.', '_')}" if alpha and alpha != 1.0 else ""
      ) + (
         f"_{regression_type}_reg" if regression_type != "lightgbm" else ""
@@ -705,3 +843,23 @@ def mk_output_prefix(output_dir: str, metric: str, regression_type: str, train_s
      ) + (
          f"_{n_samples}_samples" if n_samples != 10 else ""
      )
+
+
+def save_eval_config(eval_config: dict, output_dir: str) -> str:
+    # Serialize dict in a stable way
+    config_str = json.dumps(eval_config, sort_keys=True)
+    
+    # Hash it (short hash for readability)
+    hash_str = hashlib.sha256(config_str.encode("utf-8")).hexdigest()[:16]
+    
+    # Create directory
+    folder_path = os.path.join(output_dir, hash_str)
+    os.makedirs(folder_path, exist_ok=True)
+
+    # Save config JSON inside
+    config_path = os.path.join(folder_path, "config.json")
+    with open(config_path, "w") as f:
+        json.dump(eval_config, f, indent=2)
+
+    print(f"[INFO] Saved config to {config_path}")
+    return folder_path
