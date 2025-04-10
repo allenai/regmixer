@@ -321,10 +321,11 @@ def mk_run_history(run: Run, samples: int, eval_metric_group: GroupedWandbMetric
     if samples == 1:
         print(run.state)
         try:
-            summary = [{metric: run.summary[metric] for metric in eval_metric_group.value}]
+            summary = [{metric: run.summary[metric] for metric in eval_metric_group.value if metric in run.summary}]
         except KeyError:
             print(run.id)
             print(run.summary.keys())
+
             breakpoint()
         return mk_run_instance(
             run, 

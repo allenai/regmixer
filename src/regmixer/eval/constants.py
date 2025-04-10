@@ -54,6 +54,7 @@ class WandbMetrics(Enum):
     hellaswag_mc_5shot_accuracy = "eval/downstream/hellaswag_mc_5shot (accuracy)"
     hellaswag_mc_5shot_bpb = "eval/downstream/hellaswag_mc_5shot_bpb (BPB)"
     hellaswag_rc_5shot_bpb = "eval/downstream/hellaswag_rc_5shot (BPB)"
+    hellaswag_rc_5shot_bpb_v2 = "eval/downstream/hellaswag_rc_5shot_bpb (BPB v2)"
     hellaswag_rc_5shot_len_norm = "eval/downstream/hellaswag_rc_5shot (length-normalized accuracy)"
     ice_validation_ce_loss = "eval/lm/ice-validation/CE loss"
     ice_validation_ppl = "eval/lm/ice-validation/PPL"
@@ -166,6 +167,9 @@ class GroupedWandbMetrics(Enum):
     ]
     hellaswag = [
         WandbMetrics.hellaswag_rc_5shot_bpb.value,
+    ]
+    hellaswag_v2 = [
+        WandbMetrics.hellaswag_rc_5shot_bpb_v2.value,
     ]
     winogrande = [
         WandbMetrics.winogrande_val_rc_5shot_bpb.value,
