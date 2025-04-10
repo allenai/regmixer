@@ -18,16 +18,13 @@ from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.nn.transformer import TransformerConfig
 import olmo_core.train.train_module as tm
 
-#     TransformerDataParallelConfig,
-#     TransformerTrainModuleConfig,
-# )
 from olmo_core.optim import (
-    AdamWConfig,
     CosWithWarmup,
     LinearWithWarmup,
     OptimGroupOverride,
     Scheduler,
 )
+from olmo_core.optim.scheduler import CosWithWarmupAndLinearDecay
 from olmo_core.train import TrainerConfig
 from olmo_core.train.common import LoadStrategy
 from olmo_core.train.callbacks import (
@@ -214,11 +211,11 @@ class TransformerConfigBuilder:
         if self.train_type == TrainType.anneal:
             return LinearWithWarmup(warmup_steps=0, t_max=self.max_tokens)
 
-        return CosWithWarmup(
+        return CosWithWarmupAndLinearDecay(
             warmup_steps=self.get_warmup_steps(model.num_params),
         )
 
-    def build_callbacks(self, model: TransformerConfig) -> Dict[str, Callback]:
+    def build_callbacks(self) -> Dict[str, Callback]:
         return {
             "gpu_monitor": GPUMemoryMonitorCallback(),
             "config_saver": ConfigSaverCallback(),
@@ -315,9 +312,7 @@ class TransformerConfigBuilder:
             float8_config=Float8Config(enabled=False),
             z_loss_multiplier=1e-5,
             max_grad_norm=1.0,
-            scheduler=CosWithWarmup(
-                warmup_steps=2000, t_max=int(5e12 / global_batch_size * self.sequence_length)
-            ),
+            scheduler=self.get_scheduler(model),
         )
 
         trainer_config = TrainerConfig(
@@ -334,7 +329,7 @@ class TransformerConfigBuilder:
             ),
         )
 
-        for callback_name, callback in self.build_callbacks(model).items():
+        for callback_name, callback in self.build_callbacks().items():
             trainer_config.callbacks[callback_name] = callback
 
         return ModelTrainConfig(
