@@ -316,6 +316,7 @@ class TransformerConfigBuilder:
             num_workers=16,
         )
 
+        print(f"Microbatch size: {self.model_config.device_batch_size * self.sequence_length}")
         train_module_config = tm.TransformerTrainModuleConfig(
             rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
             max_sequence_length=self.sequence_length,
