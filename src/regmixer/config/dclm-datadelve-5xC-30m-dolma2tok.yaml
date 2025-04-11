@@ -1,5 +1,5 @@
-name: "dclm-datadelve-5xC-30m-seq-2048-new-ladder"
-description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale, testing new ladder"
+name: "dclm-datadelve-5xC-30m-seq-2048-old-ladder"
+description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale, old ladder"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1

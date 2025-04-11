@@ -285,7 +285,7 @@ class TransformerConfigBuilder:
             block_name=self.model_config.block_type,
         )
 
-        global_batch_size = self.get_batch_size(model.num_non_embedding_params)
+        global_batch_size = self.get_batch_size(model.num_params)#num_non_embedding_params)
         learning_rate = self.get_lr(model, tokenizer)
 
         """if self.sequence_length == 4096:
