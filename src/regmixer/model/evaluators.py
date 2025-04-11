@@ -1,5 +1,47 @@
 from enum import Enum
 
+class DownstreamEvaluatorsSmall(Enum):
+    """Enum class enumerating in-loop evaluators for small models.
+    This is the current set of evaluators used in https://github.com/allenai/OLMo-core/blob/main/src/olmo_core/train/config.py#L83.
+    """
+
+    ARC_CHALLENGE="arc_challenge_test_rc_5shot"
+    ARC_EASY="arc_easy_test_rc_5shot"
+    HELLASWAG="hellaswag_rc_5shot" # 1K subset of HellaSwag
+    WINOGRANDE="winogrande_val_rc_5shot" # Helpful after 750M-5xC scale
+    CSQA="csqa_val_rc_5shot"
+    PIQA="piqa_val_rc_5shot"
+    SOCIALIQA="socialiqa_val_rc_5shot"
+
+    # Too noisy to be worth tracking
+    # "boolq_val_rc_5shot",
+    # "openbookqa_test_rc_5shot",
+
+    # MMLU RC
+    MMLU_STEM_VAL="mmlu_stem_val_rc_5shot"
+    MMLU_HUMANITIES_VAL="mmlu_humanities_val_rc_5shot"
+    MMLU_SOCIAL_SCIENCES_VAL="mmlu_social_sciences_val_rc_5shot"
+    MMLU_OTHER_VAL="mmlu_other_val_rc_5shot"
+    MMLU_STEM_TEST="mmlu_stem_test_rc_5shot"
+    MMLU_HUMANITIES_TEST="mmlu_humanities_test_rc_5shot"
+    MMLU_SOCIAL_SCIENCES_TEST="mmlu_social_sciences_test_rc_5shot"
+    MMLU_OTHER_TEST="mmlu_other_test_rc_5shot"
+
+    # Gen tasks BPB
+    GSM8K="gsm8k_gold_bpb_5shot"
+    MINERVA_ALGEBRA="minerva_math_algebra_gold_bpb_0shot"
+    MINERVA_COUNTING="minerva_math_counting_and_probability_gold_bpb_0shot"
+    MINERVA_GEOMETRY="minerva_math_geometry_gold_bpb_0shot"
+    MINERVA_INTERMEDIATE="minerva_math_intermediate_algebra_gold_bpb_0shot"
+    MINERVA_NUMBER="minerva_math_number_theory_gold_bpb_0shot"
+    MINERVA_PREALGEBRA="minerva_math_prealgebra_gold_bpb_0shot"
+    MINERVA_PRECALCULUS="minerva_math_precalculus_gold_bpb_0shot"
+    CODEX_HUMANEVAL="codex_humaneval_gold_bpb_0shot"
+    CODEX_MBPP="codex_mbpp_gold_bpb_0shot"
+
+    # Sanity check for MCQA ability
+    COPYCOLORS="copycolors_10way"
+
 
 class DownstreamEvaluators(Enum):
     """Enum class enumerating available in-loop evaluators."""
