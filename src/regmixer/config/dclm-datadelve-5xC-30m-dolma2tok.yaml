@@ -1,5 +1,5 @@
-name: "dclm-datadelve-5xC-30m-seq-2048-old-ladder"
-description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale, old ladder"
+name: "dclm-datadelve-5xC-30m-seq-4096-new-ladder"
+description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale, 4096 seq length with new ladder"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
@@ -8,7 +8,7 @@ variants: 1 # 1, 5, 100
 preemptible: true
 max_tokens: 3_000_000_000 # 30_000_000 * 20
 allow_repetition: false 
-sequence_length: 2048
+sequence_length: 4096
 seed: 42
 temperature: 0.75
 minimum_weight: 0.05
