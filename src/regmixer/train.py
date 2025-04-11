@@ -179,18 +179,11 @@ def train(
     ).build()
     dataset = config.dataset.build()
 
-    device = get_default_device()
-    world_mesh = config.model.build_mesh(device=device)
-
     seed_all(config.init_seed)
-    model = config.model.build(
-        init_device="meta",
-        device=device,
-        mesh=world_mesh,
-    )
-    optim = config.optim.build(model)
-    data_loader = config.data_loader.build(dataset)
-    trainer = config.trainer.build(model, optim, data_loader)
+    model = config.model.build(init_device="meta")
+    train_module = config.train_module.build(model)
+    data_loader = config.data_loader.build(dataset, dp_process_group=train_module.dp_process_group)
+    trainer = config.trainer.build(train_module, data_loader)
     config_dict = config.as_config_dict()
     cast(WandBCallback, trainer.callbacks["wandb"]).config = config_dict
     cast(ConfigSaverCallback, trainer.callbacks["config_saver"]).config = config_dict
