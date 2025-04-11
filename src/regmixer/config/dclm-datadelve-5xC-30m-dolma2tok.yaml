@@ -1,10 +1,10 @@
-name: "dclm-datadelve-1xC-30m"
-description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 1xC scale"
+name: "dclm-datadelve-5xC-30m-seq-2048-new-ladder"
+description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale, testing new ladder"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 8 # 1, 8
-variants: 128 # 1, 5, 100
+variants: 1 # 1, 5, 100
 preemptible: true
 max_tokens: 3_000_000_000 # 30_000_000 * 20
 allow_repetition: false 

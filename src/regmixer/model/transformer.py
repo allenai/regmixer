@@ -182,30 +182,52 @@ class TransformerConfigBuilder:
         )
 
     def get_batch_size(self, parameters: int) -> int:
-        if self.sequence_length != 2048:
-            raise NotImplementedError("Only sequence length 2048 is supported right now")
+        """
+        Taken directly from https://github.com/allenai/OLMo-core/blob/main/src/olmo_core/model_ladder.py#L276 
 
+        Args:
+        - parameters: number of non-embedding parameters
+        """
         if self.train_type == TrainType.anneal:
             return 1024
 
+        assert self.sequence_length in {2048, 4096, 8192}
+        seq_len_divisor = self.sequence_length // 2048
+
         global_batch_size = 160 * (parameters / 108000000) ** (2 / 3)
+        global_batch_size /= seq_len_divisor
         global_batch_size /= self.model_config.batch_divisor
         global_batch_size = round(global_batch_size)
         global_batch_size *= self.model_config.batch_divisor
-
-        global_batch_size = self.next_power_of_2(global_batch_size)
         print(f"Global batch size is: {global_batch_size}")
 
         return global_batch_size
+
+        # old 
+        #global_batch_size = 160 * (parameters / 108000000) ** (2 / 3)
+        #global_batch_size /= self.model_config.batch_divisor
+        #global_batch_size = round(global_batch_size)
+        #global_batch_size *= self.model_config.batch_divisor
+        #global_batch_size = self.next_power_of_2(global_batch_size)
+        #return global_batch_size
 
     def next_power_of_2(self, x: int) -> int:
         return 1 if x == 0 else 2 ** (x - 1).bit_length()
 
     def get_lr(self, model: TransformerConfig, tokenizer: TokenizerConfig) -> float:
+        """
+        Taken from https://github.com/allenai/OLMo-core/blob/main/src/scripts/train/OLMo2-ladder.py#L54
+        """
         if self.train_type == TrainType.anneal:
             return 6.1852e-5  # Magic number pulled from OLMo-core examples
+        
+        assert self.sequence_length in {2048, 4096}
+        lr = 0.0047 * (model.num_non_embedding_params / 108000000) ** (-1 / 3)
+        if self.sequence_length == 4096:
+            lr /= 4
 
-        return 4.7e-3 * (model.num_params / tokenizer.padded_vocab_size()) ** (-1 / 3)
+        return lr 
+        # return 4.7e-3 * (model.num_params / tokenizer.padded_vocab_size()) ** (-1 / 3)
 
     def get_scheduler(self, model: TransformerConfig) -> Scheduler:
         if self.train_type == TrainType.anneal:
@@ -263,12 +285,12 @@ class TransformerConfigBuilder:
             block_name=self.model_config.block_type,
         )
 
-        global_batch_size = self.get_batch_size(model.num_params)
+        global_batch_size = self.get_batch_size(model.num_non_embedding_params)
         learning_rate = self.get_lr(model, tokenizer)
 
-        if self.sequence_length == 4096:
+        """if self.sequence_length == 4096:
             learning_rate /= 4
-            raise NotImplementedError("Only sequence length 2048 is supported right now")
+            raise NotImplementedError("Only sequence length 2048 is supported right now")"""
 
         mixture_config = MixtureBuilder(
             sources=self.sources,
