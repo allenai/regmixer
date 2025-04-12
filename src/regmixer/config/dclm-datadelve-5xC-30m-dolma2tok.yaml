@@ -3,7 +3,7 @@ description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale,
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
-gpus: 4 # 1, 8
+gpus: 8 # 1, 8
 variants: 1 # 1, 5, 100
 preemptible: true
 max_tokens: 3_000_000_000 # 30_000_000 * 20
