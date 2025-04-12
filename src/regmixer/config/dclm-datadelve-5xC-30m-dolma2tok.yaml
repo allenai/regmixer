@@ -15,7 +15,6 @@ minimum_weight: 0.05
 proxy_model_id: "olmo_30m"
 tokenizer: "dolma2"
 dtype: "uint32"
-device_batch_size: 4
 priority: high #high #normal, high
 cluster: ai2/saturn-cirrascale #ai2/saturn-cirrascale, ai2/neptune-cirrascale
 sources:
