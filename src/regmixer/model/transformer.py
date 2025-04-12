@@ -184,7 +184,6 @@ class TransformerConfigBuilder:
     def get_batch_size(self, parameters: int) -> int:
         """
         Taken directly from https://github.com/allenai/OLMo-core/blob/main/src/olmo_core/model_ladder.py#L276 
-
         Args:
         - parameters: number of non-embedding parameters
         """
@@ -226,10 +225,8 @@ class TransformerConfigBuilder:
         lr = 0.0047 * (model.num_non_embedding_params / 108000000) ** (-1 / 3)
         if self.sequence_length == 4096:
             lr /= 4
-
         return lr
-        # return 4.7e-3 * (model.num_params / tokenizer.padded_vocab_size()) ** (-1 / 3)
-
+    
     def get_scheduler(self, model: TransformerConfig) -> Scheduler:
         if self.train_type == TrainType.anneal:
             return LinearWithWarmup(warmup_steps=0, t_max=self.max_tokens)
@@ -288,10 +285,6 @@ class TransformerConfigBuilder:
 
         global_batch_size = self.get_batch_size(model.num_non_embedding_params)
         learning_rate = self.get_lr(model, tokenizer)
-
-        """if self.sequence_length == 4096:
-            learning_rate /= 4
-            raise NotImplementedError("Only sequence length 2048 is supported right now")"""
 
         mixture_config = MixtureBuilder(
             sources=self.sources,
