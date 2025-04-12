@@ -199,6 +199,7 @@ class TransformerConfigBuilder:
         global_batch_size /= self.model_config.batch_divisor
         global_batch_size = round(global_batch_size)
         global_batch_size *= self.model_config.batch_divisor
+        global_batch_size = self.next_power_of_2(global_batch_size)
         print(f"Global batch size is: {global_batch_size}")
 
         return global_batch_size

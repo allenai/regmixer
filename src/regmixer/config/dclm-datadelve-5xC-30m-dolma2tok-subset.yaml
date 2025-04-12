@@ -14,7 +14,7 @@ temperature: 0.75
 minimum_weight: 0.05
 proxy_model_id: "olmo_30m"
 tokenizer: "dolma2"
-dtype: "uint16"
+dtype: "uint32"
 priority: low #high #normal, high
 cluster: ai2/saturn-cirrascale #ai2/saturn-cirrascale, ai2/neptune-cirrascale
 sources:

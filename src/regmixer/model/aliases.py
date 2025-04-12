@@ -44,6 +44,9 @@ class ModelConfig:
 
     @classmethod
     def olmo_30m(cls) -> "ModelConfig":
+        """
+        54,792,448 total params, 29,102,336 non-embedding params
+        """
         return ModelConfig(
             compile=True,
             d_model=256,
@@ -52,7 +55,6 @@ class ModelConfig:
             rope_theta=500_000,
             flash_attention=True,
             max_sequence_length=4096,
-            device_batch_size=4
         )
 
     @classmethod
