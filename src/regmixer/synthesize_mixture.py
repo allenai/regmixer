@@ -92,7 +92,6 @@ def generate_weights_dirichlet(
                     for idx, (lower, upper) in enumerate(weight_bounds)
                 )
             ]
-            filtered_candidates = candidates
         else:
             filtered_candidates = candidates
 
