@@ -1,12 +1,12 @@
-name: "dclm-datadelve-5xC-30m-seq-4096-new-ladder"
-description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale, 4096 seq length with new ladder"
+name: "dclm-datadelve-5xC-30m"
+description: "Mixture of datadelve partitioned dclm sample olmo-30m @ 5xC scale"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
-gpus: 8 # 1, 8
-variants: 1 # 1, 5, 100
+gpus: 4 # 1, 8
+variants: 128 # 1, 5, 100
 preemptible: true
-max_tokens: 3_000_000_000 # 30_000_000 * 20
+max_tokens: 2_910_233_600
 allow_repetition: false 
 sequence_length: 4096
 seed: 42
@@ -15,7 +15,7 @@ minimum_weight: 0.05
 proxy_model_id: "olmo_30m"
 tokenizer: "dolma2"
 dtype: "uint32"
-priority: high #high #normal, high
+priority: low #high #normal, high
 cluster: ai2/saturn-cirrascale #ai2/saturn-cirrascale, ai2/neptune-cirrascale
 sources:
   - name: adult_content
