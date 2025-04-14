@@ -104,6 +104,11 @@ def generate_weights_dirichlet(
         candidates = np.round(candidates / minimum_weight) * minimum_weight
         candidates = candidates / np.sum(candidates)
 
+        if weight_bounds and not allow_repetition:
+            # need to check for out-of-bounds candidates again, in case normalization caused bounds to be violated.
+            if any(candidates[0][idx] < lower or candidates[0][idx] > upper for idx, (lower, upper), in enumerate(weight_bounds)):
+                continue
+
         selected: Tuple[np.ndarray, np.ndarray] = (
             candidates[0],
             np.ones(candidates.shape[1]),
