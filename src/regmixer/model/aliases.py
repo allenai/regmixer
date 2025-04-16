@@ -55,7 +55,6 @@ class ModelConfig:
             rope_theta=500_000,
             flash_attention=True,
             max_sequence_length=4096,
-            device_batch_size=32
         )
 
     @classmethod
