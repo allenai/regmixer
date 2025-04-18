@@ -13,8 +13,7 @@ authors = [
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 dependencies = [
-    # Pinned to core v2.x and removal of t_max from scheduling
-    "ai2-olmo-core @ git+https://github.com/allenai/OLMo-core.git@main",
+    "ai2-olmo-core @ git+https://github.com/allenai/OLMo-core.git@6599c2f7b85ee584e18febdc93ee1833480348e9",
     "boto3",
     "click",
     "pydantic",
