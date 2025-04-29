@@ -48,7 +48,7 @@ class ExperimentConfig(BaseModel):
     sources: list[SourceConfig]
     tokenizer: str
     proxy_model_id: str
-    minimum_weight: Optional[float]
+    minimum_weight: Optional[float] = None
     checkpoint_path: Optional[str] = None
     train_type: TrainType = TrainType.pretrain
     allow_repetition: bool = True
@@ -57,7 +57,8 @@ class ExperimentConfig(BaseModel):
     preemptible: bool = True
     shared_filesystem: bool = False
     weka: bool = False
-
+    min_strength: float = 0.1 
+    max_strength: float = 5.0
     # TODO(undfined): Add field validation for weka/cluster/train_type here
 
 

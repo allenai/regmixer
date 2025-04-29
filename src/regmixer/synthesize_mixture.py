@@ -38,6 +38,8 @@ def generate_weights_dirichlet(
     minimum_weight: float,
     num_samples_out: int,
     temperature: float,
+    min_strength: float, 
+    max_strength: float,
     max_tokens: int,
     source_tokens: int,
     allow_repetition: bool,
@@ -70,12 +72,11 @@ def generate_weights_dirichlet(
 
     for _ in range(num_samples_out * ConfigDefaults.sample_multiplier):
         candidates = []
-        if ConfigDefaults.min_strength == ConfigDefaults.max_strength:
-            candidates.append(np.random.dirichlet(prior_dist * ConfigDefaults.min_strength, 1))
+        if min_strength == max_strength:
+            candidates.append(np.random.dirichlet(prior_dist * min_strength, 1))
         else:
-            min_strength_log = np.log10(ConfigDefaults.min_strength)
-            max_strength_log = np.log10(ConfigDefaults.max_strength)
-
+            min_strength_log = np.log10(min_strength)
+            max_strength_log = np.log10(max_strength)
             for strength in np.logspace(min_strength_log, max_strength_log, 15):
                 samples_per_strength = np.random.dirichlet(prior_dist * strength, 1)
                 candidates.append(samples_per_strength)
@@ -149,6 +150,18 @@ def generate_weights_dirichlet(
     selected_samples = random.sample(deduped, num_samples_out)
     selected_samples = np.stack(selected_samples, axis=0)
 
+    print([len(np.where(selected_samples[i][0] != 0)[0]) for i in range(len(selected_samples))])
+
+    all_diffs = []
+    for i in range(len(selected_samples)):
+        for j in range(i + 1, len(selected_samples)):
+            diff = np.linalg.norm(selected_samples[i][0] - selected_samples[j][0])
+            if diff < 0.01:
+                logger.info(f"Sample {i} and Sample {j} are too close to each other!")
+                logger.info(f"Sample {i}: {selected_samples[i][0]}")
+                logger.info(f"Sample {j}: {selected_samples[j][0]}")
+            all_diffs.append(diff)
+            
     return selected_samples
 
 
@@ -187,6 +200,8 @@ def mk_mixtures(
         minimum_weight=config.minimum_weight or ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
         temperature=config.mix_temperature,
+        min_strength=config.min_strength,
+        max_strength=config.max_strength,
         allow_repetition=config.allow_repetition,
         max_tokens=config.max_tokens,
         source_tokens=source_total,
