@@ -1,5 +1,5 @@
-name: "dclm-datadelve-larger-5xC-30m"
-description: "Mixture of datadelve partitioned dclm 700B sample, olmo-30m @ 5xC scale"
+name: "dclm-datadelve-larger-5xC-30m-dense"
+description: "Mixture of datadelve partitioned dclm 700B sample, olmo-30m @ 5xC scale with denser swarm"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
@@ -17,7 +17,7 @@ max_strength: 20
 proxy_model_id: "olmo_30m"
 tokenizer: "dolma2"
 dtype: "uint32"
-priority: high #high #normal, high
+priority: low #high #normal, high
 cluster: ai2/saturn-cirrascale #ai2/saturn-cirrascale, ai2/neptune-cirrascale
 sources:
   - name: adult_content
