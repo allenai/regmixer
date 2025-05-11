@@ -66,6 +66,7 @@ def generate_weights_dirichlet(
     if temperature < 1.0:
         prior_dist = prior_dist**temperature
         prior_dist = prior_dist / np.sum(prior_dist)
+        logger.info(f"Prior distribution after temperature scaling: {prior_dist}")
 
     if not allow_repetition and weight_bounds:
         logger.info("Limiting candidates to within bounds, repetition is disabled...")
