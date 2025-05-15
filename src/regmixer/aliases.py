@@ -59,6 +59,7 @@ class ExperimentConfig(BaseModel):
     weka: bool = False
     min_strength: float = 0.1 
     max_strength: float = 5.0
+    nonzero_weight: Optional[list[str]] = None
     # TODO(undfined): Add field validation for weka/cluster/train_type here
 
 

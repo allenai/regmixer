@@ -4,7 +4,7 @@ budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 8 # 1, 8
-variants: 64 #64 # 1, 5, 100
+variants: 32 #64 # 1, 5, 100
 preemptible: true
 max_tokens: 2_910_233_600
 allow_repetition: false 
@@ -42,3 +42,5 @@ sources:
   - name: wikipedia
     paths:
       - s3://ai2-llm/preprocessed/olmo-mix/danyh-compiled-v1_7/documents/wiki/allenai/dolma2-tokenizer/*.npy
+nonzero_weight:
+  - wikipedia

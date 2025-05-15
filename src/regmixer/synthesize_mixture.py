@@ -4,7 +4,7 @@ import os
 import pathlib
 import random
 from collections import defaultdict
-from typing import Tuple
+from typing import Tuple, Optional
 
 import numpy as np
 import s3fs
@@ -44,6 +44,7 @@ def generate_weights_dirichlet(
     source_tokens: int,
     allow_repetition: bool,
     enable_bound: bool = True,
+    nonzero_weight: Optional[list[str]] = None
 ):
     """
     Generate weights for each domain group using a dirichlet distribution.
@@ -96,6 +97,10 @@ def generate_weights_dirichlet(
             ]
         else:
             filtered_candidates = candidates
+
+        if nonzero_weight:
+            nonzero_domains = [domains.index(d) for d in nonzero_weight]
+            filtered_candidates = [sample for sample in filtered_candidates if all(sample[0][idx] > minimum_weight for idx in nonzero_domains)]
 
         if not filtered_candidates:
             continue
@@ -206,6 +211,7 @@ def mk_mixtures(
         allow_repetition=config.allow_repetition,
         max_tokens=config.max_tokens,
         source_tokens=source_total,
+        nonzero_weight=config.nonzero_weight,
     )
 
     weight_maps = []
