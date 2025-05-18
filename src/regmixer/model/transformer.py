@@ -46,7 +46,7 @@ from regmixer.model.aliases import (
     SupportedModels,
     SupportedTokenizers,
 )
-from regmixer.model.evaluators import DownstreamEvaluators, DownstreamEvaluatorsSmall
+from regmixer.model.evaluators import DownstreamEvaluatorsSmall, DownstreamEvaluators
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +117,7 @@ class TransformerConfigBuilder:
     tokenizer: TokenizerConfig
     dtype: str
     weka: bool
+    device_batch_size: int 
     load_path: Optional[str] = None
     profile: bool = False
     train_type: TrainType = TrainType.pretrain
@@ -134,11 +135,13 @@ class TransformerConfigBuilder:
         dtype: str,
         model_identifier: str,
         weka: bool,
+        device_batch_size: int,
         train_type: TrainType = TrainType.pretrain,
         load_path: Optional[str] = None,
         seed: int = 42,
         s3: bool = True,
         profile: bool = False,
+        global_batch_size: Optional[int] = None,
     ):
         self.run_name = run_name
         self.sources = sources
@@ -152,6 +155,8 @@ class TransformerConfigBuilder:
         self.s3 = s3
         self.train_type = train_type
         self.load_path = load_path
+        self.device_batch_size = device_batch_size
+        self.global_batch_size = global_batch_size
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
         self.data_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
@@ -177,8 +182,9 @@ class TransformerConfigBuilder:
     def get_warmup_steps(self, parameters: int) -> int:
         if self.train_type == TrainType.anneal:
             return 0
+        bsz = self.global_batch_size if self.global_batch_size is not None else self.get_batch_size(parameters)
         return round(
-            parameters / (self.get_batch_size(parameters) * self.model_config.max_sequence_length)
+            parameters / (bsz * self.model_config.max_sequence_length)
         )
 
     def get_batch_size(self, parameters: int) -> int:
@@ -198,9 +204,18 @@ class TransformerConfigBuilder:
         global_batch_size /= self.model_config.batch_divisor
         global_batch_size = round(global_batch_size)
         global_batch_size *= self.model_config.batch_divisor
+        global_batch_size = self.next_power_of_2(global_batch_size)
         print(f"Global batch size is: {global_batch_size}")
 
         return global_batch_size
+
+        # old 
+        """global_batch_size = 160 * (parameters / 108000000) ** (2 / 3)
+        global_batch_size /= self.model_config.batch_divisor
+        global_batch_size = round(global_batch_size)
+        global_batch_size *= self.model_config.batch_divisor
+        global_batch_size = self.next_power_of_2(global_batch_size)
+        return global_batch_size"""
 
     def next_power_of_2(self, x: int) -> int:
         return 1 if x == 0 else 2 ** (x - 1).bit_length()
@@ -211,12 +226,11 @@ class TransformerConfigBuilder:
         """
         if self.train_type == TrainType.anneal:
             return 6.1852e-5  # Magic number pulled from OLMo-core examples
-
+        
         assert self.sequence_length in {2048, 4096}
         lr = 0.0047 * (model.num_non_embedding_params / 108000000) ** (-1 / 3)
         if self.sequence_length == 4096:
             lr /= 4
-
         return lr
     
     def get_scheduler(self, model: TransformerConfig) -> Scheduler:
@@ -275,7 +289,7 @@ class TransformerConfigBuilder:
             block_name=self.model_config.block_type,
         )
 
-        global_batch_size = self.get_batch_size(model.num_non_embedding_params)
+        global_batch_size = self.global_batch_size if self.global_batch_size is not None else self.get_batch_size(model.num_non_embedding_params)
         learning_rate = self.get_lr(model, tokenizer)
 
         mixture_config = MixtureBuilder(
@@ -303,7 +317,7 @@ class TransformerConfigBuilder:
         )
 
         train_module_config = tm.TransformerTrainModuleConfig(
-            rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
+            rank_microbatch_size=self.device_batch_size * self.sequence_length,
             max_sequence_length=self.sequence_length,
             optim=SkipStepAdamWConfig(
                 lr=learning_rate,

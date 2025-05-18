@@ -1,0 +1,29 @@
+name: "dclm-datadelve-5xC-30m-subset"
+description: "Datadelve subset (entertainment, health, politics) olmo-30m @ 5xC scale"
+budget: "ai2/oe-data"
+workspace: "ai2/dolma2"
+nodes: 1
+gpus: 8 # 1, 8
+variants: 64 # 1, 5, 100
+preemptible: true
+max_tokens: 3_000_000_000 # 30_000_000 * 20
+allow_repetition: false 
+sequence_length: 2048
+seed: 42
+temperature: 0.75
+minimum_weight: 0.05
+proxy_model_id: "olmo_30m"
+tokenizer: "dolma2"
+dtype: "uint32"
+priority: low #high #normal, high
+cluster: ai2/saturn-cirrascale #ai2/saturn-cirrascale, ai2/neptune-cirrascale
+sources:
+  - name: entertainment
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/entertainment/**/*.npy
+  - name: health
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/health/**/*.npy
+  - name: politics
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/politics/**/*.npy

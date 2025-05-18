@@ -99,6 +99,8 @@ def mk_instance_cmd(
         f"-m {config.proxy_model_id}",
         f"-w {config.weka}",
         f"-y {config.train_type.value}",
+        f"-b {config.device_batch_size}",
+        f"-B {config.global_batch_size}",
     ]
 
     if config.checkpoint_path:
@@ -131,7 +133,7 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
             budget=group.config.budget or "ai2/oe-data",
             workspace=group.config.workspace,
             preemptible=group.config.preemptible,
-            beaker_image="petew/olmo-core-tch270cu128-v2.1"
+            beaker_image="petew/olmo-core-tch270cu128-v2.1",
             priority=group.config.priority,
             env_secrets=[
                 BeakerEnvSecret(name="BEAKER_TOKEN", secret=f"{beaker_user}_BEAKER_TOKEN"),
@@ -186,6 +188,15 @@ def mk_mixes(
             f.write(mix_string)
 
         logger.info(f"Mixes saved to {output}:")
-    logger.info(mixes)
+
+    from copy import deepcopy 
+    display_mixes = deepcopy(mixes)
+
+    for mix in display_mixes:
+        keys_to_remove = [k for k, v in mix.items() if v[0] == 0]
+        for k in keys_to_remove:
+            mix.pop(k)
+
+    logger.info(display_mixes)
 
     return mixes

@@ -4,7 +4,7 @@ import os
 import pathlib
 import random
 from collections import defaultdict
-from typing import Tuple
+from typing import Tuple, Optional
 
 import numpy as np
 import s3fs
@@ -38,10 +38,13 @@ def generate_weights_dirichlet(
     minimum_weight: float,
     num_samples_out: int,
     temperature: float,
+    min_strength: float, 
+    max_strength: float,
     max_tokens: int,
     source_tokens: int,
     allow_repetition: bool,
     enable_bound: bool = True,
+    nonzero_weight: Optional[list[str]] = None
 ):
     """
     Generate weights for each domain group using a dirichlet distribution.
@@ -64,18 +67,18 @@ def generate_weights_dirichlet(
     if temperature < 1.0:
         prior_dist = prior_dist**temperature
         prior_dist = prior_dist / np.sum(prior_dist)
+        logger.info(f"Prior distribution after temperature scaling: {prior_dist}")
 
     if not allow_repetition and weight_bounds:
         logger.info("Limiting candidates to within bounds, repetition is disabled...")
 
     for _ in range(num_samples_out * ConfigDefaults.sample_multiplier):
         candidates = []
-        if ConfigDefaults.min_strength == ConfigDefaults.max_strength:
-            candidates.append(np.random.dirichlet(prior_dist * ConfigDefaults.min_strength, 1))
+        if min_strength == max_strength:
+            candidates.append(np.random.dirichlet(prior_dist * min_strength, 1))
         else:
-            min_strength_log = np.log10(ConfigDefaults.min_strength)
-            max_strength_log = np.log10(ConfigDefaults.max_strength)
-
+            min_strength_log = np.log10(min_strength)
+            max_strength_log = np.log10(max_strength)
             for strength in np.logspace(min_strength_log, max_strength_log, 15):
                 samples_per_strength = np.random.dirichlet(prior_dist * strength, 1)
                 candidates.append(samples_per_strength)
@@ -92,9 +95,12 @@ def generate_weights_dirichlet(
                     for idx, (lower, upper) in enumerate(weight_bounds)
                 )
             ]
-            filtered_candidates = candidates
         else:
             filtered_candidates = candidates
+
+        if nonzero_weight:
+            nonzero_domains = [domains.index(d) for d in nonzero_weight]
+            filtered_candidates = [sample for sample in filtered_candidates if all(sample[0][idx] > minimum_weight for idx in nonzero_domains)]
 
         if not filtered_candidates:
             continue
@@ -104,6 +110,11 @@ def generate_weights_dirichlet(
         candidates = candidates / np.sum(candidates).reshape(-1, 1)
         candidates = np.round(candidates / minimum_weight) * minimum_weight
         candidates = candidates / np.sum(candidates)
+
+        if weight_bounds and not allow_repetition:
+            # need to check for out-of-bounds candidates again, in case normalization caused bounds to be violated.
+            if any(candidates[0][idx] < lower or candidates[0][idx] > upper for idx, (lower, upper), in enumerate(weight_bounds)):
+                continue
 
         selected: Tuple[np.ndarray, np.ndarray] = (
             candidates[0],
@@ -145,6 +156,18 @@ def generate_weights_dirichlet(
     selected_samples = random.sample(deduped, num_samples_out)
     selected_samples = np.stack(selected_samples, axis=0)
 
+    print([len(np.where(selected_samples[i][0] != 0)[0]) for i in range(len(selected_samples))])
+
+    all_diffs = []
+    for i in range(len(selected_samples)):
+        for j in range(i + 1, len(selected_samples)):
+            diff = np.linalg.norm(selected_samples[i][0] - selected_samples[j][0])
+            if diff < 0.01:
+                logger.info(f"Sample {i} and Sample {j} are too close to each other!")
+                logger.info(f"Sample {i}: {selected_samples[i][0]}")
+                logger.info(f"Sample {j}: {selected_samples[j][0]}")
+            all_diffs.append(diff)
+            
     return selected_samples
 
 
@@ -183,9 +206,12 @@ def mk_mixtures(
         minimum_weight=config.minimum_weight or ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
         temperature=config.mix_temperature,
+        min_strength=config.min_strength,
+        max_strength=config.max_strength,
         allow_repetition=config.allow_repetition,
         max_tokens=config.max_tokens,
         source_tokens=source_total,
+        nonzero_weight=config.nonzero_weight,
     )
 
     weight_maps = []
@@ -221,7 +247,8 @@ def calculate_priors(
         ).encode("utf-8")
     ).hexdigest()
 
-    cache_path = pathlib.Path(f"/tmp/regmixer/priors_cache_{config_hash}.json")
+    pathlib.Path("cache/").mkdir(parents=True, exist_ok=True)
+    cache_path = pathlib.Path(f"cache/priors_cache_{config_hash}.json")
     if use_cache:
         try:
             with open(cache_path, "r") as f:
@@ -272,6 +299,8 @@ def calculate_priors(
 
     # Calculate relative sizes
     total_tokens = sum(token_counts.values())
+
+    token_counts = dict(sorted(token_counts.items()))
 
     if total_tokens == 0:
         raise Exception(f"Error processing config, no tokens found for sources!")

@@ -124,6 +124,19 @@ def cli():
     type=str,
     help="Type of training",
 )
+@click.option(
+    "-b",
+    "--device-batch-size",
+    type=int,
+    help="Device batch size",
+)
+@click.option(
+    "-B",
+    "--global-batch-size",
+    type=int,
+    help="Global batch size (includes multiplying by sequence length)",
+    default=None
+)
 @record
 def train(
     run_name: str,
@@ -139,7 +152,9 @@ def train(
     model_identifier: str,
     weka: bool,
     train_type: str,
+    device_batch_size: int,
     checkpoint_path: Optional[str] = None,
+    global_batch_size: Optional[int] = None,
 ):
     """
     Launch a training run with the given parameters.
@@ -176,6 +191,8 @@ def train(
         weka=weka,
         load_path=checkpoint_path,
         train_type=TrainType[train_type.strip()],
+        device_batch_size=device_batch_size,
+        global_batch_size=global_batch_size,
     ).build()
     dataset = config.dataset.build()
 

@@ -7,7 +7,7 @@ from typing import Tuple
 
 import click
 import yaml
-from beaker import Priority
+from beaker import Priority, Beaker
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.utils import generate_uuid, prepare_cli_environment
 
@@ -193,6 +193,7 @@ def train(
         cluster=cluster,
         tokenizer=tokenizer,
         priority=priority,
+        minimum_weight=0,
         proxy_model_id=model_identifier,
         dtype=NumpyDatasetDType[dtype],
         shared_filesystem=True,
@@ -202,10 +203,14 @@ def train(
     logger.info(experiment_config)
     logger.info(weights)
 
+    beaker_user = (Beaker.from_env().account.whoami().name).upper()
+    logger.info(f"Launching experiment group '{group_uuid}' as user '{beaker_user}'")
+
     if click.confirm("Launch experiment with this config and weights?", default=False):
         launch_group = LaunchGroup(
             instances=mk_launch_configs(
-                mk_experiment_group(experiment_config, mixes=[weights], group_uuid=group_uuid)
+                group=mk_experiment_group(experiment_config, mixes=[weights], group_uuid=group_uuid),
+                beaker_user=beaker_user
             )
         )
         launch_group.instances[0].launch()
