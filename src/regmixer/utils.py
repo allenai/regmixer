@@ -100,6 +100,7 @@ def mk_instance_cmd(
         f"-w {config.weka}",
         f"-y {config.train_type.value}",
         f"-b {config.device_batch_size}",
+        f"-B {config.global_batch_size}",
     ]
 
     if config.checkpoint_path:

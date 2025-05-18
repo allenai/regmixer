@@ -61,6 +61,7 @@ class ExperimentConfig(BaseModel):
     max_strength: float = 5.0
     nonzero_weight: Optional[list[str]] = None
     device_batch_size: int = 8
+    global_batch_size: Optional[int] = None
     # TODO(undfined): Add field validation for weka/cluster/train_type here
 
 

@@ -141,6 +141,7 @@ class TransformerConfigBuilder:
         seed: int = 42,
         s3: bool = True,
         profile: bool = False,
+        global_batch_size: Optional[int] = None,
     ):
         self.run_name = run_name
         self.sources = sources
@@ -155,6 +156,7 @@ class TransformerConfigBuilder:
         self.train_type = train_type
         self.load_path = load_path
         self.device_batch_size = device_batch_size
+        self.global_batch_size = global_batch_size
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
         self.data_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
@@ -180,8 +182,9 @@ class TransformerConfigBuilder:
     def get_warmup_steps(self, parameters: int) -> int:
         if self.train_type == TrainType.anneal:
             return 0
+        bsz = self.global_batch_size if self.global_batch_size is not None else self.get_batch_size(parameters)
         return round(
-            parameters / (self.get_batch_size(parameters) * self.model_config.max_sequence_length)
+            parameters / (bsz * self.model_config.max_sequence_length)
         )
 
     def get_batch_size(self, parameters: int) -> int:
@@ -286,7 +289,7 @@ class TransformerConfigBuilder:
             block_name=self.model_config.block_type,
         )
 
-        global_batch_size = self.get_batch_size(model.num_non_embedding_params)
+        global_batch_size = self.global_batch_size if self.global_batch_size is not None else self.get_batch_size(model.num_non_embedding_params)
         learning_rate = self.get_lr(model, tokenizer)
 
         mixture_config = MixtureBuilder(
