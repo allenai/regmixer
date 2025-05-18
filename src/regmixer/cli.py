@@ -244,6 +244,7 @@ def validate(config: Path):
             dtype=experiment_group.config.dtype,
             model_identifier=experiment_group.config.proxy_model_id,
             weka=experiment_group.config.weka,
+            device_batch_size=experiment_group.config.device_batch_size,
         ).build()
         dataset = transformer.dataset.build()
         dataset.prepare()

@@ -31,7 +31,7 @@ class ModelConfig:
     layer_norm_eps: float = 1e-6
     save_interval: int = 1000
     eval_interval: int = 200
-    device_batch_size: int = 8
+    #device_batch_size: int = 8
     batch_divisor: int = 32
     eps: float = 1e-8
     betas: tuple = (0.9, 0.95)
@@ -55,7 +55,7 @@ class ModelConfig:
             rope_theta=500_000,
             flash_attention=True,
             max_sequence_length=4096,
-            device_batch_size=4
+            #device_batch_size=4
         )
 
     @classmethod
@@ -97,7 +97,7 @@ class ModelConfig:
             n_layers=32,
             rope_theta=500_000,
             flash_attention=True,
-            device_batch_size=4,
+            #device_batch_size=4,
             max_sequence_length=4096,
         )
 

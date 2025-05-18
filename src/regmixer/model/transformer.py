@@ -117,6 +117,7 @@ class TransformerConfigBuilder:
     tokenizer: TokenizerConfig
     dtype: str
     weka: bool
+    device_batch_size: int 
     load_path: Optional[str] = None
     profile: bool = False
     train_type: TrainType = TrainType.pretrain
@@ -134,6 +135,7 @@ class TransformerConfigBuilder:
         dtype: str,
         model_identifier: str,
         weka: bool,
+        device_batch_size: int,
         train_type: TrainType = TrainType.pretrain,
         load_path: Optional[str] = None,
         seed: int = 42,
@@ -152,6 +154,7 @@ class TransformerConfigBuilder:
         self.s3 = s3
         self.train_type = train_type
         self.load_path = load_path
+        self.device_batch_size = device_batch_size
         self.tokenizer = self.get_tokenizer_config(tokenizer=tokenizer)
         self.data_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
@@ -310,9 +313,8 @@ class TransformerConfigBuilder:
             num_workers=16,
         )
 
-        print(f"Microbatch size: {self.model_config.device_batch_size * self.sequence_length}")
         train_module_config = tm.TransformerTrainModuleConfig(
-            rank_microbatch_size=self.model_config.device_batch_size * self.sequence_length,
+            rank_microbatch_size=self.device_batch_size * self.sequence_length,
             max_sequence_length=self.sequence_length,
             optim=SkipStepAdamWConfig(
                 lr=learning_rate,

@@ -99,6 +99,7 @@ def mk_instance_cmd(
         f"-m {config.proxy_model_id}",
         f"-w {config.weka}",
         f"-y {config.train_type.value}",
+        f"-b {config.device_batch_size}",
     ]
 
     if config.checkpoint_path:
