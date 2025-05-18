@@ -1,5 +1,0 @@
-sources:
-- domain: science_math_and_technology
-  paths:
-  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
-  weight: 1.0

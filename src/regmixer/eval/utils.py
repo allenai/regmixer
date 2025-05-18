@@ -5,7 +5,7 @@ import re
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union, List
 from sklearn.linear_model import LinearRegression
 import lightgbm as lgb
 import matplotlib.pyplot as plt
@@ -18,12 +18,17 @@ from tqdm import tqdm
 from wandb.apis.public import Run
 import hashlib 
 import os 
+import yaml
+
+from cookbook.aliases import ExperimentConfig as CookbookExperimentConfig
+from cookbook.utils.data import get_token_counts_and_ratios
+
 
 from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics
 from regmixer.eval.law import ScalingLaw
 
 logger = logging.getLogger(__name__)
-warnings.filterwarnings("ignore", category=UserWarning, module="lightgbm")
+warnings.filterwarnings("ignore", category=UserWarning)
 
 BASE_OUTPUT_DIR = "output/"
 # Match regmix setup: https://github.com/sail-sg/regmix/blob/main/regression_fitting/regression.ipynb
@@ -167,7 +172,11 @@ class SimulationProposer(Proposer):
         num_samples: int = 1_000_000,
         seed: int = 1337,
         search_iterations: int = 10,
-        opt_avg_metric: bool = False
+        opt_avg_metric: bool = False,
+        constrain_objective: bool = False,
+        final_cookbook_path: Optional[Path] = None,
+        obj_weights: Optional[list] = None,
+        temperature: Optional[float] = None,
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -179,7 +188,29 @@ class SimulationProposer(Proposer):
         search_dirichlet_factor = 2.0
 
         search_prior = prior_distributions
+
+        
+        if temperature is not None:
+            search_prior = search_prior**temperature
+            search_prior = search_prior / np.sum(search_prior)
+
+
         best_weights = np.zeros(len(prior_distributions))
+
+
+        if constrain_objective:
+            assert final_cookbook_path is not None, "final_cookbook_path must be set to determine how to construct swarm to be unconstrained."
+
+            with open(final_cookbook_path, "r") as f:
+                data = yaml.safe_load(f)
+
+            final_config = CookbookExperimentConfig(**data, path=final_cookbook_path)
+            desired_tokens = final_config.max_tokens
+
+            logger.warning(f"Using hardcoded token counts!")
+            with open("cache/priors_cache_217af510306ab626a507634c64ca7ca8.json", "r") as f:
+                available_tokens_per_source = json.load(f)['token_counts']
+
 
         # Multi-step search leveraging iterative prior results
         for search_step in tqdm(
@@ -202,16 +233,29 @@ class SimulationProposer(Proposer):
             )
 
             # Filter out invalid simulations from the population
-            simulations = simulations[np.all(simulations <= 6.5 * prior_distributions, axis=1)]
+            if temperature is None:
+                # keep this for reproducibility...
+                simulations = simulations[np.all(simulations <= 6.5 * prior_distributions, axis=1)]
+
+            if constrain_objective:
+                original_simulation_size = len(simulations)
+                simulations = simulations[((simulations*desired_tokens) <= list(available_tokens_per_source.values())).all(axis=1)]
+                logger.info(f"Removed {original_simulation_size - len(simulations)} out of {original_simulation_size} simulations that would repeat tokens at the final run scale.")
+
 
             if opt_avg_metric:
-                preds = np.array([reg.predict(simulations) for reg in predictor]).mean(axis=0)
+                if obj_weights is not None:
+                    predictions = np.array([reg.predict(simulations) for reg in predictor])
+                    objs = np.average(predictions, axis=0, weights=obj_weights)
+                    logger.info(f"Computing weighted average of predictions using {obj_weights}")
+                else:
+                    objs = np.array([reg.predict(simulations) for reg in predictor]).mean(axis=0)
             else:
-                preds = predictor[index].predict(simulations)
+                objs = predictor[index].predict(simulations)
 
             # Take the best loss prediction as an index unless it's greater than 1e-3
-            print(preds.min())
-            best_mask = (preds - preds.min()) < 1e-3
+            print(objs.min())
+            best_mask = (objs - objs.min()) < 1e-3
             best_weights = simulations[best_mask].mean(0)
 
             # Zero out weights below min_weight threshold and normalize
@@ -219,6 +263,10 @@ class SimulationProposer(Proposer):
             best_weights /= best_weights.sum()
 
             search_prior = (best_weights + search_prior) / 2
+
+
+        if constrain_objective and not all(best_weights * desired_tokens <= list(available_tokens_per_source.values())):
+            raise ValueError(f"Best weights are out of bounds!")
 
         return best_weights
 
@@ -296,6 +344,7 @@ def get_runs_from_api(
         wandb_runs.extend(
             api.runs(
                 path=workspace,
+                #filters={"display_name": {"$regex": f"^(?!.*larger).*{group}.*$"}},
                 filters={"display_name": {"$regex": f".*{group}.*"}},
             )
         )
@@ -305,10 +354,20 @@ def get_runs_from_api(
     for run in wandb_runs:
         memo[run.display_name] = run
 
-    all_runs: list[RunInstance] = sorted(
-        [mk_run_history(run, num_samples, eval_metric_group) for run in memo.values() if run is not None and run.state == "finished"],
-        key=lambda run: run.display_name.lower(),
-    )
+    all_runs = []
+    for run in memo.values():
+        if run.state == "crashed":
+            logger.warning(f"Run {run.display_name} has crashed; still using its final result")
+
+        if run.state == "running":
+            logger.warning(f"Run {run.display_name} is still running; skipping")
+            continue 
+        
+        if run is not None:
+            all_runs.append(mk_run_history(run, num_samples, eval_metric_group))
+
+    all_runs = sorted(all_runs, key=lambda run: run.display_name.lower())
+
 
     if not no_cache:
         with open(cache_path, "w") as f:
@@ -319,7 +378,6 @@ def get_runs_from_api(
 
 def mk_run_history(run: Run, samples: int, eval_metric_group: GroupedWandbMetrics) -> Any:
     if samples == 1:
-        print(run.state)
         try:
             summary = [{metric: run.summary[metric] for metric in eval_metric_group.value if metric in run.summary}]
         except KeyError:
@@ -352,9 +410,9 @@ def mk_run_from_json(run: dict) -> RunInstance:
 
 def mk_run_instance(run: Run, history: list[Any], n_samples: int) -> RunInstance:
     samples = pd.DataFrame.from_records(history).tail(n_samples)
-    logger.info(
-        f"Collected RunInstance for {run.display_name}:{run.id} with samples: {samples.shape}"
-    )
+    #logger.info(
+    #    f"Collected RunInstance for {run.display_name}:{run.id} with samples: {samples.shape}"
+    #)
     return RunInstance(
         id=run.id,
         display_name=run.display_name,
@@ -363,6 +421,23 @@ def mk_run_instance(run: Run, history: list[Any], n_samples: int) -> RunInstance
         state=run.state
     )
 
+
+def compute_mixture_neighborhood(
+    X_train: np.ndarray,
+    Y_train: np.ndarray,
+    ratios: pd.DataFrame,
+    neighborhood: str,
+    train_split: float
+)-> tuple[np.ndarray, np.ndarray]:    
+    neighborhood_size = int(train_split * len(X_train))
+    logger.info(f"Computing neighborhood of size {neighborhood_size} for {neighborhood}")
+    centroid = ratios[ratios.name == neighborhood][ratios.columns[3:]].values[0]
+    distances = np.linalg.norm(X_train - centroid, axis=1)
+    # Get indices of k smallest distances
+    nearest_indices = np.argsort(distances)[:neighborhood_size]
+    X_train = X_train[nearest_indices]
+    Y_train = Y_train[nearest_indices]
+    return X_train, Y_train
 
 def plot_simulations(
     prior_distributions: np.ndarray,
@@ -420,7 +495,6 @@ def plot_correlation(
 ):
     plt.close()
 
-    # Predict train
     y_pred_train = predictors[index].predict(X_train)
     y_true_train = Y_train[:, index]
 
@@ -502,6 +576,36 @@ def plot_correlation(
     with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_correlations.json", "w") as f:
         f.write(json.dumps(corr_results))
 
+
+def plot_interaction_matrix(
+    output_dir: str, 
+    predictors: list[Regressor], 
+    regression_type: str, 
+    domain_names: list[str],
+    metric_names: list[str]
+):
+    metric_names = [metric.split("/")[-1].split(" ")[0] for metric in metric_names]
+    interaction_matrix = np.zeros((len(metric_names), len(domain_names)))
+    for i, predictor in enumerate(predictors):
+        if regression_type == 'lightgbm':
+            interaction_matrix[i] = predictor.model.feature_importances_
+        elif regression_type == 'log_linear':
+            interaction_matrix[i] = predictor.model[1:]
+
+    plt.figure(figsize=(10, 8))
+    plt.imshow(interaction_matrix, cmap='rainbow', aspect='auto')
+    plt.colorbar(label='Influence')
+
+    plt.xticks(ticks=np.arange(len(domain_names)), labels=domain_names, rotation=90)
+    plt.yticks(ticks=np.arange(len(metric_names)), labels=metric_names)
+    plt.title(f"Interaction matrix for {regression_type}")
+    plt.tight_layout()
+
+    plt.savefig(
+        f"{output_dir}/interaction_matrix.png",
+        bbox_inches="tight",
+    )
+    plt.close()
 
 
 def mk_run_metrics(
@@ -748,7 +852,7 @@ def plot_and_log_weights(
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
 
-    columns = df_config.columns[2:].to_list()
+    columns = df_config.columns[3:].to_list()
     with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json", "w") as f:
         out = [
             {"domain": columns[idx], "weight": weight} for idx, weight in enumerate(prediction)
@@ -864,3 +968,45 @@ def save_eval_config(eval_config: dict, output_dir: str) -> str:
 
     print(f"[INFO] Saved config to {config_path}")
     return folder_path
+
+
+
+def filter_constrained_swarm(
+    final_cookbook_path: Path,
+    run_ratios: List,
+    run_metrics: List
+) -> Tuple[List, List]:
+    assert final_cookbook_path is not None, "final_cookbook_path must be set to determine how to construct swarm to be unconstrained."
+
+    with open(final_cookbook_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    final_config = CookbookExperimentConfig(**data, path=final_cookbook_path)
+    desired_tokens = final_config.max_tokens
+
+
+    #logger.warning(f"Using hardcoded token counts!")
+    #with open("cache/priors_cache_217af510306ab626a507634c64ca7ca8.json", "r") as f:
+    #    available_tokens_per_source = json.load(f)['token_counts']
+
+    token_universe = get_token_counts_and_ratios(
+        final_config.dataset.sources, final_config.dataset.dtype, True
+    )
+    available_tokens_per_source = {path: relative_size * token_universe[1] for path, relative_size in token_universe[0].items()}
+
+    original_swarm_size = len(run_ratios)
+
+    valid_runs = [
+        run['run'] for run in run_ratios if
+        all([
+            run[source] * desired_tokens <= num_available_tokens for source, num_available_tokens in available_tokens_per_source.items()
+        ])
+    ]
+
+    run_ratios = [run for run in run_ratios if run['run'] in valid_runs]
+    run_metrics = [run for run in run_metrics if run['run'] in valid_runs]
+
+
+    logger.info(f"Removed {original_swarm_size - len(run_ratios)} swarm runs that would repeat tokens at the final run scale.")
+
+    return run_ratios, run_metrics

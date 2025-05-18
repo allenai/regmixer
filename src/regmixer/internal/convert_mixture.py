@@ -31,7 +31,7 @@ def convert(
 ):
 
     if partition_type == "topic":
-        with open(f"src/regmixer/internal/config/prior.yaml", "r") as f:
+        with open(f"src/regmixer/internal/config/natural-larger-sample.yaml", "r") as f:
             base_config = yaml.safe_load(f)
     else:
         raise NotImplementedError("Only topic partitioning is supported at this time")
@@ -49,11 +49,13 @@ def convert(
     for source in base_config['sources']:
         source['weight'] = source_dict[source['domain']]
 
+    if os.path.exists(f"src/regmixer/internal/config/{dest_file}.yaml"):
+        logger.warning(f"Destination file {dest_file}.yaml already exists. Skipping.")
+    else:
+        with open(f"src/regmixer/internal/config/{dest_file}.yaml", "w") as f:
+            yaml.dump(base_config, f, sort_keys=False)
 
-    with open(f"src/regmixer/internal/config/{dest_file}.yaml", "w") as f:
-        yaml.dump(base_config, f, sort_keys=False)
-
-    logger.info(f"Successfully converted mixture at {source_file} to source yaml at {dest_file}")
+        logger.info(f"Successfully converted mixture at {source_file} to source yaml at {dest_file}")
 
 
 if __name__ == "__main__":

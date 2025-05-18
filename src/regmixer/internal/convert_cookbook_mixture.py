@@ -1,5 +1,5 @@
 """
-    rmc-convert convert -s output/0cd83153/avg_mmlu_bpb_ntest_50_seed_1_optimal.json -d seed_1_regmix_optimal
+    rmc-convert-cookbook convert -s output/62e7dc06/avg_mmlu_bpb_ntest_50_seed_1_optimal.json -d seed_1_regmix_optimal
 """
 
 import click
@@ -33,7 +33,7 @@ def convert(
 ):
 
     if partition_type == "topic":
-        with open(f"{cookbook_path}/src/cookbook/recipes/train-1b-5xC-uniform.yaml", "r") as f:
+        with open(f"{cookbook_path}/src/cookbook/recipes/train-1b-v2-5xC-dclm-larger-natural.yaml", "r") as f:
             base_config = yaml.safe_load(f)
     else:
         raise NotImplementedError("Only topic partitioning is supported at this time")
@@ -47,10 +47,13 @@ def convert(
         source['target_ratio'] = source_dict[source['name']]
 
 
-    with open(f"{cookbook_path}/src/cookbook/recipes/{dest_file}.yaml", "w") as f:
-        yaml.dump(base_config, f, sort_keys=False)
+    if os.path.exists(f"{cookbook_path}/src/cookbook/recipes/{dest_file}.yaml"):
+        logger.warning(f"Destination file {dest_file}.yaml already exists. Skipping.")
+    else:
+        with open(f"{cookbook_path}/src/cookbook/recipes/{dest_file}.yaml", "w") as f:
+            yaml.dump(base_config, f, sort_keys=False)
 
-    logger.info(f"Succesfsully converted mixture at {source_file} to source yaml at {dest_file}")
+        logger.info(f"Succesfsully converted mixture at {source_file} to source yaml at {dest_file}")
 
 
 if __name__ == "__main__":

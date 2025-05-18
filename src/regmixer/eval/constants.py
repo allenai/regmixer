@@ -314,6 +314,9 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.arc_challenge_test_rc_5shot_bpb.value,
     ]
 
+# arc_easy, arc_challenge, hellaswag, MMLU macro average, 
+# GSM8K is a step function, is bad 
+
 
 AUS_CLUSTERS = "ai2/jupiter-cirrascale-2,ai2/saturn-cirrascale,ai2/neptune-cirrascale"
 GOOG_CLUSTERS = "ai2/augusta-google-1"
@@ -442,3 +445,17 @@ ALL_GEN_TASKS = [
     "drop::olmes",
     "gsm8k::olmo1",
 ]
+
+
+class ObjectiveWeights(Enum):
+    aggregated_minerva_codex = {
+            WandbMetrics.minerva_math_precalculus_gold_bpb_0shot.value: 1.0/7,
+            WandbMetrics.minerva_math_prealgebra_gold_bpb_0shot.value: 1.0/7,
+            WandbMetrics.minerva_math_number_theory_gold_0shot.value: 1.0/7,
+            WandbMetrics.minerva_math_intermediate_algebra_gold_bpb_0shot.value: 1.0/7,
+            WandbMetrics.minerva_math_geometry_gold_bpb_0shot.value: 1.0/7,
+            WandbMetrics.minerva_math_counting_and_probability_gold_bpb_0shot.value: 1.0/7,
+            WandbMetrics.minerva_math_algebra_gold_bpb_0shot.value: 1.0/7,
+            WandbMetrics.codex_mbpp_gold_bpb_0shot.value: 0.5,
+            WandbMetrics.codex_humaneval_gold_bpb_0shot.value: 0.5
+    }

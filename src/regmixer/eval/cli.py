@@ -6,14 +6,20 @@ from typing import Optional
 from copy import deepcopy 
 from sklearn.model_selection import train_test_split
 
+from pathlib import Path
 import click
 import numpy as np
 import pandas as pd
 import wandb
 import torch 
+import yaml
 from olmo_core.utils import prepare_cli_environment
 
-from regmixer.eval.constants import GroupedWandbMetrics
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+
+from regmixer.eval.constants import GroupedWandbMetrics, ObjectiveWeights
 from regmixer.synthesize_mixture import calculate_priors
 from regmixer.utils import config_from_path
 from regmixer.eval.utils import (
@@ -28,8 +34,14 @@ from regmixer.eval.utils import (
     simulate2,
     save_eval_config,
     solve_log_linear,
+    plot_interaction_matrix,
+    compute_mixture_neighborhood,
+    filter_constrained_swarm,
     PROPOSER_TYPES
 )
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +67,7 @@ def cli():
     "-c",
     "--config",
     type=click.Path(exists=True),
+    multiple=True,
     help="Relative path to the experiment configuration file.",
     required=True,
 )
@@ -85,7 +98,7 @@ def cli():
     "-s",
     "--num-samples",
     type=int,
-    default=10,
+    default=1,
     help="The number of evaluation samples per metric to collect from the run history",
     required=False,
 )
@@ -157,8 +170,6 @@ def cli():
     help="If set, each metric is fit separately, and then a mixture is selected to minimize the average of all metrics",
     required=False,
     default=False,
-
-
 )
 @click.option(
     "--proposer-type",
@@ -167,10 +178,52 @@ def cli():
     required=False,
     default="simulation",
 )
+@click.option(
+    "--neighborhood",
+    type=str,
+    help="the training run display name that defines the neighborhood of subselected mixtures we regress on",
+    required=False,
+    default=None,
+)
+@click.option(
+    "--final-cookbook-path",
+    type=click.Path(exists=True),
+    help="Path to cookbook config containing information about the full run for which the proposed mix is used (number of tokens, dataset being used)",
+    required=False,
+    default="/home/mayee/re/year6/ai2/olmo-cookbook/src/cookbook/recipes/train-1b-v2-5xC-dclm-larger-natural.yaml"
+)
+@click.option(
+    "--constrain-swarm",
+    is_flag=True,
+    help="If set, we only use swarm runs that are unconstrained according to the final cookbook config.",
+    required=False,
+    default=False
+)
+@click.option(
+    "--constrain-objective",
+    is_flag=True,
+    help="If set, we produce a proposed mix that is unconstrained according to the final cookbook config.",
+    required=False,
+    default=False
+)
+@click.option(
+    "--obj-weights",
+    type=str,
+    help="The non-uniform weights used to average BPB over all tasks. If not set, uniform weights are used.",
+    required=False,
+    default=None,
+)
+@click.option(
+    "--temperature",
+    type=float,
+    help="The temperature used to adjust the dirichlet prior in the simulation process. Closer to 0 = more uniform." ,
+    required=False,
+    default=None,
+)
 
 def fit(
     experiment_groups: list[str],
-    config: pathlib.Path,
+    config: list[pathlib.Path],
     alpha: float,
     num_samples: int,
     simulation_samples: int,
@@ -185,6 +238,12 @@ def fit(
     seed: int,
     opt_avg_metric: bool,
     proposer_type: str,
+    neighborhood: Optional[str],
+    final_cookbook_path: Optional[Path],
+    constrain_swarm: bool,
+    constrain_objective: bool ,
+    obj_weights: Optional[str],
+    temperature: Optional[float],
 ):
 
     output_dir = get_output_dir(experiment_groups)
@@ -198,7 +257,7 @@ def fit(
         raise ValueError("Proposer type search only works with regression type search")
     
     eval_config = {
-        "config": config,
+        "config": config[0] if len(config) == 1 else config,
         "alpha": alpha,
         "num_samples": num_samples,
         "simulation_samples": simulation_samples,
@@ -213,13 +272,24 @@ def fit(
     }
     if proposer_type != "simulation":
         eval_config["proposer_type"] = proposer_type
+    if neighborhood is not None:
+        eval_config["neighborhood"] = neighborhood
+    if constrain_swarm:
+        eval_config["constrain_swarm"] = True 
+        eval_config["final_cookbook_path"] = final_cookbook_path 
+    if constrain_objective:
+        eval_config["constrain_objective"] = True 
+        eval_config["final_cookbook_path"] = final_cookbook_path 
+    if obj_weights is not None:
+        eval_config["obj_weights"] = obj_weights
+    if temperature is not None:
+        eval_config["temperature"] = temperature
 
     output_dir = save_eval_config(eval_config, output_dir)
 
 
 
     api = wandb.Api()
-
 
     eval_metric_group = GroupedWandbMetrics.all_metrics
     eval_metric_group_name = eval_metric_group.name
@@ -232,13 +302,17 @@ def fit(
         eval_metric_group = GroupedWandbMetrics[group_metrics]
         eval_metric_group_name = group_metrics
 
-    cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group}_runs_cache.json"
 
+        
 
+    cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name}_runs_cache.json"
+
+    launch_configs = [config_from_path(c) for c in config]
+    full_group_names = [f"{launch_config.name}-{group}" for group, launch_config in zip(experiment_groups, launch_configs)]
     if no_cache:
         logger.info(f"Cache disabled, will not use cache for run samples...")
         run_instances = get_runs_from_api(
-            api, workspace, experiment_groups, cache_path, no_cache, num_samples, eval_metric_group
+            api, workspace, full_group_names, cache_path, no_cache, num_samples, eval_metric_group
         )
     else:
         try:
@@ -251,7 +325,7 @@ def fit(
         except FileNotFoundError:
             logger.warning(f"Failed to load cache from {cache_path}, fetching runs from API...")
             run_instances = get_runs_from_api(
-                api, workspace, experiment_groups, cache_path, no_cache, num_samples, eval_metric_group
+                api, workspace, full_group_names, cache_path, no_cache, num_samples, eval_metric_group
             )
 
     # Filter out failed runs or runs without evals
@@ -266,25 +340,24 @@ def fit(
         f"Found {len(run_instances)} valid run instances for group(s) {experiment_groups} to fit regression..."
     )
 
-    launch_config = config_from_path(config)
-
     logger.info(f"Calculating source weights...")
     priors = calculate_priors(
-        source_configs=launch_config.sources,
-        dtype=launch_config.dtype,
+        source_configs=launch_configs[0].sources,
+        dtype=launch_configs[0].dtype,
         use_cache=(no_cache == False),
     )
     logger.info(f"Source weights:")
     logger.info(priors)
 
     run_ratios = [
-        {"run": run.id, "index": idx, **mk_weights_from_config(run.config, priors)}
+        {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors)}
         for idx, run in enumerate(run_instances)
     ]
 
     run_metrics = [
         {
             "run": run.id,
+            "name": run.display_name, 
             "index": idx,
             **mk_run_metrics(
                 history=run.samples,
@@ -295,28 +368,39 @@ def fit(
         }
         for idx, run in enumerate(run_instances) if len(run.samples) > 0
     ]
+
+    if constrain_swarm:
+        run_ratios, run_metrics = filter_constrained_swarm(final_cookbook_path, run_ratios, run_metrics)
+
     ratios = pd.DataFrame(run_ratios)
     metrics = pd.DataFrame(run_metrics)
 
-    # X = Domain weights
-    X_train = ratios[ratios.columns[2:]].values
-    # Y = Metric values 
-    Y_train = metrics[metrics.columns[2:]].values
+    if len(ratios[ratios.columns[3:]]) > len(ratios):
+        raise ValueError("The number of swarm runs is fewer than the number of mixing sources.")
 
-    if n_test == 0:
-        # if n_test is 0
-        X_test = deepcopy(X_train)
-        Y_test = deepcopy(Y_train)
-    else:
-        # If we want to evaluate on a fixed number of test samples
+    # X = Domain weights
+    X_train = ratios[ratios.columns[3:]].values
+    # Y = Metric values 
+    Y_train = metrics[metrics.columns[3:]].values
+
+    if n_test > 0:
         logger.info(f"Using {n_test} samples for test data")
         X_train, X_test, Y_train, Y_test = train_test_split(X_train, Y_train, test_size=n_test / len(Y_train), random_state=seed)
 
-        if train_split != 1.0:
-            # If we also want to subsample the training_data to study the effect of number of proxy runs
-            logger.info(f"Subsampling training data to {train_split} of original size")
-            X_train, _, Y_train, _ = train_test_split(X_train, Y_train, train_size=train_split, random_state=seed)
 
+    if train_split != 1.0:
+        # If we also want to subsample the training_data to study the effect of number of proxy runs
+        logger.info(f"Subsampling training data to {train_split} of original size")
+
+        if neighborhood is None:
+            # we IID subselect training data
+            X_train, _, Y_train, _ = train_test_split(X_train, Y_train, train_size=train_split, random_state=seed)
+        else:
+            X_train, Y_train = compute_mixture_neighborhood(X_train, Y_train, ratios, neighborhood, train_split)
+
+    if n_test == 0:
+        X_test = deepcopy(X_train)
+        Y_test = deepcopy(Y_train)
 
     logger.info(f"Number of train samples: {len(Y_train)}. Number of test samples: {len(Y_test)}.")
 
@@ -330,10 +414,15 @@ def fit(
     logger.info(f"Fitting {regression_type} regression for metrics:")
     logger.info(indexed_metrics)
 
+    if obj_weights:
+        obj_weights = ObjectiveWeights[obj_weights]
+        obj_weights = [obj_weights.value.get(metric, 1) for idx, metric in indexed_metrics]
+        logger.info(f"Minimizing weighted average: {obj_weights}")
 
     for idx, metric in indexed_metrics:
         predictors.append(build_regression(idx, Y_train, X_train, regression_type))
 
+    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist())
     results = []
 
     for idx, metric in indexed_metrics:
@@ -361,7 +450,11 @@ def fit(
                 predictor=predictors,
                 prior_distributions=np.array(list(priors[0].values())),
                 num_samples=simulation_samples,
-                opt_avg_metric=opt_avg_metric
+                opt_avg_metric=opt_avg_metric,
+                constrain_objective=constrain_objective,
+                final_cookbook_path=final_cookbook_path,
+                obj_weights=obj_weights,
+                temperature=temperature
             )
 
             plot_and_log_weights(
@@ -378,22 +471,6 @@ def fit(
                 output_dir=output_dir,
             )
 
-            """weights = simulate2(
-                index=idx,
-                predictor=predictors,
-                df_config=ratios,
-                prior_distributions=np.array(list(priors[0].values())),
-                metric_name=metric,
-                regression_type=regression_type,
-                train_split=train_split,
-                n_test=n_test,
-                split_seed=seed,
-                n_samples=num_samples,
-                alpha=alpha,
-                output_dir=output_dir,
-                num_samples=simulation_samples,
-            )"""
-
             results.append((metric, weights))
 
     if opt_avg_metric and n_test == 0:
@@ -403,7 +480,11 @@ def fit(
             predictor=predictors,
             prior_distributions=np.array(list(priors[0].values())),
             num_samples=simulation_samples,
-            opt_avg_metric=opt_avg_metric
+            opt_avg_metric=opt_avg_metric,
+            constrain_objective=constrain_objective,
+            final_cookbook_path=final_cookbook_path,
+            obj_weights=obj_weights,
+            temperature=temperature
         )
         plot_and_log_weights(
             prior=np.array(list(priors[0].values())),
@@ -419,41 +500,9 @@ def fit(
             output_dir=output_dir,
         )
 
+        results.append((group_metrics, weights))
 
-        """        if regression_type in ["lightgbm", "linear", "log_linear"]:
-                    weights = simulate2(
-                            index=-1,
-                            predictor=predictors,
-                            df_config=ratios,
-                            prior_distributions=np.array(list(priors[0].values())),
-                            metric_name="opt_avg",
-                            regression_type=regression_type,
-                            train_split=train_split,
-                            n_test=n_test,
-                            split_seed=seed,
-                            n_samples=num_samples,
-                            alpha=alpha,
-                            output_dir=output_dir,
-                            num_samples=simulation_samples,
-                    )
-                elif regression_type == "log_linear":
-                    weights = solve_log_linear(
-                        predictor=predictors,
-                        prior_distributions=np.array(list(priors[0].values())),
-                        df_config=ratios,
-                        metric_name="opt_avg",
-                        regression_type=regression_type,
-                        train_split=train_split,
-                        n_test=n_test,
-                        split_seed=seed,
-                        n_samples=num_samples,
-                        alpha=alpha,
-                        output_dir=output_dir,
-                    )
-        """
-
-
-    elif not group_average:
+    elif not group_average and n_test == 0:
         # If we're not optimizing for the average of the metric group, then we average the reweighted distributions after fitting
         avg_name = f"avg_{eval_metric_group_name}"
         average = np.mean([result[1] for result in results], axis=0)
@@ -471,12 +520,16 @@ def fit(
             output_dir=output_dir,
         )
 
+        results.append((avg_name, average))
 
-    for i, result in enumerate(results):
-        metric, weights = result
-        if n_test == 0:
-            predicted_performance = predictors[i].predict(weights[None])
-            logger.info(f"Metric: {metric}. Predicted performance using regression model: {predicted_performance}")
+    if n_test == 0:
+        metric, weights = results[-1]
+        predicted_performance = np.array([p.predict(weights[None])[0] for p in predictors]).mean()
+        logger.info(f"Metric: {metric}. Predicted performance using regression model: {predicted_performance}")
+
+        with open(f"{output_dir}/predicted_performance.json", "w") as f:
+            json.dump(float(predicted_performance), f)
+
 
     logger.info(f"Results saved to {output_dir}")
 
