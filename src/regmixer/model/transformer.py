@@ -161,6 +161,12 @@ class TransformerConfigBuilder:
         self.data_dir: str = "s3://ai2-llm"
         self.dataset_dtype = NumpyDatasetDType[dtype]
         self.root_dir = f"/tmp/{self.run_name}"
+        self.cluster = cluster
+
+
+        if any(substring in cluster for substring in ["augusta"]):
+            self.root_dir = f"gs://ai2-llm"
+            self.checkpoint_dir = f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
 
         if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
             logger.info("Using Weka bucket as root dir")
