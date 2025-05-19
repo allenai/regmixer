@@ -363,6 +363,7 @@ def fit(
                 history=run.samples,
                 samples=num_samples,
                 metrics=(eval_metric_group_name, eval_metric_group.value),
+                display_name=run.display_name,
                 average=group_average != None,
             ),
         }
@@ -448,7 +449,7 @@ def fit(
             weights = PROPOSER_TYPES[proposer_type]().propose(
                 index=idx,
                 predictor=predictors,
-                prior_distributions=np.array(list(priors[0].values())),
+                prior_distributions=priors[0],
                 num_samples=simulation_samples,
                 opt_avg_metric=opt_avg_metric,
                 constrain_objective=constrain_objective,
@@ -478,7 +479,7 @@ def fit(
         weights = PROPOSER_TYPES[proposer_type]().propose(
             index=-1,
             predictor=predictors,
-            prior_distributions=np.array(list(priors[0].values())),
+            prior_distributions=priors[0],
             num_samples=simulation_samples,
             opt_avg_metric=opt_avg_metric,
             constrain_objective=constrain_objective,

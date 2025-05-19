@@ -135,6 +135,7 @@ def cli():
     "--global-batch-size",
     type=int,
     help="Global batch size (includes multiplying by sequence length)",
+    required=False,
     default=None
 )
 @record
