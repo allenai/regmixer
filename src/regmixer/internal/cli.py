@@ -139,6 +139,20 @@ def cli():
     default=5.0,
     help="Max repetition factor for sources (applies to all sources)",
 )
+@click.option(
+    "--device-batch-size",
+    type=int,
+    help="Device batch size",
+    default=4
+)
+@click.option(
+    "-B",
+    "--global-batch-size",
+    type=int,
+    help="Global batch size (includes multiplying by sequence length)",
+    required=False,
+    default=None
+)
 def train(
     name: str,
     priority: Priority,
@@ -156,6 +170,8 @@ def train(
     seed: int,
     dtype: str,
     max_repetition: float,
+    device_batch_size: int,
+    global_batch_size: int,
 ):
     """Launch training run with the specified configuration properties."""
 
@@ -198,6 +214,8 @@ def train(
         dtype=NumpyDatasetDType[dtype],
         shared_filesystem=True,
         weka=True,
+        device_batch_size=device_batch_size,
+        global_batch_size=global_batch_size,
     )
 
     logger.info(experiment_config)

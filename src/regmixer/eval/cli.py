@@ -220,7 +220,14 @@ def cli():
     required=False,
     default=None,
 )
-
+@click.option(
+    "--keep-sources",
+    type=str,
+    multiple=True,
+    help="If set, we only use swarm runs that have nonzero weight on keep_sources for the regression.",
+    required=False,
+    default=None,
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -244,6 +251,7 @@ def fit(
     constrain_objective: bool ,
     obj_weights: Optional[str],
     temperature: Optional[float],
+    keep_sources: Optional[list[str]],
 ):
 
     output_dir = get_output_dir(experiment_groups)
@@ -284,6 +292,8 @@ def fit(
         eval_config["obj_weights"] = obj_weights
     if temperature is not None:
         eval_config["temperature"] = temperature
+    if keep_sources is not None:
+        eval_config["keep_sources"] = keep_sources
 
     output_dir = save_eval_config(eval_config, output_dir)
 
@@ -378,6 +388,14 @@ def fit(
 
     if len(ratios[ratios.columns[3:]]) > len(ratios):
         raise ValueError("The number of swarm runs is fewer than the number of mixing sources.")
+    
+    if keep_sources is not None:
+        old_len = len(ratios)
+        other_columns = list(set(ratios.columns[3:]).difference(set(keep_sources)))
+        ratios = ratios[ratios[list(keep_sources)].ne(0).all(axis=1) &  # all specified columns nonzero
+            ratios[other_columns].eq(0).all(axis=1)  ]
+        logger.info(f"Filtered out {old_len - len(ratios)} runs that were not only on {keep_sources}")
+        metrics = metrics[metrics['name'].isin(ratios['name'])]
 
     # X = Domain weights
     X_train = ratios[ratios.columns[3:]].values

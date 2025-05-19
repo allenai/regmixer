@@ -24,14 +24,16 @@ def cli():
 @click.option("-t", "--partition-type", type=str, default="topic", help="Whether partitioned by topic or format")
 @click.option("-s", "--source-file", required=True, type=str, help="Path to source file (json containing regmix weights)")
 @click.option("-d", "--dest-file", required=True, type=str, help="Path to destination file (yaml containing source mixture, input to rmc-internal)")
+@click.option("-r", "--reference-file", type=str, default="src/regmixer/internal/config/natural-larger-sample.yaml", help="Path to reference file (yaml containing source mixture, input to rmc-internal)")
 def convert(
     partition_type: str,
     source_file: str,
     dest_file: str,
+    reference_file: Optional[str],
 ):
 
     if partition_type == "topic":
-        with open(f"src/regmixer/internal/config/natural-larger-sample.yaml", "r") as f:
+        with open(reference_file, "r") as f:
             base_config = yaml.safe_load(f)
     else:
         raise NotImplementedError("Only topic partitioning is supported at this time")
