@@ -99,9 +99,11 @@ def mk_instance_cmd(
         f"-m {config.proxy_model_id}",
         f"-w {config.weka}",
         f"-y {config.train_type.value}",
-        f"-b {config.device_batch_size}",
-        f"-B {config.global_batch_size}",
+        f"-b {config.device_batch_size}"
     ]
+
+    if config.global_batch_size:
+        cmd_list.append(f"-B {config.global_batch_size}")
 
     if config.checkpoint_path:
         cmd_list.append(f"-C {config.checkpoint_path}")
