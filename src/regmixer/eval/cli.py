@@ -363,6 +363,7 @@ def fit(
                 history=run.samples,
                 samples=num_samples,
                 metrics=(eval_metric_group_name, eval_metric_group.value),
+                display_name=run.display_name,
                 average=group_average != None,
             ),
         }

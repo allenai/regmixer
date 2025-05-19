@@ -19,6 +19,7 @@ from wandb.apis.public import Run
 import hashlib 
 import os 
 import yaml
+import boto3
 
 from cookbook.aliases import ExperimentConfig as CookbookExperimentConfig
 from cookbook.utils.data import get_token_counts_and_ratios
@@ -197,7 +198,6 @@ class SimulationProposer(Proposer):
 
         best_weights = np.zeros(len(prior_distributions))
 
-        breakpoint()
         if constrain_objective:
             assert final_cookbook_path is not None, "final_cookbook_path must be set to determine how to construct swarm to be unconstrained."
 
@@ -615,23 +615,85 @@ def mk_run_metrics(
     history,
     samples: int,
     metrics: Tuple[str, list[str]],
+    display_name: str,
     average: bool = False,
 ) -> dict[str, float]:
     df = pd.DataFrame(history)
     results = {}
     group_name, group_metrics = metrics
+    in_loop_tasks = df.columns.tolist()
+    offline_tasks = list(set(group_metrics) - set(in_loop_tasks))
+    in_loop_tasks = list(set(in_loop_tasks).intersection(set(group_metrics)))
 
     if average:
+        raise NotImplementedError("Averaging the task is implemented but out of date!")
         result = np.mean(
             [df.loc[:, metric_name].tail(samples).mean() for metric_name in group_metrics]
         )
 
         results[group_name] = result
     else:
-        for metric_name in group_metrics:
+        for metric_name in in_loop_tasks:
             results[metric_name] = df.loc[:, metric_name].tail(samples).mean()
 
+        if len(offline_tasks) > 0:
+            # need to obtain offline results
+            offline_results = get_offline_evals(display_name, offline_tasks)
+            results.update(offline_results)
+
     return results
+
+
+def get_offline_evals(display_name, tasks, dashboard="regmixer"):
+    bucket = 'ai2-llm'
+    prefix = f'evaluation/{dashboard}/{display_name}'
+
+    s3 = boto3.client('s3')
+
+    # Get list of all files under the prefix
+    paginator = s3.get_paginator('list_objects_v2')
+    pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+
+    json_files = []
+    jsonl_files = []
+
+    for page in pages:
+        for obj in page.get('Contents', []):
+            key = obj['Key']
+            if not key.endswith('/'):
+                if key.endswith('.jsonl'):
+                    jsonl_files.append(key)
+                elif key.endswith('.json'):
+                    json_files.append(key)
+
+    all_jsonl_data = []
+
+    for key in jsonl_files:
+        if key.endswith("metrics-all.jsonl"):
+            obj = s3.get_object(Bucket=bucket, Key=key)
+            for line in obj['Body'].iter_lines():
+                if line:
+                    try:
+                        data = json.loads(line.decode('utf-8'))
+                        all_jsonl_data.append(data)
+                    except json.JSONDecodeError as e:
+                        print(f"Error decoding JSON line in {key}: {e}")
+            
+    offline_results = {}
+    for task in tasks:
+        task_data = [data for data in all_jsonl_data if data['task_config']['metadata']['alias'] == task]
+        if len(task_data) == 0:
+            raise ValueError(f"Task {task} not found in JSONL data.")
+        data = task_data[0]
+        if 'bits_per_byte_corr' in data['metrics']:
+            offline_results[data['task_config']['metadata']['alias']] = data['metrics']['bits_per_byte_corr']
+        elif 'bits_per_byte_corr_macro' in data['metrics']:
+            offline_results[data['task_config']['metadata']['alias']] = data['metrics']['bits_per_byte_corr_macro']
+        else:
+            raise ValueError(f"{data['task_name']} does not have bits_per_byte_corr or bits_per_byte_corr_macro in metrics {data['metrics'].keys()}.")
+            
+    return offline_results
+
 
 
 def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
