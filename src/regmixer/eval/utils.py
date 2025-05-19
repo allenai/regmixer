@@ -168,7 +168,7 @@ class SimulationProposer(Proposer):
     def propose(self,
         index: int,
         predictor: list[Regressor],
-        prior_distributions: np.ndarray,
+        prior_distributions: dict,
         num_samples: int = 1_000_000,
         seed: int = 1337,
         search_iterations: int = 10,
@@ -187,7 +187,7 @@ class SimulationProposer(Proposer):
         max_dirichlet = 100
         search_dirichlet_factor = 2.0
 
-        search_prior = prior_distributions
+        search_prior = np.array(list(prior_distributions.values()))
 
         
         if temperature is not None:
@@ -197,7 +197,7 @@ class SimulationProposer(Proposer):
 
         best_weights = np.zeros(len(prior_distributions))
 
-
+        breakpoint()
         if constrain_objective:
             assert final_cookbook_path is not None, "final_cookbook_path must be set to determine how to construct swarm to be unconstrained."
 
@@ -207,9 +207,12 @@ class SimulationProposer(Proposer):
             final_config = CookbookExperimentConfig(**data, path=final_cookbook_path)
             desired_tokens = final_config.max_tokens
 
-            logger.warning(f"Using hardcoded token counts!")
-            with open("cache/priors_cache_217af510306ab626a507634c64ca7ca8.json", "r") as f:
-                available_tokens_per_source = json.load(f)['token_counts']
+            token_universe = get_token_counts_and_ratios(
+                final_config.dataset.sources, final_config.dataset.dtype, True
+            )
+            available_tokens_per_source = {path: relative_size * token_universe[1] for path, relative_size in token_universe[0].items()}
+            # ensures that order of sources in simulations and in the constraint dictionary are aligned
+            available_tokens_per_source = {source: available_tokens_per_source[source] for source, _ in prior_distributions.items()}
 
 
         # Multi-step search leveraging iterative prior results
@@ -235,7 +238,7 @@ class SimulationProposer(Proposer):
             # Filter out invalid simulations from the population
             if temperature is None:
                 # keep this for reproducibility...
-                simulations = simulations[np.all(simulations <= 6.5 * prior_distributions, axis=1)]
+                simulations = simulations[np.all(simulations <= 6.5 * np.array(list(prior_distributions.values())), axis=1)]
 
             if constrain_objective:
                 original_simulation_size = len(simulations)
