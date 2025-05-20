@@ -163,6 +163,16 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
                 "export LOCAL_RANK=0",
                 "export RANK=0",
                 "export WORLD_SIZE=1",
+                # bind the rendez-vous server on this host
+                "export MASTER_ADDR=127.0.0.1",
+                # pick a free port at launch time
+                "export MASTER_PORT=$(python - <<'PY'\n"
+                "import socket,contextlib; "
+                "with contextlib.closing(socket.socket()) as s: "
+                "    s.bind(('',0)); print(s.getsockname()[1])\n"
+                "PY)",
+                # (optional) keep the job on a single GPU even if eight are visible
+                "export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}",
             ],
         )
         for experiment in group.instances
