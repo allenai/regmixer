@@ -160,6 +160,7 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
                 "mkdir -p ~/.aws",
                 "printenv AWS_CONFIG > ~/.aws/config",
                 "printenv AWS_CREDENTIALS > ~/.aws/credentials",
+                "export OLMO_LOCAL_RANK_ENV_VAR=0",
             ],
         )
         for experiment in group.instances
