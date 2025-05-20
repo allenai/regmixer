@@ -161,6 +161,8 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
                 "printenv AWS_CONFIG > ~/.aws/config",
                 "printenv AWS_CREDENTIALS > ~/.aws/credentials",
                 "export LOCAL_RANK=0",
+                "expert RANK=0",
+                "export WORLD_SIZE=1",
             ],
         )
         for experiment in group.instances
