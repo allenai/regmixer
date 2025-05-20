@@ -167,11 +167,16 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
                 "export MASTER_ADDR=127.0.0.1",
                 # pick a free port at launch time
                 "export MASTER_PORT=$(python - <<'PY'\n"
-                "import socket,contextlib; "
-                "with contextlib.closing(socket.socket()) as s: "
-                "    s.bind(('',0)); print(s.getsockname()[1])\n"
+                "import socket, contextlib, sys\n"
+                "with contextlib.closing(socket.socket()) as s:\n"
+                "    s.bind(('', 0))              # ask the kernel for any free port\n"
+                "    sys.stdout.write(str(s.getsockname()[1]))\n"
                 "PY)",
-                # (optional) keep the job on a single GPU even if eight are visible
+                # 2) tell the single process how to rendez-vous
+                "export MASTER_ADDR=127.0.0.1",
+                # 3) standard single-process values
+                "export WORLD_SIZE=1 RANK=0 LOCAL_RANK=0",
+                # 4) keep the job on GPU 0 even if the box has more
                 "export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}",
             ],
         )
