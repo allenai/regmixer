@@ -120,6 +120,46 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
     if group.config.weka:
         weka_buckets.append(BeakerWekaBucket("oe-training-default", "/weka/oe-training-default"))
 
+
+    setup_steps = [
+        'git clone "$REPO_URL"',
+        "conda shell.bash activate base",
+        "cd regmixer",
+        'git checkout "$GIT_REF"',
+        "git submodule update --init --recursive",
+        "pip install -e '.[all]'",
+        # Temporary until they release a fix for 2.7.0
+        "pip install torch==2.7.0 torchaudio torchvision --index-url https://download.pytorch.org/whl/test/cu128",
+        "pip freeze",
+        # Move AWS credentials from env to relevant files
+        "mkdir -p ~/.aws",
+        "printenv AWS_CONFIG > ~/.aws/config",
+        "printenv AWS_CREDENTIALS > ~/.aws/credentials",
+    ]
+
+    if group.config.gpus == 1:
+        setup_steps += [
+            "export LOCAL_RANK=0",
+            "export RANK=0",
+            "export WORLD_SIZE=1",
+            # bind the rendez-vous server on this host
+            "export MASTER_ADDR=127.0.0.1",
+            # pick a free port at launch time
+            "export MASTER_PORT=$(python - <<'PY'\n"
+            "import socket, contextlib, sys\n"
+            "with contextlib.closing(socket.socket()) as s:\n"
+            "    s.bind(('', 0))              # ask the kernel for any free port\n"
+            "    sys.stdout.write(str(s.getsockname()[1]))\n"
+            "PY)",
+            # 2) tell the single process how to rendez-vous
+            "export MASTER_ADDR=127.0.0.1",
+            # 3) standard single-process values
+            "export WORLD_SIZE=1 RANK=0 LOCAL_RANK=0",
+            # 4) keep the job on GPU 0 even if the box has more
+            "export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}",
+        ]
+
+
     return [
         BeakerLaunchConfig(
             name=f"{experiment.name}",
@@ -144,22 +184,9 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
                 BeakerEnvSecret(name="AWS_CREDENTIALS", secret=f"{beaker_user}_AWS_CREDENTIALS"),
                 BeakerEnvSecret(name="R2_ENDPOINT_URL", secret="R2_ENDPOINT_URL"),
                 BeakerEnvSecret(name="WEKA_ENDPOINT_URL", secret="WEKA_ENDPOINT_URL"),
+                BeakerEnvSecret(name="GOOGLE_CLOUD_PROJECT", secret="GOOGLE_CLOUD_PROJECT")
             ],
-            setup_steps=[
-                'git clone "$REPO_URL"',
-                "conda shell.bash activate base",
-                "cd regmixer",
-                'git checkout "$GIT_REF"',
-                "git submodule update --init --recursive",
-                "pip install -e '.[all]'",
-                # Temporary until they release a fix for 2.7.0
-                "pip install torch==2.7.0 torchaudio torchvision --index-url https://download.pytorch.org/whl/test/cu128",
-                "pip freeze",
-                # Move AWS credentials from env to relevant files
-                "mkdir -p ~/.aws",
-                "printenv AWS_CONFIG > ~/.aws/config",
-                "printenv AWS_CREDENTIALS > ~/.aws/credentials",
-            ],
+            setup_steps=setup_steps,
         )
         for experiment in group.instances
     ]
