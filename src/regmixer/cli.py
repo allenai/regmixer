@@ -99,7 +99,7 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
                 spinner.ok("✔")
     else:
         mixes = mk_mixes(config, use_cache=(no_cache == False))
-
+        breakpoint()
         if click.confirm("Launch experiment with this set of mixtures?", default=False):
             with yaspin(text="Building experiment group...", color="yellow") as spinner:
                 launch_group = LaunchGroup(
