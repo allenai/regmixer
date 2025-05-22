@@ -147,7 +147,6 @@ def generate_weights_dirichlet(
     if not allow_repetition and weight_bounds:
         logger.info("Limiting candidates to within bounds, repetition is disabled...")
 
-    breakpoint()
     for _ in range(num_samples_out * ConfigDefaults.sample_multiplier):
         candidates = []
 
