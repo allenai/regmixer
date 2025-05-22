@@ -57,16 +57,24 @@ class ExperimentConfig(BaseModel):
     tokenizer: str
     proxy_model_id: str
     minimum_weight: Optional[float] = None
+    minimum_source_weight: Optional[float] = None
+    minimum_topic_weight: Optional[float] = None
     checkpoint_path: Optional[str] = None
     train_type: TrainType = TrainType.pretrain
     allow_repetition: bool = True
     dtype: NumpyDatasetDType = NumpyDatasetDType.uint32
     mix_temperature: float = 1.0
+    source_mix_temperature: float = 1.0
+    topic_mix_temperature: float = 1.0
     preemptible: bool = True
     shared_filesystem: bool = False
     weka: bool = False
     min_strength: float = 0.1 
     max_strength: float = 5.0
+    min_source_strength: float = 0.1
+    max_source_strength: float = 5.0
+    min_topic_strength: float = 0.1
+    max_topic_strength: float = 5.0
     nonzero_weight: Optional[list[str]] = None
     device_batch_size: int = 4
     global_batch_size: Optional[int] = None

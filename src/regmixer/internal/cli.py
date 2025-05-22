@@ -178,6 +178,7 @@ def train(
     with open(f"src/regmixer/internal/config/{sources_file}", "r") as f:
         config = yaml.safe_load(f)
 
+    # for proposed mixes, our mix is defined at the leaf level, so we can use a flat SourceConfig.
     sources = [
         SourceConfig(
             name=source["domain"],

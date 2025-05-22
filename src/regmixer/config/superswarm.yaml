@@ -1,0 +1,128 @@
+name: "olmo2-5xC-30m-superswarm"
+description: "OLMoE-mix-0824 30M @ 5xC scale, super swarm (with topic-partitioned DCLM)"
+budget: "ai2/oe-data"
+workspace: "ai2/dolma2"
+nodes: 1
+gpus: 8 # 1, 8
+variants: 1 #64 # 1, 5, 100
+preemptible: true
+max_tokens: 2_910_233_600
+allow_repetition: false 
+sequence_length: 4096
+seed: 42
+source_mix_temperature: 0.6 # more dense at source level
+topic_mix_temperature: 1.0 # sparser at topic level 
+minimum_weight: 0.0001
+minimum_source_weight: 0.0001
+minimum_topic_weight: 0.05
+min_source_strength: 0.1
+max_source_strength: 20
+min_topic_strength: 0.1
+max_topic_strength: 5
+proxy_model_id: "olmo_30m"
+tokenizer: "dolma2"
+weka: true
+dtype: "uint32"
+priority: urgent #high #normal, high
+cluster: ai2/saturn-cirrascale #ai2/saturn-cirrascale, ai2/neptune-cirrascale
+sources:
+  - name: proofpile-2-stack
+    paths:
+      - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/algebraic-stack/train/allenai/dolma2-tokenizer/*.npy
+  - name: proofpile-2-arxiv
+    paths:
+      - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/dolma2-tokenizer/*.npy
+  - name: proofpile-2-open-web-math
+    paths:
+      - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/open-web-math/train/allenai/dolma2-tokenizer/*.npy
+  - name: pes2o
+    paths:
+      - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+  - name: starcoder
+    paths:
+      - s3://ai2-llm/preprocessed/starcoder/v1-decon-100_to_20k-2star-top_token_030/allenai/dolma2-tokenizer/*.npy
+  - name: wikipedia
+    paths:
+      - s3://ai2-llm/preprocessed/olmo-mix/danyh-compiled-v1_7/documents/wiki/allenai/dolma2-tokenizer/*.npy
+  - name: dclm
+    topics:
+      - name: adult_content
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/adult_content/dolma2-tokenizer/*.npy
+      - name: art_and_design
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/art_and_design/dolma2-tokenizer/*.npy
+      - name: software_development
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software_development/dolma2-tokenizer/*.npy
+      - name: education_and_jobs
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/education_and_jobs/dolma2-tokenizer/*.npy
+      - name: electronics_and_hardware
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/electronics_and_hardware/dolma2-tokenizer/*.npy
+      - name: entertainment
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/entertainment/dolma2-tokenizer/*.npy
+      - name: crime_and_law
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/crime_and_law/dolma2-tokenizer/*.npy
+      - name: social_life
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/social_life/dolma2-tokenizer/*.npy
+      - name: fashion_and_beauty
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/fashion_and_beauty/dolma2-tokenizer/*.npy
+      - name: finance_and_business
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/finance_and_business/dolma2-tokenizer/*.npy
+      - name: food_and_dining
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/food_and_dining/dolma2-tokenizer/*.npy
+      - name: games
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/games/dolma2-tokenizer/*.npy
+      - name: health
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/health/dolma2-tokenizer/*.npy
+      - name: history_and_geography
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/history_and_geography/dolma2-tokenizer/*.npy
+      - name: home_and_hobbies
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/home_and_hobbies/dolma2-tokenizer/*.npy
+      - name: industrial
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/industrial/dolma2-tokenizer/*.npy
+      - name: literature
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/literature/dolma2-tokenizer/*.npy
+      - name: politics
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/politics/dolma2-tokenizer/*.npy
+      - name: religion
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/religion/dolma2-tokenizer/*.npy
+      - name: science_math_and_technology
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/science_math_and_technology/dolma2-tokenizer/*.npy
+      - name: software
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software/dolma2-tokenizer/*.npy
+      - name: sports_and_fitness
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/sports_and_fitness/dolma2-tokenizer/*.npy
+      - name: transportation
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/transportation/dolma2-tokenizer/*.npy
+      - name: travel_and_tourism
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/travel_and_tourism/dolma2-tokenizer/*.npy
+nonzero_weight: # density at source level 
+  - proofpile-2-stack
+  - proofpile-2-arxiv
+  - proofpile-2-open-web-math
+  - pes2o
+  - starcoder
+  - dclm
+  - wikipedia
