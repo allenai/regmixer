@@ -292,7 +292,7 @@ def fit(
         eval_config["obj_weights"] = obj_weights
     if temperature is not None:
         eval_config["temperature"] = temperature
-    if keep_sources is not None:
+    if len(keep_sources) != 0:
         eval_config["keep_sources"] = keep_sources
 
     output_dir = save_eval_config(eval_config, output_dir)
@@ -389,13 +389,14 @@ def fit(
     if len(ratios[ratios.columns[3:]]) > len(ratios):
         raise ValueError("The number of swarm runs is fewer than the number of mixing sources.")
     
-    if keep_sources is not None:
+    if len(keep_sources) != 0:
         old_len = len(ratios)
         other_columns = list(set(ratios.columns[3:]).difference(set(keep_sources)))
         ratios = ratios[ratios[list(keep_sources)].ne(0).all(axis=1) &  # all specified columns nonzero
             ratios[other_columns].eq(0).all(axis=1)  ]
         logger.info(f"Filtered out {old_len - len(ratios)} runs that were not only on {keep_sources}")
         metrics = metrics[metrics['name'].isin(ratios['name'])]
+        ratios.drop(columns=other_columns, inplace=True)
 
     # X = Domain weights
     X_train = ratios[ratios.columns[3:]].values
@@ -543,7 +544,11 @@ def fit(
 
     if n_test == 0:
         metric, weights = results[-1]
-        predicted_performance = np.array([p.predict(weights[None])[0] for p in predictors]).mean()
+        if obj_weights is not None:
+            predictions = [p.predict(weights[None])[0] for p in predictors]
+            predicted_performance = np.average(predictions, axis=0, weights=obj_weights)
+        else:
+            predicted_performance = np.array([p.predict(weights[None])[0] for p in predictors]).mean()
         logger.info(f"Metric: {metric}. Predicted performance using regression model: {predicted_performance}")
 
         with open(f"{output_dir}/predicted_performance.json", "w") as f:
