@@ -32,151 +32,6 @@ class ConfigDefaults:
     maximum_repetition: int = 5
     minimum_weight: float = 2e-3  # 0.002
 
-
-def generate_weights_dirichlet(
-    domains: list[str],
-    prior_dist: np.ndarray,
-    minimum_weight: float,
-    num_samples_out: int,
-    temperature: float,
-    min_strength: float, 
-    max_strength: float,
-    max_tokens: int,
-    source_tokens: int,
-    allow_repetition: bool,
-    enable_bound: bool = True,
-    nonzero_weight: Optional[list[str]] = None
-):
-    """
-    Generate weights for each domain group using a dirichlet distribution.
-    """
-
-    token_scale = source_tokens / max_tokens
-    logger.info(f"Source token population is {token_scale:.2f}:1 target population.")
-
-    collected_samples: list[Tuple[np.ndarray, np.ndarray]] = []
-    weight_bounds = None
-
-    if enable_bound:
-        weight_bounds = [
-            (0.0, min(prior_dist[idx] * token_scale, 1.0)) for idx in range(len(prior_dist))
-        ]
-        grouped_bounds = {domain: weight_bounds[idx] for idx, domain in enumerate(domains)}
-        logger.info("Weight bounds:")
-        logger.info(grouped_bounds)
-
-
-
-    if temperature < 1.0:
-        prior_dist_temp = prior_dist**temperature
-        prior_dist_temp = prior_dist_temp / np.sum(prior_dist_temp)
-        logger.info(f"Prior distribution after temperature scaling: {prior_dist_temp}")
-    else:
-        prior_dist_temp = prior_dist
-
-    if not allow_repetition and weight_bounds:
-        logger.info("Limiting candidates to within bounds, repetition is disabled...")
-
-    for _ in range(num_samples_out * ConfigDefaults.sample_multiplier):
-        candidates = []
-        if min_strength == max_strength:
-            candidates.append(np.random.dirichlet(prior_dist_temp * min_strength, 1))
-        else:
-            min_strength_log = np.log10(min_strength)
-            max_strength_log = np.log10(max_strength)
-            for strength in np.logspace(min_strength_log, max_strength_log, 15):
-                samples_per_strength = np.random.dirichlet(prior_dist_temp * strength, 1)
-                candidates.append(samples_per_strength)
-
-        filtered_candidates = []
-
-        # If we don't allow repetition, we need to filter out candidates that are outside the bounds
-        if weight_bounds and not allow_repetition:
-            filtered_candidates = [
-                sample
-                for sample in candidates
-                if all(
-                    lower <= sample[0][idx] <= upper
-                    for idx, (lower, upper) in enumerate(weight_bounds)
-                )
-            ]
-        else:
-            filtered_candidates = candidates
-
-        if nonzero_weight:
-            nonzero_domains = [domains.index(d) for d in nonzero_weight]
-            filtered_candidates = [sample for sample in filtered_candidates if all(sample[0][idx] > minimum_weight for idx in nonzero_domains)]
-
-        if not filtered_candidates:
-            continue
-
-        candidates = random.choice(filtered_candidates)
-        candidates = np.where(candidates < minimum_weight, 0, candidates)
-        candidates = candidates / np.sum(candidates).reshape(-1, 1)
-        candidates = np.round(candidates / minimum_weight) * minimum_weight
-        candidates = candidates / np.sum(candidates)
-
-        if weight_bounds and not allow_repetition:
-            # need to check for out-of-bounds candidates again, in case normalization caused bounds to be violated.
-            if any(candidates[0][idx] < lower or candidates[0][idx] > upper for idx, (lower, upper), in enumerate(weight_bounds)):
-                continue
-
-        selected: Tuple[np.ndarray, np.ndarray] = (
-            candidates[0],
-            np.ones(candidates.shape[1]),
-        )
-
-        reject = False
-
-        if allow_repetition:
-            for idx, _ in enumerate(domains):
-                available_tokens = int(prior_dist[idx] * source_tokens)
-                required_tokens = int(selected[0][idx] * max_tokens)
-
-                repetition = (
-                    np.ceil(required_tokens / available_tokens * 1000) / 1000
-                    if available_tokens != 0
-                    else 0
-                )
-
-                if repetition > ConfigDefaults.maximum_repetition:
-                    reject = True
-                    break
-
-                selected[1][idx] = max(1, repetition)
-
-        if not reject:
-            collected_samples.append(selected)
-
-    if len(collected_samples) == 0:
-        raise ValueError("No valid samples were generated, please check the configuration!")
-
-    deduped = sort_and_deduplicate(collected_samples)
-
-    if len(collected_samples) < num_samples_out:
-        raise ValueError(
-            f"The number of collected samples '{len(collected_samples)}' is less than the required number of samples '{num_samples_out}'!"
-        )
-
-    selected_samples = random.sample(deduped, num_samples_out)
-    selected_samples = np.stack(selected_samples, axis=0)
-
-    logger.info(f"Number of nonzero domains per swarm run: ")
-    print([len(np.where(selected_samples[i][0] != 0)[0]) for i in range(len(selected_samples))])
-
-    all_diffs = []
-    for i in range(len(selected_samples)):
-        for j in range(i + 1, len(selected_samples)):
-            diff = np.linalg.norm(selected_samples[i][0] - selected_samples[j][0])
-            if diff < 0.01:
-                logger.info(f"Sample {i} and Sample {j} are too close to each other!")
-                logger.info(f"Sample {i}: {selected_samples[i][0]}")
-                logger.info(f"Sample {j}: {selected_samples[j][0]}")
-            all_diffs.append(diff)
-            
-    return selected_samples
-
-
 def clip_candidates_by_level(candidates, idx_to_level, minimum_source_weight, minimum_topic_weight):
     assert len(candidates[0]) == len(idx_to_level), f"Length mismatch: {len(candidates)} vs {len(idx_to_level)}"
     clipped = np.array(candidates)  # defensive copy
@@ -212,7 +67,7 @@ def sample_has_required_sources(sample_vector, domains, nonzero_sources, minimum
 
 
 
-def generate_weights_dirichlet_hierarchical(
+def generate_weights_dirichlet(
     sources: list[SourceConfig], # flat 
     source_dist: dict[str, float],
     minimum_source_weight: float,
@@ -473,7 +328,7 @@ def mk_mixtures(
     min_topic_strength = config.min_topic_strength if config.min_topic_strength else config.min_strength
     max_topic_strength = config.max_topic_strength if config.max_topic_strength else config.max_strength
 
-    mixtures = generate_weights_dirichlet_hierarchical(
+    mixtures = generate_weights_dirichlet(
         sources=sources,
         source_dist=source_dist,
         minimum_source_weight=minimum_source_weight,
@@ -491,20 +346,6 @@ def mk_mixtures(
         enable_bound=True,
         nonzero_weight=config.nonzero_weight,
     )
-
-    """mixtures = generate_weights_dirichlet(
-        domains=domains,
-        prior_dist=prior_dist,
-        minimum_weight=config.minimum_weight or ConfigDefaults.minimum_weight,
-        num_samples_out=num_samples,
-        temperature=config.mix_temperature,
-        min_strength=config.min_strength,
-        max_strength=config.max_strength,
-        allow_repetition=config.allow_repetition,
-        max_tokens=config.max_tokens,
-        source_tokens=source_total,
-        nonzero_weight=config.nonzero_weight,
-    )"""
 
     weight_maps = []
     for mix in mixtures:
