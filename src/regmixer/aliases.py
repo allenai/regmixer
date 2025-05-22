@@ -8,6 +8,7 @@ from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.launch.beaker import BeakerLaunchConfig
 from pydantic import BaseModel
 import pydantic
+from typing import List, Optional, Union
 
 PathType = Union[Path, PathLike[Any], str]
 
@@ -17,9 +18,16 @@ class TrainType(Enum):
     anneal = "anneal"
 
 
+class TopicConfig(BaseModel):
+    name: str
+    paths: List[str]
+    max_repetition_factor: float = 1.0
+    max_topic_ratio: float = 1.0
+
 class SourceConfig(BaseModel):
     name: str
-    paths: list[str]
+    paths: Optional[List[str]] = None
+    topics: Optional[List[TopicConfig]] = None
     max_repetition_factor: float = 1.0
     max_source_ratio: float = 1.0
 
