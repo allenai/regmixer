@@ -177,10 +177,46 @@ def generate_weights_dirichlet(
     return selected_samples
 
 
+def clip_candidates_by_level(candidates, idx_to_level, minimum_source_weight, minimum_topic_weight):
+    assert len(candidates[0]) == len(idx_to_level), f"Length mismatch: {len(candidates)} vs {len(idx_to_level)}"
+    clipped = np.array(candidates)  # defensive copy
+
+    for i, level in enumerate(idx_to_level):
+        if level == "source" and clipped[0][i] < minimum_source_weight:
+            clipped[0][i] = 0.0
+        elif level == "topic" and clipped[0][i] < minimum_topic_weight:
+            clipped[0][i] = 0.0
+
+    total = clipped.sum()
+    if total > 0:
+        clipped = clipped / total
+    else:
+        raise ValueError("All weights were clipped to zero.")
+
+    return clipped
+
+def sample_has_required_sources(sample_vector, domains, nonzero_sources, minimum_source_weight):
+    # Compute source-level sums
+    source_sums = defaultdict(float)
+
+    for idx, weight in enumerate(sample_vector):
+        domain = domains[idx]
+        if ':' in domain:
+            source = domain.split(':', 1)[0]
+        else:
+            source = domain
+        source_sums[source] += weight
+
+    return all(source_sums[source] > minimum_source_weight for source in nonzero_sources)
+
+
+
+
 def generate_weights_dirichlet_hierarchical(
     sources: list[SourceConfig], # flat 
     source_dist: dict[str, float],
-    minimum_weight: float,
+    minimum_source_weight: float,
+    minimum_topic_weight: float,
     num_samples_out: int,
     source_temperature: float,
     topic_temperature: float,
@@ -207,6 +243,8 @@ def generate_weights_dirichlet_hierarchical(
 
     prior_dist = np.array([v for _, v in source_dist.items()])
     domains = [k for k, _ in source_dist.items()]
+    source_names = [source.name for source in sources]
+    idx_to_level = ["source" if name in source_names else "topic" for name in source_dist]
 
     if enable_bound:
         # weight bounds are at the leaf level.
@@ -250,9 +288,6 @@ def generate_weights_dirichlet_hierarchical(
             topic_priors[source] = topic_prior
     else:
         topic_priors = deepcopy(topic_distributions)
-
-    breakpoint() 
-
 
     if not allow_repetition and weight_bounds:
         logger.info("Limiting candidates to within bounds, repetition is disabled...")
@@ -308,23 +343,31 @@ def generate_weights_dirichlet_hierarchical(
             filtered_candidates = candidates
 
         if nonzero_weight:
-            nonzero_domains = [
-                i for i, d in enumerate(domains)
-                if any(
-                    d == w or d.startswith(f"{w}:")
-                    for w in set(nonzero_weight)
-                )
+            source_names = set(nonzero_weight)
+            # Filter candidates
+            filtered_candidates = [
+                sample for sample in filtered_candidates
+                if sample_has_required_sources(sample[0], domains, source_names, minimum_source_weight)
             ]
-            filtered_candidates = [sample for sample in filtered_candidates if all(sample[0][idx] > minimum_weight for idx in nonzero_domains)]
 
         if not filtered_candidates:
             continue
 
         candidates = random.choice(filtered_candidates)
-        candidates = np.where(candidates < minimum_weight, 0, candidates)
-        candidates = candidates / np.sum(candidates).reshape(-1, 1)
-        candidates = np.round(candidates / minimum_weight) * minimum_weight
-        candidates = candidates / np.sum(candidates)
+
+
+        if minimum_source_weight == minimum_topic_weight:
+            candidates = np.where(candidates < minimum_source_weight, 0, candidates)
+            candidates = candidates / np.sum(candidates).reshape(-1, 1)
+            candidates = np.round(candidates / minimum_source_weight) * minimum_source_weight
+            candidates = candidates / np.sum(candidates)
+        else:
+            candidates = clip_candidates_by_level(
+                candidates,
+                idx_to_level,
+                minimum_source_weight,
+                minimum_topic_weight
+            )
 
         if weight_bounds and not allow_repetition:
             # need to check for out-of-bounds candidates again, in case normalization caused bounds to be violated.
@@ -420,14 +463,15 @@ def mk_mixtures(
     mixtures = generate_weights_dirichlet_hierarchical(
         sources=sources,
         source_dist=source_dist,
-        minimum_weight=config.minimum_weight or ConfigDefaults.minimum_weight,
+        minimum_source_weight=config.minimum_source_weight or ConfigDefaults.minimum_weight,
+        minimum_topic_weight=config.minimum_topic_weight or ConfigDefaults.minimum_weight,
         num_samples_out=num_samples,
-        source_temperature=config.mix_temperature,
-        topic_temperature=config.mix_temperature,
-        min_source_strength=config.min_strength,
-        max_source_strength=config.max_strength,
-        min_topic_strength=config.min_strength,
-        max_topic_strength=config.max_strength,
+        source_temperature=config.source_mix_temperature,
+        topic_temperature=config.topic_mix_temperature,
+        min_source_strength=config.min_source_strength,
+        max_source_strength=config.max_source_strength,
+        min_topic_strength=config.min_topic_strength,
+        max_topic_strength=config.max_topic_strength,
         allow_repetition=config.allow_repetition,
         max_tokens=config.max_tokens,
         source_tokens=source_total,
