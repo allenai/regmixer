@@ -292,6 +292,7 @@ def generate_weights_dirichlet_hierarchical(
     if not allow_repetition and weight_bounds:
         logger.info("Limiting candidates to within bounds, repetition is disabled...")
 
+    breakpoint()
     for _ in range(num_samples_out * ConfigDefaults.sample_multiplier):
         candidates = []
 
@@ -439,7 +440,7 @@ def mk_mixtures(
 
     num_samples = config.variants
     sources = config.sources
-    source_dist, source_total, source_tokens = calculate_priors_hierarchical(
+    source_dist, source_total, source_tokens = calculate_priors(
         sources, config.dtype, use_cache=use_cache
     )
     logger.info(f"Total tokens for config: {source_total:,}")
@@ -459,19 +460,31 @@ def mk_mixtures(
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
 
+    # convert single-level sampling params into topic/source level
+    minimum_source_weight = config.minimum_source_weight if config.minimum_source_weight else config.minimum_weight if config.minimum_weight else ConfigDefaults.minimum_weight
+    minimum_topic_weight = config.minimum_topic_weight if config.minimum_topic_weight else config.minimum_weight if config.minimum_weight else ConfigDefaults.minimum_weight
+
+    source_mix_temperature = config.source_mix_temperature if config.source_mix_temperature else config.mix_temperature
+    topic_mix_temperature = config.topic_mix_temperature if config.topic_mix_temperature else config.mix_temperature
+
+    min_source_strength = config.min_source_strength if config.min_source_strength else config.min_strength
+    max_source_strength = config.max_source_strength if config.max_source_strength else config.max_strength
+
+    min_topic_strength = config.min_topic_strength if config.min_topic_strength else config.min_strength
+    max_topic_strength = config.max_topic_strength if config.max_topic_strength else config.max_strength
 
     mixtures = generate_weights_dirichlet_hierarchical(
         sources=sources,
         source_dist=source_dist,
-        minimum_source_weight=config.minimum_source_weight or ConfigDefaults.minimum_weight,
-        minimum_topic_weight=config.minimum_topic_weight or ConfigDefaults.minimum_weight,
+        minimum_source_weight=minimum_source_weight,
+        minimum_topic_weight=minimum_topic_weight,
         num_samples_out=num_samples,
-        source_temperature=config.source_mix_temperature,
-        topic_temperature=config.topic_mix_temperature,
-        min_source_strength=config.min_source_strength,
-        max_source_strength=config.max_source_strength,
-        min_topic_strength=config.min_topic_strength,
-        max_topic_strength=config.max_topic_strength,
+        source_temperature=source_mix_temperature,
+        topic_temperature=topic_mix_temperature,
+        min_source_strength=min_source_strength,
+        max_source_strength=max_source_strength,
+        min_topic_strength=min_topic_strength,
+        max_topic_strength=max_topic_strength,
         allow_repetition=config.allow_repetition,
         max_tokens=config.max_tokens,
         source_tokens=source_total,
@@ -520,6 +533,27 @@ def _count_tokens_for_file(path: PathOrStr, dtype: NumpyDatasetDType) -> int:
     return _bytes_to_tokens(get_file_size(path), dtype)
 
 
+def count_tokens(paths: list[str], dtype: NumpyDatasetDType, fs) -> int:
+    """Helper to count tokens across a list of paths using glob expansion."""
+    total = 0
+    for path in paths:
+        matches = fs.glob(path)
+        for match in matches:
+            total += _count_tokens_for_file(f"s3://{match}", dtype)
+    return total
+
+
+def get_leaf_configs(source_config):
+    """Return a list of (name, paths) tuples representing the leaf nodes."""
+    if source_config.topics:
+        return [
+            (f"{source_config.name}:{topic.name}", topic.paths)
+            for topic in source_config.topics
+        ]
+    else:
+        return [(source_config.name, source_config.paths)]
+
+
 def calculate_priors(
     source_configs: list[SourceConfig], dtype: NumpyDatasetDType, use_cache: bool
 ) -> Tuple[dict[str, float], int, dict[str, int]]:
@@ -546,113 +580,7 @@ def calculate_priors(
     fs = s3fs.S3FileSystem(anon=False)
 
     token_counts = defaultdict(int)
-    # Count tokens in each source directory
-    with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-        future_to_source = {
-            executor.submit(
-                lambda sc: {
-                    sc.name: sum(
-                        executor.submit(
-                            lambda path: sum(
-                                _count_tokens_for_file(f"s3://{match}", dtype)
-                                for match in fs.glob(path)
-                            ),
-                            path,
-                        ).result()
-                        for path in sc.paths
-                    )
-                },
-                source_config,
-            ): source_config
-            for source_config in source_configs
-        }
-
-        for future in tqdm(
-            concurrent.futures.as_completed(future_to_source),
-            total=len(future_to_source),
-            desc="Counting source tokens",
-        ):
-            source_config = future_to_source[future]
-            try:
-                result = future.result()
-                token_counts.update(result)
-            except Exception as e:
-                logger.info(f"Error processing {source_config.name}: {str(e)}, exiting!")
-                raise e
-
-    # Calculate relative sizes
-    total_tokens = sum(token_counts.values())
-
-    token_counts = dict(sorted(token_counts.items()))
-
-    if total_tokens == 0:
-        raise Exception(f"Error processing config, no tokens found for sources!")
-
-    relative_sizes = {path: count / total_tokens for path, count in token_counts.items()}
-
-    if use_cache:
-        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-        with open(cache_path, "w") as f:
-            json.dump(
-                {
-                    "relative_sizes": relative_sizes,
-                    "total_tokens": total_tokens,
-                    "token_counts": token_counts,
-                },
-                f,
-            )
-
-    return (relative_sizes, total_tokens, token_counts)
-
-
-def count_tokens(paths: list[str], dtype: NumpyDatasetDType, fs) -> int:
-    """Helper to count tokens across a list of paths using glob expansion."""
-    total = 0
-    for path in paths:
-        matches = fs.glob(path)
-        for match in matches:
-            total += _count_tokens_for_file(f"s3://{match}", dtype)
-    return total
-
-
-def get_leaf_configs(source_config):
-    """Return a list of (name, paths) tuples representing the leaf nodes."""
-    if source_config.topics:
-        return [
-            (f"{source_config.name}:{topic.name}", topic.paths)
-            for topic in source_config.topics
-        ]
-    else:
-        return [(source_config.name, source_config.paths)]
-
-
-def calculate_priors_hierarchical(
-    source_configs: list[SourceConfig], dtype: NumpyDatasetDType, use_cache: bool
-) -> Tuple[dict[str, float], int, dict[str, int]]:
-    config_hash = hashlib.md5(
-        json.dumps(
-            [(sc.name, sc.paths) for sc in source_configs],
-            sort_keys=True,
-        ).encode("utf-8")
-    ).hexdigest()
-
-    pathlib.Path("cache/").mkdir(parents=True, exist_ok=True)
-    cache_path = pathlib.Path(f"cache/priors_cache_{config_hash}.json")
-    if use_cache:
-        try:
-            with open(cache_path, "r") as f:
-                logger.info(
-                    "Source distribution cache found, using cached values! This can be disabled by setting use_cache=False."
-                )
-                obj = json.load(f)
-                return (obj["relative_sizes"], obj["total_tokens"], obj["token_counts"])
-        except FileNotFoundError:
-            logger.info("No cache file found, calculating from source files...")
-
-    fs = s3fs.S3FileSystem(anon=False)
-
-    token_counts = defaultdict(int)
-    # Count tokens in each source directory
+    # Count tokens in each "leaf": the prior distribution is represented at the leaf level.
     leaf_configs = []
     for source_config in source_configs:
         leaf_configs.extend(get_leaf_configs(source_config))
