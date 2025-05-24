@@ -3,7 +3,7 @@ description: "Datadelve partitioned OLMocr PDF tokens @ 5xC"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
-gpus: 8
+gpus: 4
 variants: 24
 preemptible: true
 max_tokens: 2_910_233_600
@@ -74,3 +74,18 @@ sources:
   - name: science_tech
     paths:
       - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/science_tech/*.npy
+  - name: software_dev
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/software_dev/*.npy
+  - name: software
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/software/*.npy
+  - name: sports_fitness
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/sports_fitness/*.npy
+  - name: transportation
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/transportation/*.npy
+  - name: travel
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/travel/*.npy
