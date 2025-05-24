@@ -25,54 +25,91 @@ from regmixer.aliases import ExperimentConfig, SourceConfig
 
 
 class ConfigDefaults:
-    temp: float = 1.0
     min_strength: float = 0.1
     max_strength: float = 5.0
     sample_multiplier: int = 10
     maximum_repetition: int = 5
     minimum_weight: float = 2e-3  # 0.002
 
-def clip_candidates_by_level(candidates, idx_to_level, minimum_source_weight, minimum_topic_weight):
-    assert len(candidates[0]) == len(idx_to_level), f"Length mismatch: {len(candidates)} vs {len(idx_to_level)}"
-    clipped = np.array(candidates)  # defensive copy
 
-    for i, level in enumerate(idx_to_level):
-        if level == "source" and clipped[0][i] < minimum_source_weight:
-            clipped[0][i] = 0.0
-        elif level == "topic" and clipped[0][i] < minimum_topic_weight:
-            clipped[0][i] = 0.0
+def leaf_to_source(leaf_weights: np.ndarray, domains: list[str]) -> dict[str, float]:
+    """
+    Given a flat vector of weights at the leaf level (like 'dclm:math' or 'wikipedia'),
+    return a dict mapping each source to its total weight.
+    """
+    assert len(leaf_weights) == len(domains), "Vector and domain lengths must match"
+    source_dist = defaultdict(float)
+    for weight, domain in zip(leaf_weights, domains):
+        source = domain.split(':', 1)[0]  # supports both 'source' and 'source:topic'
+        source_dist[source] += weight
+    return dict(source_dist)
 
-    total = clipped.sum()
+
+def clip_candidates_by_level(
+    candidates,
+    idx_to_level,
+    domains,
+    minimum_source_weight,
+    minimum_topic_weight 
+):
+    assert len(candidates[0]) == len(idx_to_level), "Mismatch between weights and level types."
+
+    # get the weight per source 
+    source_totals = leaf_to_source(candidates[0], domains)
+
+    # we clip topics to be minimum_topic_weight * source_totals[source] (relative), and we clip sources to be minimum_source_weight (absolute)
+    for idx, level in enumerate(idx_to_level):
+        weight = candidates[0][idx]
+        domain = domains[idx]
+        source = domain.split(':', 1)[0] if ':' in domain else domain
+
+        if level == "source" and weight < minimum_source_weight:
+            candidates[0][idx] = 0.0
+        elif level == "topic":
+            threshold = minimum_topic_weight * source_totals[source]
+            if weight < threshold:
+                candidates[0][idx] = 0.0
+
+    # normalize
+    total = candidates.sum()
     if total > 0:
-        clipped = clipped / total
+        candidates /= total
     else:
         raise ValueError("All weights were clipped to zero.")
 
-    return clipped
+    return candidates
+
 
 def sample_has_required_sources(
     sample_vector,
     domains,
     nonzero_sources,
     minimum_source_weight,
-    minimum_topic_weight
+    minimum_topic_weight 
 ):
-    source_sums = defaultdict(float)
+    # Convert leaf-level weights to source and topic level weights
+    source_weights = leaf_to_source(sample_vector, domains)
+    topic_weights = defaultdict(list)  # source -> list of (idx, weight)
 
     for idx, weight in enumerate(sample_vector):
-        if weight < minimum_topic_weight:
-            continue  # clip this topic
-
         domain = domains[idx]
         source = domain.split(':', 1)[0] if ':' in domain else domain
-        source_sums[source] += weight
+        topic_weights[source].append((idx, weight))
 
+    # Only count topics that are above the minimum topic weight * source_weights[source] towards the source weight.
+    clipped_source_sums = defaultdict(float)
+    for source, topics in topic_weights.items():
+        total = source_weights[source]
+        threshold = minimum_topic_weight * total
+        for _, weight in topics:
+            if weight >= threshold:
+                clipped_source_sums[source] += weight
+
+    # Check that all nonzero sources pass threshold
     return all(
-        source_sums[source] > minimum_source_weight
+        clipped_source_sums[source] > minimum_source_weight
         for source in nonzero_sources
     )
-
-
 
 
 def generate_weights_dirichlet(
@@ -91,6 +128,7 @@ def generate_weights_dirichlet(
     available_tokens: int,
     allow_repetition: bool,
     manual_prior: Optional[dict[str, float]],
+    sample_multiplier: Optional[int],
     enable_bound: bool = True,
     nonzero_weight: Optional[list[str]] = None
 ):
@@ -106,6 +144,7 @@ def generate_weights_dirichlet(
 
 
     prior_dist = np.array([v for _, v in leaf_dist.items()])
+    logger.info(f"Dimension of leaf-level distribution: {len(prior_dist)}")
     domains = [k for k, _ in leaf_dist.items()]
     source_names = [source.name for source in sources]
     idx_to_level = ["source" if name in source_names else "topic" for name in leaf_dist]
@@ -167,7 +206,8 @@ def generate_weights_dirichlet(
     if not allow_repetition and weight_bounds:
         logger.info("Limiting candidates to within bounds, repetition is disabled...")
 
-    for _ in range(num_samples_out * ConfigDefaults.sample_multiplier):
+    sample_multiplier = sample_multiplier if sample_multiplier else ConfigDefaults.sample_multiplier
+    for _ in tqdm(range(num_samples_out * sample_multiplier)):
         candidates = []
 
         # first, generate source-level weights
@@ -225,6 +265,7 @@ def generate_weights_dirichlet(
             ]
 
         if not filtered_candidates:
+            # logger.warning("No candidates left after filtering according to weight bounds and nonzero weights!")
             continue
 
         candidates = random.choice(filtered_candidates)
@@ -239,6 +280,7 @@ def generate_weights_dirichlet(
             candidates = clip_candidates_by_level(
                 candidates,
                 idx_to_level,
+                domains,
                 minimum_source_weight,
                 minimum_topic_weight
             )
@@ -254,7 +296,6 @@ def generate_weights_dirichlet(
         )
 
         reject = False
-
         if allow_repetition:
             for idx, _ in enumerate(domains):
                 available_tokens = int(prior_dist[idx] * available_tokens)
@@ -278,7 +319,11 @@ def generate_weights_dirichlet(
     if len(collected_samples) == 0:
         raise ValueError("No valid samples were generated, please check the configuration!")
 
-    deduped = sort_and_deduplicate(collected_samples)
+    if len(collected_samples) > 10000:
+        # when we have a lot of samples, regular sort_and_deduplicate is O(n^2) and takes too long
+        deduped = sort_and_deduplicate_with_hash(collected_samples)
+    else:
+        deduped = sort_and_deduplicate(collected_samples)
 
     if len(collected_samples) < num_samples_out:
         raise ValueError(
@@ -363,7 +408,8 @@ def mk_mixtures(
         available_tokens=available_tokens,
         enable_bound=True,
         nonzero_weight=config.nonzero_weight,
-        manual_prior=config.manual_prior
+        manual_prior=config.manual_prior,
+        sample_multiplier=config.sample_multiplier
     )
 
     weight_maps = []
@@ -496,12 +542,36 @@ def sort_and_deduplicate(
     Remove identical configs to avoid duplicated training.
     """
     unique_samples = []
-    for sample in samples:
+    for sample in tqdm(samples):
         is_duplicate = any(
             np.allclose(sample[0], unique_sample[0], atol=threshold)
             for unique_sample in unique_samples
         )
         if not is_duplicate:
+            unique_samples.append(sample)
+
+    logger.info(
+        f"Filtered {len(samples) - len(unique_samples)} duplicate distributions from candidate pool..."
+    )
+    return unique_samples
+
+
+
+def sort_and_deduplicate_with_hash(
+    samples: list[Tuple[np.ndarray, np.ndarray]], threshold=1e-5
+) -> list[Tuple[np.ndarray, np.ndarray]]:
+    """
+    Remove near-identical configs efficiently to avoid duplicated training.
+    """
+    unique_samples = []
+    seen_hashes = set()
+
+    for sample in tqdm(samples):
+        vec = sample[0]
+        rounded = tuple(np.round(vec / threshold).astype(int))
+
+        if rounded not in seen_hashes:
+            seen_hashes.add(rounded)
             unique_samples.append(sample)
 
     logger.info(
