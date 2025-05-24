@@ -1,16 +1,16 @@
-name: "olmo2-5xC-30m-superswarm"
+name: "5xC-30m-superswarm"
 description: "OLMoE-mix-0824 30M @ 5xC scale, super swarm (with topic-partitioned DCLM)"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
 gpus: 8 # 1, 8
-variants: 1 #64 # 1, 5, 100
+variants: 8 #64 # 1, 5, 100
 preemptible: true
 max_tokens: 2_910_233_600
 allow_repetition: false 
 sequence_length: 4096
 seed: 42
-source_mix_temperature: 0.6 # more dense at source level
+source_mix_temperature: 1.0 # more dense at source level
 topic_mix_temperature: 1.0 # sparser at topic level 
 minimum_weight: 0.0001
 minimum_source_weight: 0.0001
@@ -126,3 +126,12 @@ nonzero_weight: # density at source level
   - starcoder
   - dclm
   - wikipedia
+manual_prior:
+  proofpile-2-stack: 0.1
+  proofpile-2-arxiv: 0.1
+  proofpile-2-open-web-math: 0.1
+  pes2o: 0.1
+  starcoder: 0.1
+  wikipedia: 0.1
+  dclm: 0.4
+  
