@@ -1,5 +1,5 @@
 name: "5xC-30m-superswarm"
-description: "OLMoE-mix-0824 30M @ 5xC scale, super swarm (with topic-partitioned DCLM)"
+description: "30M @ 5xC superswarm across sources (finemath-3plus, arxiv, pes2o, wikipedia, dclm, s2pdf, stack-edu) and topics (for dclm, s2pdf, and stack-edu)"
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
