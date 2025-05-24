@@ -50,26 +50,34 @@ def clip_candidates_by_level(candidates, idx_to_level, minimum_source_weight, mi
 
     return clipped
 
-def sample_has_required_sources(sample_vector, domains, nonzero_sources, minimum_source_weight):
-    # Compute source-level sums
+def sample_has_required_sources(
+    sample_vector,
+    domains,
+    nonzero_sources,
+    minimum_source_weight,
+    minimum_topic_weight
+):
     source_sums = defaultdict(float)
 
     for idx, weight in enumerate(sample_vector):
+        if weight < minimum_topic_weight:
+            continue  # clip this topic
+
         domain = domains[idx]
-        if ':' in domain:
-            source = domain.split(':', 1)[0]
-        else:
-            source = domain
+        source = domain.split(':', 1)[0] if ':' in domain else domain
         source_sums[source] += weight
 
-    return all(source_sums[source] > minimum_source_weight for source in nonzero_sources)
+    return all(
+        source_sums[source] > minimum_source_weight
+        for source in nonzero_sources
+    )
 
 
 
 
 def generate_weights_dirichlet(
     sources: list[SourceConfig], # flat 
-    source_dist: dict[str, float],
+    leaf_dist: dict[str, float],
     minimum_source_weight: float,
     minimum_topic_weight: float,
     num_samples_out: int,
@@ -80,8 +88,9 @@ def generate_weights_dirichlet(
     min_topic_strength: float,
     max_topic_strength: float,
     max_tokens: int,
-    source_tokens: int,
+    available_tokens: int,
     allow_repetition: bool,
+    manual_prior: Optional[dict[str, float]],
     enable_bound: bool = True,
     nonzero_weight: Optional[list[str]] = None
 ):
@@ -89,20 +98,20 @@ def generate_weights_dirichlet(
     Generate weights for each domain group using a dirichlet distribution.
     """
 
-    token_scale = source_tokens / max_tokens
+    token_scale = available_tokens / max_tokens
     logger.info(f"Source token population is {token_scale:.2f}:1 target population.")
 
     collected_samples: list[Tuple[np.ndarray, np.ndarray]] = []
     weight_bounds = None
 
 
-    prior_dist = np.array([v for _, v in source_dist.items()])
-    domains = [k for k, _ in source_dist.items()]
+    prior_dist = np.array([v for _, v in leaf_dist.items()])
+    domains = [k for k, _ in leaf_dist.items()]
     source_names = [source.name for source in sources]
-    idx_to_level = ["source" if name in source_names else "topic" for name in source_dist]
+    idx_to_level = ["source" if name in source_names else "topic" for name in leaf_dist]
 
     if enable_bound:
-        # weight bounds are at the leaf level.
+        # weight bounds are at the leaf level and computed using the number of available tokens per source/topic.
         weight_bounds = [
             (0.0, min(prior_dist[idx] * token_scale, 1.0)) for idx in range(len(prior_dist))
         ]
@@ -116,22 +125,32 @@ def generate_weights_dirichlet(
     source_distribution = []
     for source_config in sorted(sources, key=lambda x: x.name):
         if source_config.topics:
-            weights = np.array([source_dist[f"{source_config.name}:{topic.name}"] for topic in source_config.topics])
+            # this source has topics 
+            weights = np.array([leaf_dist[f"{source_config.name}:{topic.name}"] for topic in source_config.topics])
             normalized_weights = weights / weights.sum()
             topic_distributions[source_config.name] = normalized_weights 
-            source_distribution.append(weights.sum())
+
+            if manual_prior is not None and source_config.name in manual_prior:
+                source_distribution.append(manual_prior[source_config.name])
+            else:
+                source_distribution.append(weights.sum())
         else:
+            # this source does not have topics 
             topic_distributions[source_config.name] = np.array([1.0])
-            source_distribution.append(source_dist[source_config.name])
+            if manual_prior is not None and source_config.name in manual_prior:
+                source_distribution.append(manual_prior[source_config.name])
+            else:
+                source_distribution.append(leaf_dist[source_config.name])
 
     source_distribution = np.array(source_distribution)
     source_distribution /= source_distribution.sum()
 
-
+    logger.info(f"Source prior: {source_distribution}")
+    logger.info(f"Topic prior: {topic_distributions}")
     if source_temperature < 1.0:
         source_prior = source_distribution**source_temperature
         source_prior = source_prior / np.sum(source_prior)
-        logger.info(f"Source prior distribution after temperature scaling: {source_prior}")
+        logger.info(f"Source prior after temperature scaling: {source_prior}")
     else:
         source_prior = source_distribution
 
@@ -141,6 +160,7 @@ def generate_weights_dirichlet(
             topic_prior = topic_prior**topic_temperature
             topic_prior = topic_prior / np.sum(topic_prior)
             topic_priors[source] = topic_prior
+        logger.info(f"Topic priors after temperature scaling: {topic_priors}")
     else:
         topic_priors = deepcopy(topic_distributions)
 
@@ -151,7 +171,6 @@ def generate_weights_dirichlet(
         candidates = []
 
         # first, generate source-level weights
-
         if min_source_strength == max_source_strength:
             source_samples = np.random.dirichlet(source_prior * min_source_strength, 1)
         else:
@@ -202,7 +221,7 @@ def generate_weights_dirichlet(
             # Filter candidates
             filtered_candidates = [
                 sample for sample in filtered_candidates
-                if sample_has_required_sources(sample[0], domains, source_names, minimum_source_weight)
+                if sample_has_required_sources(sample[0], domains, source_names, minimum_source_weight, minimum_topic_weight)
             ]
 
         if not filtered_candidates:
@@ -238,7 +257,7 @@ def generate_weights_dirichlet(
 
         if allow_repetition:
             for idx, _ in enumerate(domains):
-                available_tokens = int(prior_dist[idx] * source_tokens)
+                available_tokens = int(prior_dist[idx] * available_tokens)
                 required_tokens = int(selected[0][idx] * max_tokens)
 
                 repetition = (
@@ -294,22 +313,22 @@ def mk_mixtures(
 
     num_samples = config.variants
     sources = config.sources
-    source_dist, source_total, source_tokens = calculate_priors(
+    leaf_dist, available_tokens, leaf_tokens = calculate_priors(
         sources, config.dtype, use_cache=use_cache
     )
-    logger.info(f"Total tokens for config: {source_total:,}")
+    logger.info(f"Total tokens for config: {available_tokens:,}")
     logger.info(f"Using seed: {config.seed}")
 
     logger.info("Source distribution:")
-    logger.info(source_dist)
+    logger.info(leaf_dist)
     logger.info("Source tokens:")
 
-    source_tokens = {k: f"{v:,}" for k, v in source_tokens.items() if v > 0}
-    logger.info(source_tokens)
+    leaf_tokens = {k: f"{v:,}" for k, v in leaf_tokens.items() if v > 0}
+    logger.info(leaf_tokens)
 
-    source_items = list(source_dist.items())
-    prior_dist = [v for _, v in source_items]
-    domains = [k for k, _ in source_items]
+    leaf_items = list(leaf_dist.items())
+    prior_dist = [v for _, v in leaf_items]
+    domains = [k for k, _ in leaf_items]
 
     # renormalize the prior distribution
     prior_dist = prior_dist / np.sum(prior_dist)
@@ -329,7 +348,7 @@ def mk_mixtures(
 
     mixtures = generate_weights_dirichlet(
         sources=sources,
-        source_dist=source_dist,
+        leaf_dist=leaf_dist,
         minimum_source_weight=minimum_source_weight,
         minimum_topic_weight=minimum_topic_weight,
         num_samples_out=num_samples,
@@ -341,9 +360,10 @@ def mk_mixtures(
         max_topic_strength=max_topic_strength,
         allow_repetition=config.allow_repetition,
         max_tokens=config.max_tokens,
-        source_tokens=source_total,
+        available_tokens=available_tokens,
         enable_bound=True,
         nonzero_weight=config.nonzero_weight,
+        manual_prior=config.manual_prior
     )
 
     weight_maps = []
