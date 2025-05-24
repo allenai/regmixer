@@ -588,3 +588,52 @@ class ObjectiveWeights(Enum):
         'basic_skills_common_knowledge:rc::olmes': 0.05919216023553791,
         'eval/downstream/mmlu_other_test_rc_5shot (BPB)': 0.07852935589649764
     }
+
+    mbpp_dummy = {
+        #'eval/downstream/codex_mbpp_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/codex_humaneval_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_geometry_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_precalculus_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_intermediate_algebra_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_prealgebra_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_algebra_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_number_theory_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_counting_and_probability_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/gsm8k_gold_bpb_5shot (BPB)': 0,
+        'eval/downstream/mmlu_humanities_test_rc_5shot (BPB)': 0,
+        'eval/downstream/csqa_val_rc_5shot (BPB)': 0,
+        'eval/downstream/mmlu_stem_test_rc_5shot (BPB)': 0,
+        'eval/downstream/piqa_val_rc_5shot (BPB)': 0,
+        'eval/downstream/socialiqa_val_rc_5shot (BPB)': 0,
+        'eval/downstream/winogrande_val_rc_5shot (BPB)': 0,
+        'eval/downstream/hellaswag_rc_5shot (BPB)': 0,
+        'eval/downstream/arc_easy_test_rc_5shot (BPB)': 0,
+        'eval/downstream/mmlu_social_sciences_test_rc_5shot (BPB)': 0,
+        'eval/downstream/arc_challenge_test_rc_5shot (BPB)': 0,
+        'eval/downstream/mmlu_other_test_rc_5shot (BPB)': 0,
+    }
+
+    minerva_dummy = {
+        'eval/downstream/codex_mbpp_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/codex_humaneval_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_geometry_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_precalculus_gold_bpb_0shot (BPB)': 0,
+        #'eval/downstream/minerva_math_intermediate_algebra_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_prealgebra_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_algebra_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_number_theory_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/minerva_math_counting_and_probability_gold_bpb_0shot (BPB)': 0,
+        'eval/downstream/gsm8k_gold_bpb_5shot (BPB)': 0,
+        'eval/downstream/mmlu_humanities_test_rc_5shot (BPB)': 0,
+        'eval/downstream/csqa_val_rc_5shot (BPB)': 0,
+        'eval/downstream/mmlu_stem_test_rc_5shot (BPB)': 0,
+        'eval/downstream/piqa_val_rc_5shot (BPB)': 0,
+        'eval/downstream/socialiqa_val_rc_5shot (BPB)': 0,
+        'eval/downstream/winogrande_val_rc_5shot (BPB)': 0,
+        'eval/downstream/hellaswag_rc_5shot (BPB)': 0,
+        'eval/downstream/arc_easy_test_rc_5shot (BPB)': 0,
+        'eval/downstream/mmlu_social_sciences_test_rc_5shot (BPB)': 0,
+        'eval/downstream/arc_challenge_test_rc_5shot (BPB)': 0,
+        'eval/downstream/mmlu_other_test_rc_5shot (BPB)': 0,
+
+    }

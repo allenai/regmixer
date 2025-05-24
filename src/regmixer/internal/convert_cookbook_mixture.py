@@ -25,15 +25,17 @@ def cli():
 @click.option("-s", "--source-file", required=True, type=str, help="Path to source file (json containing regmix weights)")
 @click.option("-d", "--dest-file", required=True, type=str, help="Path to destination file (yaml containing source mixture, input to rmc-internal)")
 @click.option("-c", "--cookbook-path", required=False, type=str, help="Path to cookbook directory", default="../olmo-cookbook/")
+@click.option("-r", "--reference-file", type=str, default="../olmo-cookbook/src/cookbook/recipes/train-1b-v2-5xC-dclm-larger-natural.yaml", help="Path to reference file (yaml containing source mixture, input to rmc-internal)")
 def convert(
     partition_type: str,
     source_file: str,
     dest_file: str,
-    cookbook_path: str 
+    cookbook_path: str,
+    reference_file: str, 
 ):
 
     if partition_type == "topic":
-        with open(f"{cookbook_path}/src/cookbook/recipes/train-1b-v2-5xC-dclm-larger-natural.yaml", "r") as f:
+        with open(reference_file, "r") as f:
             base_config = yaml.safe_load(f)
     else:
         raise NotImplementedError("Only topic partitioning is supported at this time")
@@ -53,7 +55,7 @@ def convert(
         with open(f"{cookbook_path}/src/cookbook/recipes/{dest_file}.yaml", "w") as f:
             yaml.dump(base_config, f, sort_keys=False)
 
-        logger.info(f"Succesfsully converted mixture at {source_file} to source yaml at {dest_file}")
+        logger.info(f"Successfully converted mixture at {source_file} to source yaml at {dest_file}")
 
 
 if __name__ == "__main__":

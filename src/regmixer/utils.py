@@ -28,7 +28,7 @@ def config_from_path(config: Path) -> ExperimentConfig:
     return ExperimentConfig(**data)
 
 
-def mk_source_instances(
+"""def mk_source_instances(
     sources: list[SourceConfig], mix_map: dict[str, tuple[float, float]]
 ) -> list[SourceInstance]:
     # Note: We filter out any sources that have a weight of 0 so we don' try to build
@@ -42,7 +42,40 @@ def mk_source_instances(
             repetition_factor=mix_map[source.name][1],
         )
         for source in filtered_sources
-    ]
+    ]"""
+
+def mk_source_instances(
+    sources: list[SourceConfig], mix_map: dict[str, tuple[float, float]]
+) -> list[SourceInstance]:
+    instances = []
+
+    for source in sources:
+        if source.topics:
+            for topic in source.topics:
+                full_name = f"{source.name}:{topic.name}"
+                if full_name not in mix_map or mix_map[full_name][0] == 0:
+                    continue
+                instances.append(
+                    SourceInstance(
+                        name=full_name,
+                        paths=topic.paths,
+                        ratio=mix_map[full_name][0],
+                        repetition_factor=mix_map[full_name][1],
+                    )
+                )
+        else:
+            if source.name not in mix_map or mix_map[source.name][0] == 0:
+                continue
+            instances.append(
+                SourceInstance(
+                    name=source.name,
+                    paths=source.paths,
+                    ratio=mix_map[source.name][0],
+                    repetition_factor=mix_map[source.name][1],
+                )
+            )
+
+    return instances
 
 
 def mk_experiments(

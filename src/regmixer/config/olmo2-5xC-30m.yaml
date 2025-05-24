@@ -11,7 +11,7 @@ allow_repetition: false
 sequence_length: 4096
 seed: 42
 mix_temperature: 0.7
-minimum_weight: 0.0001
+minimum_weight: 0.01
 #min_strength: 1
 max_strength: 20
 proxy_model_id: "olmo_30m"
