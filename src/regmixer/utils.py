@@ -3,7 +3,7 @@ import logging
 import os
 from pathlib import Path
 from typing import List, Optional, Tuple
-
+from collections import defaultdict
 import yaml
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig, BeakerWekaBucket
@@ -254,11 +254,34 @@ def mk_mixes(
     from copy import deepcopy 
     display_mixes = deepcopy(mixes)
 
+    nested_mixes = []
     for mix in display_mixes:
-        keys_to_remove = [k for k, v in mix.items() if v[0] == 0]
-        for k in keys_to_remove:
-            mix.pop(k)
+        mix = {k: v for k, v in mix.items() if v[0] > 0}
 
-    logger.info(display_mixes)
+        # Organize into source → topic → weight
+        source_totals = defaultdict(float)
+        source_topics = defaultdict(dict)
+
+        for domain, (weight, _) in mix.items():
+            if ':' in domain:
+                source, topic = domain.split(':', 1)
+                source_totals[source] += weight
+                source_topics[source][topic] = weight
+            else:
+                source_totals[domain] += weight
+
+        # Combine into final nested structure
+        nested = {}
+        for source in source_totals:
+            if source in source_topics:
+                nested[source] = {
+                    'total': source_totals[source],
+                    'topics': source_topics[source]
+                }
+            else:
+                nested[source] = source_totals[source]
+
+        nested_mixes.append(nested)
+    logger.info(nested_mixes)
 
     return mixes
