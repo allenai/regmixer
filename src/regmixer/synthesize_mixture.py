@@ -421,8 +421,24 @@ def mk_mixtures(
         weight_maps.append(weight_map)
 
     for i in range(len(domains)):
-        weights = np.array([mix[0][i] for mix in mixtures])
-        logger.info(f"Domain {domains[i]}, min: {weights.min()}, max: {weights.max()}")
+        if ':' in domains[i]:
+            weights = np.array([mix[0][i] for mix in mixtures])
+            logger.info(f"Topic {domains[i]}, min: {weights.min()}, max: {weights.max()}")
+
+
+    source_to_indices = defaultdict(list)
+    for i, domain in enumerate(domains):
+        source = domain.split(':', 1)[0] 
+        source_to_indices[source].append(i)
+
+    for source, indices in source_to_indices.items():
+        source_weights = []
+        for mix in mixtures:
+            total = sum(mix[0][i] for i in indices)
+            source_weights.append(total)
+        source_weights = np.array(source_weights)
+        logger.info(f"Source {source}, min: {source_weights.min()}, max: {source_weights.max()}")
+
 
     return weight_maps
 

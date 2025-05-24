@@ -19,12 +19,12 @@ class DownstreamEvaluatorsSmall(Enum):
     # "openbookqa_test_rc_5shot",
 
     # BASIC_SKILLS RC
-    #BASIC_SKILLS_ARITHMETIC_RC_5SHOT = "basic_skills_arithmetic_rc_5shot"
-    #BASIC_SKILLS_CODING_RC_5SHOT = "basic_skills_coding_rc_5shot"
-    #BASIC_SKILLS_COMMON_KNOWLEDGE_RC_5SHOT = "basic_skills_common_knowledge_rc_5shot"
-    #BASIC_SKILLS_LOGICAL_REASONING_RC_5SHOT = "basic_skills_logical_reasoning_rc_5shot"
-    #BASIC_SKILLS_PATTERN_RC_5SHOT = "basic_skills_pattern_rc_5shot"
-    #BASIC_SKILLS_STRING_OPERATIONS_RC_5SHOT = "basic_skills_string_operations_rc_5shot"
+    BASIC_SKILLS_ARITHMETIC_RC_5SHOT = "basic_skills_arithmetic_rc_5shot"
+    BASIC_SKILLS_CODING_RC_5SHOT = "basic_skills_coding_rc_5shot"
+    BASIC_SKILLS_COMMON_KNOWLEDGE_RC_5SHOT = "basic_skills_common_knowledge_rc_5shot"
+    BASIC_SKILLS_LOGICAL_REASONING_RC_5SHOT = "basic_skills_logical_reasoning_rc_5shot"
+    BASIC_SKILLS_PATTERN_RC_5SHOT = "basic_skills_pattern_rc_5shot"
+    BASIC_SKILLS_STRING_OPERATIONS_RC_5SHOT = "basic_skills_string_operations_rc_5shot"
 
     # MMLU RC
     MMLU_STEM_VAL = "mmlu_stem_val_rc_5shot"
