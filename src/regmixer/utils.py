@@ -3,7 +3,7 @@ import logging
 import os
 from pathlib import Path
 from typing import List, Optional, Tuple
-
+from collections import defaultdict
 import yaml
 from beaker import Beaker
 from olmo_core.launch.beaker import BeakerEnvSecret, BeakerLaunchConfig, BeakerWekaBucket
@@ -28,7 +28,7 @@ def config_from_path(config: Path) -> ExperimentConfig:
     return ExperimentConfig(**data)
 
 
-def mk_source_instances(
+"""def mk_source_instances(
     sources: list[SourceConfig], mix_map: dict[str, tuple[float, float]]
 ) -> list[SourceInstance]:
     # Note: We filter out any sources that have a weight of 0 so we don' try to build
@@ -42,7 +42,40 @@ def mk_source_instances(
             repetition_factor=mix_map[source.name][1],
         )
         for source in filtered_sources
-    ]
+    ]"""
+
+def mk_source_instances(
+    sources: list[SourceConfig], mix_map: dict[str, tuple[float, float]]
+) -> list[SourceInstance]:
+    instances = []
+
+    for source in sources:
+        if source.topics:
+            for topic in source.topics:
+                full_name = f"{source.name}:{topic.name}"
+                if full_name not in mix_map or mix_map[full_name][0] == 0:
+                    continue
+                instances.append(
+                    SourceInstance(
+                        name=full_name,
+                        paths=topic.paths,
+                        ratio=mix_map[full_name][0],
+                        repetition_factor=mix_map[full_name][1],
+                    )
+                )
+        else:
+            if source.name not in mix_map or mix_map[source.name][0] == 0:
+                continue
+            instances.append(
+                SourceInstance(
+                    name=source.name,
+                    paths=source.paths,
+                    ratio=mix_map[source.name][0],
+                    repetition_factor=mix_map[source.name][1],
+                )
+            )
+
+    return instances
 
 
 def mk_experiments(
@@ -221,11 +254,34 @@ def mk_mixes(
     from copy import deepcopy 
     display_mixes = deepcopy(mixes)
 
+    nested_mixes = []
     for mix in display_mixes:
-        keys_to_remove = [k for k, v in mix.items() if v[0] == 0]
-        for k in keys_to_remove:
-            mix.pop(k)
+        mix = {k: v for k, v in mix.items() if v[0] > 0}
 
-    logger.info(display_mixes)
+        # Organize into source → topic → weight
+        source_totals = defaultdict(float)
+        source_topics = defaultdict(dict)
+
+        for domain, (weight, _) in mix.items():
+            if ':' in domain:
+                source, topic = domain.split(':', 1)
+                source_totals[source] += weight
+                source_topics[source][topic] = weight
+            else:
+                source_totals[domain] += weight
+
+        # Combine into final nested structure
+        nested = {}
+        for source in source_totals:
+            if source in source_topics:
+                nested[source] = {
+                    'total': source_totals[source],
+                    'topics': source_topics[source]
+                }
+            else:
+                nested[source] = source_totals[source]
+
+        nested_mixes.append(nested)
+    logger.info(nested_mixes)
 
     return mixes

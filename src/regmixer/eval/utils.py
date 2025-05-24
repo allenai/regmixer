@@ -609,7 +609,7 @@ def plot_interaction_matrix(
         bbox_inches="tight",
     )
     plt.close()
-
+    np.save(f"{output_dir}/interaction_matrix.npy", interaction_matrix)
 
 def mk_run_metrics(
     history,
@@ -621,10 +621,8 @@ def mk_run_metrics(
     df = pd.DataFrame(history)
     results = {}
     group_name, group_metrics = metrics
-    in_loop_tasks = df.columns.tolist()
-    offline_tasks = list(set(group_metrics) - set(in_loop_tasks))
-    in_loop_tasks = list(set(in_loop_tasks).intersection(set(group_metrics)))
-
+    in_loop_tasks = [task for task in df.columns if task in group_metrics]
+    offline_tasks = [task for task in group_metrics if task not in in_loop_tasks]
     if average:
         raise NotImplementedError("Averaging the task is implemented but out of date!")
         result = np.mean(
