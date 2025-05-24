@@ -3,28 +3,28 @@ description: "OLMoE-mix-0824 30M @ 5xC scale, super swarm (with topic-partitione
 budget: "ai2/oe-data"
 workspace: "ai2/dolma2"
 nodes: 1
-gpus: 1 # 1, 8
-variants: 512 #64 # 1, 5, 100
+gpus: 1
+variants: 512
 preemptible: true
 max_tokens: 2_910_233_600
 allow_repetition: false 
-sequence_length: 2048
+sequence_length: 2048 # we changed this from 4096 to 2048 to maintain batch size (?)
 seed: 42
-source_mix_temperature: 0.75 # more dense at source level
-topic_mix_temperature: 1.0 # sparser at topic level 
-minimum_weight: 0.0001
-minimum_source_weight: 0.0001
-minimum_topic_weight: 0.05 # this is RELATIVE to the source weight
-min_source_strength: 0.1
+source_mix_temperature: 0.75 # lower temperature = closer to uniform --> this lets us sample more from the sources with lower priors
+topic_mix_temperature: 1.0  # keeping the temperature from the dclm sparse swarm 
+minimum_weight: 0.0001 # ignore
+minimum_source_weight: 0.0001 # each source must have at least this weight
+minimum_topic_weight: 0.05 # each topic must be at least this proportion of its source
+min_source_strength: 0.1 # higher strength = sample more closely to the prior
 max_source_strength: 20
 min_topic_strength: 0.1
-max_topic_strength: 5 # higher max = sample more closely to the prior 
-sample_multiplier: 50
+max_topic_strength: 5 
+sample_multiplier: 50 # how many tries per swarm run 
 proxy_model_id: "olmo_30m"
 tokenizer: "dolma2"
 weka: true
 dtype: "uint32"
-priority: urgent #high #normal, high
+priority: urgent
 cluster: ai2/augusta-google-1 #ai2/saturn-cirrascale, ai2/neptune-cirrascale
 device_batch_size: 32
 sources:
@@ -226,7 +226,7 @@ sources:
       - name: TypeScript
         paths:
           - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/TypeScript/*.npy
-nonzero_weight: # density at source level 
+nonzero_weight: # make sure all sources have nonzero weight
   - finemath-3plus
   - arxiv
   - pes2o
@@ -234,7 +234,7 @@ nonzero_weight: # density at source level
   - dclm
   - s2pdf
   - stack-edu
-manual_prior:
+manual_prior: # enforce a manual prior based on the final sources' sizes 
   finemath-3plus: 0.006734006734
   arxiv: 0.003961180432
   pes2o: 0.0118835413
