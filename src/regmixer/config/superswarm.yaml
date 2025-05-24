@@ -14,7 +14,7 @@ source_mix_temperature: 0.75 # lower temperature = closer to uniform --> this le
 topic_mix_temperature: 1.0  # keeping the temperature from the dclm sparse swarm 
 minimum_weight: 0.0001 # ignore
 minimum_source_weight: 0.0001 # each source must have at least this weight
-minimum_topic_weight: 0.05 # each topic must be at least this proportion of its source
+minimum_topic_weight: 0.05 # each topic must be at least this proportion of its source. higher = more sparse
 min_source_strength: 0.1 # higher strength = sample more closely to the prior
 max_source_strength: 20
 min_topic_strength: 0.1
