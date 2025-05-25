@@ -13,7 +13,7 @@ authors = [
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 dependencies = [
-    "ai2-olmo-core @ git+https://github.com/allenai/OLMo-core.git@91ccd0b4612ce628bf632a2a03a111027c6257e4",
+    "ai2-olmo-core @ git+https://github.com/allenai/OLMo-core.git@1c4f259edcb4ba093fef28d58f9992e8e394a37e",
     "boto3",
     "click",
     "pydantic",
