@@ -193,6 +193,7 @@ def train(
         source["domain"]: (source["weight"], max_repetition) for source in config["sources"]
     }
 
+    weka = False if "augusta" in cluster else True
     group_uuid = generate_uuid()[:8]
     experiment_config = ExperimentConfig(
         name=f"regmixer-{name}",
@@ -214,7 +215,7 @@ def train(
         proxy_model_id=model_identifier,
         dtype=NumpyDatasetDType[dtype],
         shared_filesystem=True,
-        weka=True,
+        weka=weka,
         device_batch_size=device_batch_size,
         global_batch_size=global_batch_size,
     )
