@@ -261,7 +261,6 @@ class TransformerConfigBuilder:
                 name=self.run_name.strip(),
                 project="regmixer",
                 group=self.group_id.strip(),
-                cancel_check_interval=10,
                 enabled=True,
             ),
             "lm_evaluator": LMEvaluatorCallbackConfig(
@@ -351,7 +350,6 @@ class TransformerConfigBuilder:
             save_folder=self.checkpoint_dir,
             save_overwrite=True,
             metrics_collect_interval=10,
-            cancel_check_interval=5,
             load_path=self.load_path,
             # We fail fast if an existing if we expect a checkpoint for annealing and one is not found.
             load_strategy=(

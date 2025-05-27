@@ -44,6 +44,7 @@ def config_from_path(config: Path) -> ExperimentConfig:
         for source in filtered_sources
     ]"""
 
+
 def mk_source_instances(
     sources: list[SourceConfig], mix_map: dict[str, tuple[float, float]]
 ) -> list[SourceInstance]:
@@ -132,7 +133,7 @@ def mk_instance_cmd(
         f"-m {config.proxy_model_id}",
         f"-w {config.weka}",
         f"-y {config.train_type.value}",
-        f"-b {config.device_batch_size}"
+        f"-b {config.device_batch_size}",
     ]
 
     if config.global_batch_size:
@@ -152,7 +153,6 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
     weka_buckets: List[BeakerWekaBucket] = []
     if group.config.weka:
         weka_buckets.append(BeakerWekaBucket("oe-training-default", "/weka/oe-training-default"))
-
 
     setup_steps = [
         'git clone "$REPO_URL"',
@@ -192,7 +192,6 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
             "export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}",
         ]
 
-
     return [
         BeakerLaunchConfig(
             name=f"{experiment.name}",
@@ -202,7 +201,7 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
             clusters=[group.config.cluster],
             num_nodes=group.config.nodes,
             num_gpus=group.config.gpus,
-            shared_filesystem=group.config.shared_filesystem,
+            shared_filesystem=group.config.weka,
             allow_dirty=True,
             weka_buckets=weka_buckets,
             budget=group.config.budget or "ai2/oe-data",
@@ -217,7 +216,7 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
                 BeakerEnvSecret(name="AWS_CREDENTIALS", secret=f"{beaker_user}_AWS_CREDENTIALS"),
                 BeakerEnvSecret(name="R2_ENDPOINT_URL", secret="R2_ENDPOINT_URL"),
                 BeakerEnvSecret(name="WEKA_ENDPOINT_URL", secret="WEKA_ENDPOINT_URL"),
-                BeakerEnvSecret(name="GOOGLE_CLOUD_PROJECT", secret="GOOGLE_CLOUD_PROJECT")
+                BeakerEnvSecret(name="GOOGLE_CLOUD_PROJECT", secret="GOOGLE_CLOUD_PROJECT"),
             ],
             setup_steps=setup_steps,
         )
@@ -251,7 +250,8 @@ def mk_mixes(
 
         logger.info(f"Mixes saved to {output}:")
 
-    from copy import deepcopy 
+    from copy import deepcopy
+
     display_mixes = deepcopy(mixes)
 
     nested_mixes = []
@@ -263,8 +263,8 @@ def mk_mixes(
         source_topics = defaultdict(dict)
 
         for domain, (weight, _) in mix.items():
-            if ':' in domain:
-                source, topic = domain.split(':', 1)
+            if ":" in domain:
+                source, topic = domain.split(":", 1)
                 source_totals[source] += weight
                 source_topics[source][topic] = weight
             else:
@@ -274,10 +274,7 @@ def mk_mixes(
         nested = {}
         for source in source_totals:
             if source in source_topics:
-                nested[source] = {
-                    'total': source_totals[source],
-                    'topics': source_topics[source]
-                }
+                nested[source] = {"total": source_totals[source], "topics": source_topics[source]}
             else:
                 nested[source] = source_totals[source]
 
