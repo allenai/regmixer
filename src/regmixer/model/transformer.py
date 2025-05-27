@@ -13,15 +13,13 @@ from olmo_core.data import (
 )
 from olmo_core.distributed.parallel import DataParallelType
 from olmo_core.float8 import Float8Config
-from olmo_core.optim import CosWithWarmup, OptimGroupOverride, SkipStepAdamWConfig
+from olmo_core.optim import OptimGroupOverride, SkipStepAdamWConfig
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.nn.transformer import TransformerConfig
 import olmo_core.train.train_module as tm
 
 from olmo_core.optim import (
-    CosWithWarmup,
     LinearWithWarmup,
-    OptimGroupOverride,
     Scheduler,
 )
 from olmo_core.optim.scheduler import CosWithWarmupAndLinearDecay
@@ -117,7 +115,7 @@ class TransformerConfigBuilder:
     tokenizer: TokenizerConfig
     dtype: str
     weka: bool
-    device_batch_size: int 
+    device_batch_size: int
     load_path: Optional[str] = None
     profile: bool = False
     train_type: TrainType = TrainType.pretrain
@@ -163,19 +161,27 @@ class TransformerConfigBuilder:
         self.root_dir = f"/tmp/{self.run_name}"
         self.cluster = cluster
 
+        # Default will always be s3 for checkpoints, and we override if Augusta or AUS+Weka
+        self.checkpoint_dir = (
+            f"{self.data_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
+        )
 
-        if any(substring in cluster for substring in ["augusta"]):
-            self.root_dir = f"gs://ai2-llm"
-            self.checkpoint_dir = f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
-
-        if any(substring in cluster for substring in ["jupiter", "saturn"]) and weka:
-            logger.info("Using Weka bucket as root dir")
-            self.root_dir = f"/weka/oe-training-default/ai2-llm"
-
-        self.checkpoint_save_dir = f"{self.root_dir if weka else self.data_dir}/checkpoints/{self.beaker_user.lower().strip()}/{self.run_name}"
+        self._setup_dirs()
 
         self.dataset_cache = (
             f"{self.root_dir}/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
+        )
+
+    def _setup_dirs(self) -> None:
+        """Setup checkpoint directory based on cluster configuration."""
+        if any(substring in self.cluster for substring in ["augusta"]):
+            self.root_dir = "gs://ai2-llm"
+        elif any(substring in self.cluster for substring in ["jupiter", "saturn"]) and self.weka:
+            logger.info("Using Weka bucket as root dir")
+            self.root_dir = "/weka/oe-training-default/ai2-llm"
+
+        self.checkpoint_dir = (
+            f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
         )
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
@@ -188,14 +194,16 @@ class TransformerConfigBuilder:
     def get_warmup_steps(self, parameters: int) -> int:
         if self.train_type == TrainType.anneal:
             return 0
-        bsz = self.global_batch_size if self.global_batch_size is not None else self.get_batch_size(parameters)
-        return round(
-            parameters / (bsz * self.model_config.max_sequence_length)
+        bsz = (
+            self.global_batch_size
+            if self.global_batch_size is not None
+            else self.get_batch_size(parameters)
         )
+        return round(parameters / (bsz * self.model_config.max_sequence_length))
 
     def get_batch_size(self, parameters: int) -> int:
         """
-        Taken directly from https://github.com/allenai/OLMo-core/blob/main/src/olmo_core/model_ladder.py#L276 
+        Taken directly from https://github.com/allenai/OLMo-core/blob/main/src/olmo_core/model_ladder.py#L276
         Args:
         - parameters: number of non-embedding parameters
         """
@@ -215,14 +223,6 @@ class TransformerConfigBuilder:
 
         return global_batch_size
 
-        # old 
-        """global_batch_size = 160 * (parameters / 108000000) ** (2 / 3)
-        global_batch_size /= self.model_config.batch_divisor
-        global_batch_size = round(global_batch_size)
-        global_batch_size *= self.model_config.batch_divisor
-        global_batch_size = self.next_power_of_2(global_batch_size)
-        return global_batch_size"""
-
     def next_power_of_2(self, x: int) -> int:
         return 1 if x == 0 else 2 ** (x - 1).bit_length()
 
@@ -232,13 +232,13 @@ class TransformerConfigBuilder:
         """
         if self.train_type == TrainType.anneal:
             return 6.1852e-5  # Magic number pulled from OLMo-core examples
-        
+
         assert self.sequence_length in {2048, 4096}
         lr = 0.0047 * (model.num_non_embedding_params / 108000000) ** (-1 / 3)
         if self.sequence_length == 4096:
             lr /= 4
         return lr
-    
+
     def get_scheduler(self, model: TransformerConfig) -> Scheduler:
         if self.train_type == TrainType.anneal:
             return LinearWithWarmup(warmup_steps=0, t_max=self.max_tokens)
@@ -295,7 +295,11 @@ class TransformerConfigBuilder:
             block_name=self.model_config.block_type,
         )
 
-        global_batch_size = self.global_batch_size if self.global_batch_size is not None else self.get_batch_size(model.num_non_embedding_params)
+        global_batch_size = (
+            self.global_batch_size
+            if self.global_batch_size is not None
+            else self.get_batch_size(model.num_non_embedding_params)
+        )
         learning_rate = self.get_lr(model, tokenizer)
 
         mixture_config = MixtureBuilder(
@@ -344,7 +348,7 @@ class TransformerConfigBuilder:
         )
 
         trainer_config = TrainerConfig(
-            save_folder=self.checkpoint_save_dir,
+            save_folder=self.checkpoint_dir,
             save_overwrite=True,
             metrics_collect_interval=10,
             cancel_check_interval=5,
