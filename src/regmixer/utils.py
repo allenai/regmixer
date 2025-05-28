@@ -170,6 +170,9 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
         "printenv AWS_CREDENTIALS > ~/.aws/credentials",
     ]
 
+    if group.config.wandb_debug:
+        setup_steps.append("export WANDB_DEBUG=true")
+
     if group.config.gpus == 1:
         setup_steps += [
             "export LOCAL_RANK=0",
