@@ -13,6 +13,9 @@ import pandas as pd
 import wandb
 import torch 
 import yaml
+import hashlib
+import os 
+import pickle 
 from olmo_core.utils import prepare_cli_environment
 
 import warnings
@@ -20,7 +23,6 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 
 from regmixer.eval.constants import GroupedWandbMetrics, ObjectiveWeights
-from regmixer.synthesize_mixture import calculate_priors
 from regmixer.utils import config_from_path
 from regmixer.eval.utils import (
     build_regression,
@@ -37,10 +39,13 @@ from regmixer.eval.utils import (
     plot_interaction_matrix,
     compute_mixture_neighborhood,
     filter_constrained_swarm,
-    PROPOSER_TYPES
+    calculate_priors_with_manual,
+    aggregate_mmlu,
+    PROPOSER_TYPES, 
+    LogLinearRegressor
 )
 
-
+from tqdm import tqdm
 
 
 logger = logging.getLogger(__name__)
@@ -228,6 +233,27 @@ def cli():
     required=False,
     default=None,
 )
+@click.option(
+    "--early-stopping",
+    type=float,
+    help="The epsilon for early stopping",
+    required=False,
+    default=0.0,
+)
+@click.option(
+    "--dro-reference-model-id",
+    type=str,
+    help="If we want to enforce pareto improvements, this is the id of the initial model we want to do better than",
+    required=False,
+    default=None,
+)
+@click.option(
+    "--use-reference-model-predicted-scores",
+    is_flag=True,
+    help="If true, we use the predicted performance of the reference model, not the true performance",
+    required=False,
+    default=False
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -252,6 +278,9 @@ def fit(
     obj_weights: Optional[str],
     temperature: Optional[float],
     keep_sources: Optional[list[str]],
+    early_stopping: float = 0.0,
+    dro_reference_model_id: Optional[str] = None,
+    use_reference_model_predicted_scores: bool = False
 ):
 
     output_dir = get_output_dir(experiment_groups)
@@ -294,6 +323,26 @@ def fit(
         eval_config["temperature"] = temperature
     if len(keep_sources) != 0:
         eval_config["keep_sources"] = keep_sources
+    if early_stopping > 0.0:
+        eval_config["early_stopping"] = early_stopping
+    if dro_reference_model_id is not None:
+        eval_config["dro_reference_model_id"] = dro_reference_model_id
+    if use_reference_model_predicted_scores:
+        eval_config["use_reference_model_predicted_scores"] = use_reference_model_predicted_scores
+
+    # used for caching regression model
+    regression_config = {
+        "group_average": group_average,
+        "group_metrics": group_metrics,
+        "regression_type": regression_type,
+        "train_split": train_split,
+        "n_test": n_test,
+        "seed": seed,
+        "neighborhood": neighborhood,
+        "constrain_swarm": constrain_swarm,
+        "keep_sources": keep_sources,
+        "early_stopping": early_stopping,
+    }
 
     output_dir = save_eval_config(eval_config, output_dir)
 
@@ -339,7 +388,7 @@ def fit(
             )
 
     # Filter out failed runs or runs without evals
-    run_instances = [run for run in run_instances if run.samples.shape[0] > 0]
+    #run_instances = [run for run in run_instances if run.samples.shape[0] > 0]
 
     logger.info(
         f"Found {len(run_instances)} runs in {workspace} that match group id filter, gathering samples..."
@@ -351,40 +400,65 @@ def fit(
     )
 
     logger.info(f"Calculating source weights...")
-    priors = calculate_priors(
+
+    priors = calculate_priors_with_manual(
         source_configs=launch_configs[0].sources,
         dtype=launch_configs[0].dtype,
         use_cache=(no_cache == False),
+        manual_prior=launch_configs[0].manual_prior if hasattr(launch_configs[0], "manual_prior") else None,
     )
     logger.info(f"Source weights:")
-    logger.info(priors)
+    logger.info(priors[0])
 
-    run_ratios = [
-        {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors)}
-        for idx, run in enumerate(run_instances)
-    ]
+    ratios_cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name}_ratios.pkl"
+    metrics_cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name}_metrics.pkl"
 
-    run_metrics = [
-        {
-            "run": run.id,
-            "name": run.display_name, 
-            "index": idx,
-            **mk_run_metrics(
-                history=run.samples,
-                samples=num_samples,
-                metrics=(eval_metric_group_name, eval_metric_group.value),
-                display_name=run.display_name,
-                average=group_average != None,
-            ),
-        }
-        for idx, run in enumerate(run_instances) if len(run.samples) > 0
-    ]
+    if os.path.exists(ratios_cache_path) and os.path.exists(metrics_cache_path):
+        logger.info(f"Loading cached ratios and metrics from {ratios_cache_path} and {metrics_cache_path}")
+        with open(ratios_cache_path, "rb") as f:
+            ratios = pd.read_pickle(f)
+        with open(metrics_cache_path, "rb") as f:
+            metrics = pd.read_pickle(f)
+        ratios = ratios[ratios['run'].isin(metrics.run)]
+    else:
+        run_ratios = [
+            {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors)}
+            for idx, run in enumerate(run_instances)
+        ]
+        run_metrics = [
+            {
+                "run": run.id,
+                "name": run.display_name, 
+                "index": idx,
+                **mk_run_metrics(
+                    history=run.samples,
+                    samples=num_samples,
+                    metrics=(eval_metric_group_name, eval_metric_group.value),
+                    display_name=run.display_name,
+                    average=group_average != None,
+                ),
+            }
+            for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name == "superswarm_offline" or len(run.samples) > 0
+        ]
+        if constrain_swarm:
+            run_ratios, run_metrics = filter_constrained_swarm(final_cookbook_path, run_ratios, run_metrics)
+        ratios = pd.DataFrame(run_ratios)
+        metrics = pd.DataFrame(run_metrics)
+        ratios = ratios[ratios['run'].isin(metrics.run)]
+        pd.to_pickle(ratios, ratios_cache_path)
+        pd.to_pickle(metrics, metrics_cache_path)
+        logger.info(f"Saved ratios to {ratios_cache_path} and metrics to {metrics_cache_path}")
 
-    if constrain_swarm:
-        run_ratios, run_metrics = filter_constrained_swarm(final_cookbook_path, run_ratios, run_metrics)
+    metrics_to_index = eval_metric_group.value
 
-    ratios = pd.DataFrame(run_ratios)
-    metrics = pd.DataFrame(run_metrics)
+    if group_average:
+        metrics_to_index = [eval_metric_group_name]
+
+    if all("mmlu_stem" not in s for s in metrics.columns):
+        metrics, metrics_to_index = aggregate_mmlu(
+            metrics,
+            metrics_to_index
+        )
 
     if len(ratios[ratios.columns[3:]]) > len(ratios):
         raise ValueError("The number of swarm runs is fewer than the number of mixing sources.")
@@ -425,10 +499,6 @@ def fit(
     logger.info(f"Number of train samples: {len(Y_train)}. Number of test samples: {len(Y_test)}.")
 
     predictors = []
-    metrics_to_index = eval_metric_group.value
-
-    if group_average:
-        metrics_to_index = [eval_metric_group_name]
 
     indexed_metrics = list(enumerate(metrics_to_index))
     logger.info(f"Fitting {regression_type} regression for metrics:")
@@ -439,11 +509,77 @@ def fit(
         obj_weights = [obj_weights.value.get(metric, 1) for idx, metric in indexed_metrics]
         logger.info(f"Minimizing weighted average: {obj_weights}")
 
-    for idx, metric in indexed_metrics:
-        predictors.append(build_regression(idx, Y_train, X_train, regression_type))
+    # caching logic for regression model. Note that one regression model can be used for many different proposed mixes,
+    # which is why we need to cache based on a separate subconfig, regression_config 
+    regression_config_str = json.dumps(regression_config, sort_keys=True)
+    hash_str = hashlib.sha256(regression_config_str.encode("utf-8")).hexdigest()[:16]
+    regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / hash_str 
+    regression_model_cache_folder.mkdir(parents=True, exist_ok=True)
+    regression_model_cache_path = regression_model_cache_folder / f"regression_params.pkl"
+    if os.path.exists(regression_model_cache_path) and regression_type == "log_linear":
+        logger.info(f"Using log-linear regression model at {regression_model_cache_path}")
+        with open(regression_model_cache_path, "rb") as f:
+            params = pickle.load(f)
 
+        # link the regression model cache to the run that uses it 
+        with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:    
+            f.write(str(regression_model_cache_path))
+
+        # initialize the regression models using the cached parameters 
+        for idx, metric in indexed_metrics:
+            reg = LogLinearRegressor(params[metric])
+            predictors.append(reg)
+    else:
+        for idx, metric in indexed_metrics:
+            predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping))
+
+        if regression_type == "log_linear":
+            parameters = {metric: predictors[idx].model for idx, metric in indexed_metrics}
+            with open(regression_model_cache_path, "wb") as f:
+                pickle.dump(parameters, f)
+            logger.info(f"Log linear regression model saved to {regression_model_cache_path}")
+            with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
+                f.write(str(regression_model_cache_path))
+ 
     plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist())
     results = []
+
+    if dro_reference_model_id is not None: 
+        # load in metrics of the reference model 
+        reference_model_run_instance = get_runs_from_api(
+            api, workspace, [dro_reference_model_id], cache_path, True, num_samples, eval_metric_group
+        )[0]
+
+        if use_reference_model_predicted_scores:
+            # get reference model's mix and pass this through the regression model
+            reference_run_ratio = {
+                "run": reference_model_run_instance.id, 
+                "name": reference_model_run_instance.display_name, 
+                "index": 0, 
+                **mk_weights_from_config(reference_model_run_instance.config, priors)
+            }
+            reference_ratio_df = pd.DataFrame([reference_run_ratio])
+            reference_ratio = reference_ratio_df[reference_ratio_df.columns[3:]].values
+            reference_scores = [pred.predict(reference_ratio)[0] for pred in predictors]
+            reference_scores = np.array(reference_scores)
+        else:
+            # load in the reference model's true performance
+            reference_run_metric ={
+                "run": reference_model_run_instance.id,
+                "name": reference_model_run_instance.display_name, 
+                "index": 0,
+                **mk_run_metrics(
+                    history=reference_model_run_instance.samples,
+                    samples=num_samples,
+                    metrics=(eval_metric_group_name, eval_metric_group.value),
+                    display_name=reference_model_run_instance.display_name,
+                    average=group_average != None,
+                ),
+            }
+            reference_scores = []
+            for idx, metric in indexed_metrics:
+                reference_scores.append(reference_run_metric[metric])
+            reference_scores = np.array(reference_scores)
 
     for idx, metric in indexed_metrics:
         plot_correlation(
@@ -474,7 +610,8 @@ def fit(
                 constrain_objective=constrain_objective,
                 final_cookbook_path=final_cookbook_path,
                 obj_weights=obj_weights,
-                temperature=temperature
+                temperature=temperature,
+                reference_scores=reference_scores if dro_reference_model_id is not None else None
             )
 
             plot_and_log_weights(
@@ -504,7 +641,8 @@ def fit(
             constrain_objective=constrain_objective,
             final_cookbook_path=final_cookbook_path,
             obj_weights=obj_weights,
-            temperature=temperature
+            temperature=temperature,
+            reference_scores=reference_scores if dro_reference_model_id is not None else None
         )
         plot_and_log_weights(
             prior=np.array(list(priors[0].values())),

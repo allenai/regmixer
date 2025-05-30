@@ -1,0 +1,29 @@
+sources:
+- domain: proofpile-2-stack
+  paths:
+  - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/algebraic-stack/train/allenai/dolma2-tokenizer/*.npy
+  weight: 0.019284240835816716
+- domain: proofpile-2-arxiv
+  paths:
+  - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/dolma2-tokenizer/*.npy
+  weight: 0.03386955580322353
+- domain: proofpile-2-open-web-math
+  paths:
+  - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/open-web-math/train/allenai/dolma2-tokenizer/*.npy
+  weight: 0.01994608678191331
+- domain: pes2o
+  paths:
+  - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0024912091363646608
+- domain: starcoder
+  paths:
+  - s3://ai2-llm/preprocessed/starcoder/v1-decon-100_to_20k-2star-top_token_030/allenai/dolma2-tokenizer/*.npy
+  weight: 0.12929755944144108
+- domain: dclm
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/text_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/allenai/dolma2-tokenizer/*.npy
+  weight: 0.7951003236763506
+- domain: wikipedia
+  paths:
+  - s3://ai2-llm/preprocessed/olmo-mix/danyh-compiled-v1_7/documents/wiki/allenai/dolma2-tokenizer/*.npy
+  weight: 1.1024324890153436e-05

@@ -1,0 +1,78 @@
+sources:
+- domain: finemath-3plus
+  paths:
+  - s3://ai2-llm/preprocessed/finemath/finemath-3plus/allenai/dolma2-tokenizer/*.npy
+  weight: 0.010414150328991916
+- domain: arxiv
+  paths:
+  - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/dolma2-tokenizer/*.npy
+  weight: 0.003233820080047628
+- domain: pes2o
+  paths:
+  - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+  weight: 0.021487305554506456
+- domain: wikipedia
+  paths:
+  - s3://ai2-llm/preprocessed/structured-wikipedia/concat_with_links/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0845498836149088
+- domain: dclm:adult_content
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/adult_content/dolma2-tokenizer/*.npy
+  weight: 0.05581942347436748
+- domain: dclm:food_and_dining  
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/food_and_dining/dolma2-tokenizer/*.npy
+  weight: 0.058623125582994436
+- domain: dclm:health
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/health/dolma2-tokenizer/*.npy
+  weight: 0.21297240352413319
+- domain: dclm:science_math_and_technology
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/science_math_and_technology/dolma2-tokenizer/*.npy
+  weight: 0.15759079487293604
+- domain: dclm:sports_and_fitness
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/sports_and_fitness/dolma2-tokenizer/*.npy
+  weight: 0.13804468208952217
+- domain: s2pdf:education_jobs
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/education_jobs/*.npy
+  weight: 0.013302086790626593
+- domain: s2pdf:finance_business
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/finance_business/*.npy
+  weight: 0.017532080038085856
+- domain: s2pdf:health
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/health/*.npy
+  weight: 0.012613050802946188
+- domain: s2pdf:religion
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/religion/*.npy
+  weight: 0.028275420509213667
+- domain: s2pdf:science_tech
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/science_tech/*.npy
+  weight: 0.10993970099078068
+- domain: s2pdf:software
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/software/*.npy
+  weight: 0.012706150832493362
+- domain: stack-edu:Go
+  paths:
+  - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Go/*.npy
+  weight: 0.004693615466978782
+- domain: stack-edu:Java
+  paths:
+  - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Java/*.npy
+  weight: 0.020160866758021312
+- domain: stack-edu:JavaScript
+  paths:
+  - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/JavaScript/*.npy
+  weight: 0.00461221868885161
+- domain: stack-edu:Markdown
+  paths:
+  - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Markdown/*.npy
+  weight: 0.0334292199995938
+

@@ -24,9 +24,10 @@ import boto3
 from cookbook.aliases import ExperimentConfig as CookbookExperimentConfig
 from cookbook.utils.data import get_token_counts_and_ratios
 
-
+from regmixer.synthesize_mixture import calculate_priors
 from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics
 from regmixer.eval.law import ScalingLaw
+from regmixer.aliases import SourceConfig
 
 logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -61,7 +62,7 @@ def init_params_law(idx, num_domains=3):
 
 
 class Regressor():
-    def fit(self, x, y, idx):
+    def fit(self, x, y, idx, **kwargs):
         raise NotImplementedError("Subclasses must implement this method")
 
     def predict(self, x):
@@ -74,7 +75,7 @@ class LightGBMRegressor(Regressor):
     def __init__(self):
         self.model = lgb.LGBMRegressor(**LGBM_HPS)
 
-    def fit(self, x, y, idx):
+    def fit(self, x, y, idx, **kwargs):
         target = y[:, idx]
         self.model = self.model.fit(
             x,
@@ -88,25 +89,30 @@ class LinearRegressor(Regressor):
     def __init__(self):
         self.model = LinearRegression()
 
-    def fit(self, x, y, idx):
+    def fit(self, x, y, idx, **kwargs):
         target = y[:, idx]
         self.model = self.model.fit(x, target)
 
     
 class LogLinearRegressor(Regressor):
-    def __init__(self):
+    def __init__(self, params=None):
         np.random.seed(42)
         random.seed(42)
-        self.model = ScalingLaw(mixing_law)
 
-    def fit(self, x, y, idx, max_step=100, delta=0.02):
+        if params is None:
+            self.model = ScalingLaw(mixing_law)
+        else:
+            self.model = params
+
+    def fit(self, x, y, idx, early_stopping=0.0, max_step=100, delta=0.02):
         target = y[:, idx]
         self.model = self.model.fit(
             x,
             target,
             init_params_law(idx, num_domains = x.shape[-1]),
             max_step=max_step,
-            delta=delta
+            delta=delta,
+            eps=early_stopping
         )
 
     def predict(self, x):
@@ -139,6 +145,36 @@ def mixing_law(x, param):
     t_i = param[1:]
     result = torch.exp(log_c_i) + torch.exp(torch.matmul(x, t_i))
     return result
+
+def nonlinear_mixing_law(x, param, B_mask=None):
+    """
+    Vectorized implementation of nonlinear mixing law:
+    Y = exp(log_c + x @ t + sum_k B_k * x_i_k * x_j_k)
+
+    Parameters:
+        x:       (batch_size, d) input data
+        param:   tensor of shape (1 + d + len(B_mask),)
+                 [log_c, t (d,), B_params (len(B_mask),)]
+        B_mask:  list of (i, j) tuples specifying quadratic terms
+
+    Returns:
+        Tensor of shape (batch_size,) with predicted outputs
+    """
+    log_c_i = param[0]
+    d = x.shape[1]
+    t_i = param[1:1 + d]                      # Linear weights
+    B_params = param[1 + d:]                  # Quadratic weights
+
+    lin_term = torch.matmul(x, t_i)           # (batch_size,)
+
+    quad_term = 0.0
+    if B_mask is not None and len(B_mask) > 0:
+        B_mask = torch.tensor(B_mask, dtype=torch.long, device=x.device)  # (num_terms, 2)
+        x_i = x[:, B_mask[:, 0]]              # (batch_size, num_terms)
+        x_j = x[:, B_mask[:, 1]]              # (batch_size, num_terms)
+        quad_term = (x_i * x_j) @ B_params    # (batch_size,)
+
+    return torch.exp(log_c_i) + torch.exp(lin_term + quad_term)
 
 def init_params_law(idx, num_domains=3):
     for log_c_i in np.linspace(-2, 1.5, 10): # originally (-2, 1.5, 10)
@@ -178,6 +214,7 @@ class SimulationProposer(Proposer):
         final_cookbook_path: Optional[Path] = None,
         obj_weights: Optional[list] = None,
         temperature: Optional[float] = None,
+        reference_scores: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -245,14 +282,32 @@ class SimulationProposer(Proposer):
                 simulations = simulations[((simulations*desired_tokens) <= list(available_tokens_per_source.values())).all(axis=1)]
                 logger.info(f"Removed {original_simulation_size - len(simulations)} out of {original_simulation_size} simulations that would repeat tokens at the final run scale.")
 
+            predictions = np.array([reg.predict(simulations) for reg in predictor])
+            if reference_scores is not None:
+                # If reference scores are provided, filter simulations based on them
+                tol_range = [0, 0.05, 0.1, 0.15, 0.2]
+                for tol in tol_range:
+                    # we allow for predicted scores to be within a tolerance of the reference scores
+                    # if the current tol results in no remaining simulations, we increase tol 
+                    pareto_idxs = np.where(np.all(predictions.T < reference_scores+tol, axis=1))[0]
+                    if len(pareto_idxs) != 0:
+                        logger.info(f"Using eps={tol} for enforcing pareto improvements")
+                        break 
+
+                if len(pareto_idxs) == 0:
+                    continue
+
+                # filter both the simulations and corresponding predictions down 
+                simulations = simulations[pareto_idxs]
+                predictions = predictions[:, pareto_idxs]  
+                logger.info(f"Filtered simulations to {len(simulations)} based on reference scores.")
 
             if opt_avg_metric:
                 if obj_weights is not None:
-                    predictions = np.array([reg.predict(simulations) for reg in predictor])
                     objs = np.average(predictions, axis=0, weights=obj_weights)
                     logger.info(f"Computing weighted average of predictions using {obj_weights}")
                 else:
-                    objs = np.array([reg.predict(simulations) for reg in predictor]).mean(axis=0)
+                    objs = predictions.mean(axis=0)
             else:
                 objs = predictor[index].predict(simulations)
 
@@ -330,10 +385,11 @@ def build_regression(
     Y_train: np.ndarray,
     X_train: np.ndarray,
     regression_type: str,
+    early_stopping: float
 ) -> Regressor:
     logger.info(f"Building regression model, index: {idx}")
     reg = REGRESSION_TYPES[regression_type]()
-    reg.fit(X_train, Y_train, idx)
+    reg.fit(X_train, Y_train, idx, early_stopping=early_stopping)
     return reg
 
 
@@ -342,7 +398,6 @@ def get_runs_from_api(
 ) -> list[RunInstance]:
 
     wandb_runs = []
-
     for group in groups:
         wandb_runs.extend(
             api.runs(
@@ -370,8 +425,6 @@ def get_runs_from_api(
             all_runs.append(mk_run_history(run, num_samples, eval_metric_group))
 
     all_runs = sorted(all_runs, key=lambda run: run.display_name.lower())
-
-
     if not no_cache:
         with open(cache_path, "w") as f:
             json.dump([run.as_dict() for run in all_runs], f)
@@ -679,14 +732,22 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer"):
             
     offline_results = {}
     for task in tasks:
-        task_data = [data for data in all_jsonl_data if data['task_config']['metadata']['alias'] == task]
+        task_data = [
+            data for data in all_jsonl_data
+            if (
+                data['task_config'].get('metadata', {}).get('alias') == task
+                or data['task_name'] == task
+            )
+        ]
         if len(task_data) == 0:
-            raise ValueError(f"Task {task} not found in JSONL data.")
+            raise ValueError(f"Task {task} not found in JSONL data for {display_name}")
         data = task_data[0]
         if 'bits_per_byte_corr' in data['metrics']:
             offline_results[data['task_config']['metadata']['alias']] = data['metrics']['bits_per_byte_corr']
         elif 'bits_per_byte_corr_macro' in data['metrics']:
             offline_results[data['task_config']['metadata']['alias']] = data['metrics']['bits_per_byte_corr_macro']
+        elif 'bits_per_byte' in data['metrics']:
+            offline_results[data['task_name']] = data['metrics']['bits_per_byte'] 
         else:
             raise ValueError(f"{data['task_name']} does not have bits_per_byte_corr or bits_per_byte_corr_macro in metrics {data['metrics'].keys()}.")
             
@@ -1073,3 +1134,59 @@ def filter_constrained_swarm(
     logger.info(f"Removed {original_swarm_size - len(run_ratios)} swarm runs that would repeat tokens at the final run scale.")
 
     return run_ratios, run_metrics
+
+
+def calculate_priors_with_manual(
+    source_configs: list[SourceConfig],
+    dtype,
+    use_cache: bool,
+    manual_prior: Optional[dict[str, float]] = None,
+):
+
+    priors = calculate_priors(
+        source_configs=source_configs,
+        dtype=dtype,
+        use_cache=use_cache,
+    )
+
+    if manual_prior is not None:
+        logger.info(f"Adjusting priors with manual prior weights: {manual_prior}")
+        for source_config in sorted(source_configs, key=lambda x: x.name):
+            if source_config.topics:
+                # adjust each topic weight by the manual prior  
+                weights = np.array([priors[0][f"{source_config.name}:{topic.name}"] for topic in source_config.topics])
+                normalized_weights = weights / weights.sum()
+                if manual_prior is not None and source_config.name in manual_prior:
+                    for i, topic in enumerate(source_config.topics):
+                        priors[0][f"{source_config.name}:{topic.name}"] = manual_prior[source_config.name] * normalized_weights[i]
+            else:
+                # directly overwrite source weight with manual prior
+                if manual_prior is not None and source_config.name in manual_prior:
+                    priors[0][source_config.name] = manual_prior[source_config.name]
+
+    return priors 
+
+
+def aggregate_mmlu(metrics: pd.DataFrame, metrics_to_index: list):
+    logger.info("Aggregating MMLU metrics...")
+
+    def add_weighted_dot_column(df: pd.DataFrame, weights: dict, output_col: str, metrics_to_index: list):
+        weight_series = pd.Series(weights)
+        df[output_col] = df[weight_series.index].dot(weight_series)
+        df.drop(columns=weight_series.index, inplace=True)
+        columns_to_remove = set(weight_series.index)
+        metrics_to_index = [col for col in metrics_to_index if col not in columns_to_remove]
+        metrics_to_index.append(output_col)
+        return metrics_to_index
+
+    stem_weights = {'mmlu_abstract_algebra:rc::olmes': 0.03313452617627568, 'mmlu_astronomy:rc::olmes': 0.05036447978793903, 'mmlu_college_biology:rc::olmes': 0.04771371769383698, 'mmlu_college_chemistry:rc::olmes': 0.03313452617627568, 'mmlu_college_computer_science:rc::olmes': 0.03313452617627568, 'mmlu_college_mathematics:rc::olmes': 0.03313452617627568, 'mmlu_college_physics:rc::olmes': 0.033797216699801194, 'mmlu_computer_security:rc::olmes': 0.03313452617627568, 'mmlu_conceptual_physics:rc::olmes': 0.07786613651424784, 'mmlu_electrical_engineering:rc::olmes': 0.04804506295559974, 'mmlu_elementary_mathematics:rc::olmes': 0.12524850894632206, 'mmlu_high_school_biology:rc::olmes': 0.10271703114645461, 'mmlu_high_school_chemistry:rc::olmes': 0.06726308813783963, 'mmlu_high_school_computer_science:rc::olmes': 0.03313452617627568, 'mmlu_high_school_mathematics:rc::olmes': 0.08946322067594434, 'mmlu_high_school_physics:rc::olmes': 0.050033134526176276, 'mmlu_high_school_statistics:rc::olmes': 0.07157057654075547, 'mmlu_machine_learning:rc::olmes': 0.03711066931742876}
+    other_weights = {'mmlu_anatomy:rc::olmes': 0.04164096236890808, 'mmlu_business_ethics:rc::olmes': 0.030845157310302282, 'mmlu_clinical_knowledge:rc::olmes': 0.08173966687230105, 'mmlu_college_medicine:rc::olmes': 0.05336212214682295, 'mmlu_global_facts:rc::olmes': 0.030845157310302282, 'mmlu_human_aging:rc::olmes': 0.06878470080197409, 'mmlu_management:rc::olmes': 0.03177051202961135, 'mmlu_marketing:rc::olmes': 0.07217766810610735, 'mmlu_medical_genetics:rc::olmes': 0.030845157310302282, 'mmlu_miscellaneous:rc::olmes': 0.24151758173966686, 'mmlu_nutrition:rc::olmes': 0.09438618136952498, 'mmlu_professional_accounting:rc::olmes': 0.08698334361505243, 'mmlu_professional_medicine:rc::olmes': 0.08389882788402221, 'mmlu_virology:rc::olmes': 0.05120296113510179}
+    social_sciences_weights = {'mmlu_econometrics:rc::olmes': 0.03704907377315567, 'mmlu_high_school_geography:rc::olmes': 0.06434839129021774, 'mmlu_high_school_government_and_politics:rc::olmes': 0.06272343191420214, 'mmlu_high_school_macroeconomics:rc::olmes': 0.12674683132921677, 'mmlu_high_school_microeconomics:rc::olmes': 0.07734806629834254, 'mmlu_high_school_psychology:rc::olmes': 0.17712057198570036, 'mmlu_human_sexuality:rc::olmes': 0.04257393565160871, 'mmlu_professional_psychology:rc::olmes': 0.19889502762430938, 'mmlu_public_relations:rc::olmes': 0.03574910627234319, 'mmlu_security_studies:rc::olmes': 0.07962300942476438, 'mmlu_sociology:rc::olmes': 0.0653233669158271, 'mmlu_us_foreign_policy:rc::olmes': 0.032499187520311994}
+    humanities_weights = {'mmlu_formal_logic:rc::olmes': 0.026780021253985122, 'mmlu_high_school_european_history:rc::olmes': 0.03506907545164718, 'mmlu_high_school_us_history:rc::olmes': 0.04335812964930925, 'mmlu_high_school_world_history:rc::olmes': 0.050371944739638685, 'mmlu_international_law:rc::olmes': 0.0257173219978746, 'mmlu_jurisprudence:rc::olmes': 0.022954303931987247, 'mmlu_logical_fallacies:rc::olmes': 0.034643995749202974, 'mmlu_moral_disputes:rc::olmes': 0.07353878852284804, 'mmlu_moral_scenarios:rc::olmes': 0.1902231668437832, 'mmlu_philosophy:rc::olmes': 0.06609989373007438, 'mmlu_prehistory:rc::olmes': 0.06886291179596174, 'mmlu_professional_law:rc::olmes': 0.32603613177470775, 'mmlu_world_religions:rc::olmes': 0.03634431455897981}
+
+    metrics_to_index = add_weighted_dot_column(metrics, stem_weights, "mmlu_stem", metrics_to_index)
+    metrics_to_index = add_weighted_dot_column(metrics, other_weights, "mmlu_other", metrics_to_index)
+    metrics_to_index = add_weighted_dot_column(metrics, social_sciences_weights, "mmlu_social_sciences", metrics_to_index)
+    metrics_to_index = add_weighted_dot_column(metrics, humanities_weights, "mmlu_humanities", metrics_to_index)
+
+    return metrics, metrics_to_index
