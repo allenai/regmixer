@@ -51,7 +51,7 @@ def fit_scaling_laws(func, valid_split, x, y, max_step, eps, delta, init_param):
     min_loss, best_param = 1e10, None
     best_step = 0
     for i in range(max_step):
-        loss = optimizer.step(closure).item()
+        loss = float(optimizer.step(closure))
         # prediction = func(train_x, param) 
         # train_r2 = calculate_r_squared(train_y, prediction)
         with torch.no_grad():
@@ -68,13 +68,13 @@ def fit_scaling_laws(func, valid_split, x, y, max_step, eps, delta, init_param):
                 eval_loss = torch.nn.functional.huber_loss(eval_prediction, train_y, delta=delta).item() 
                 # eval_loss = -calculate_r_squared(train_y, eval_prediction)
                 # eval_loss = -eval_r2
-        if eval_loss <= min_loss: # FIXME
+        improvement = abs(eval_loss - min_loss)
+        if eval_loss <= min_loss:
             min_loss = eval_loss
             best_param = param.detach().clone()
             best_step = i
-        # print(loss)
-        if np.abs(min_loss - eval_loss) < eps:
-            assert False
+        if improvement < eps:
+            #logger.info(f"step: {i}, eval_loss = {eval_loss}, diff = {improvement}")
             break
 
     if best_param is None:
@@ -93,9 +93,9 @@ class ScalingLaw:
         self.func = func
         self.params = None
         
-    def fit(self, x, y, init_params, max_step=20, eps=0, workers=-1, valid_split=0, delta=0.01):
+    def fit(self, x, y, init_params, max_step=20, eps=0.0, workers=-1, valid_split=0, delta=0.01):
         if workers == -1:
-            workers = min(8, mp.cpu_count())
+            workers = min(4, mp.cpu_count())
         init_params = [torch.tensor(init_param, dtype=torch.float32) for init_param in init_params]
         minloss, optimal_param = 1e10, None
         _fit = partial(fit_scaling_laws, self.func, valid_split, x, y, max_step, eps, delta)
