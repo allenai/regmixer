@@ -24,6 +24,7 @@ class TopicConfig(BaseModel):
     max_repetition_factor: float = 1.0
     max_topic_ratio: float = 1.0
 
+
 class SourceConfig(BaseModel):
     name: str
     paths: Optional[List[str]] = None
@@ -69,7 +70,7 @@ class ExperimentConfig(BaseModel):
     preemptible: bool = True
     shared_filesystem: bool = False
     weka: bool = False
-    min_strength: float = 0.1 
+    min_strength: float = 0.1
     max_strength: float = 5.0
     min_source_strength: Optional[float] = None
     max_source_strength: Optional[float] = None
@@ -80,6 +81,7 @@ class ExperimentConfig(BaseModel):
     global_batch_size: Optional[int] = None
     manual_prior: Optional[dict[str, float]] = None
     sample_multiplier: Optional[int] = None
+    wandb_debug: bool = False
     # TODO(undfined): Add field validation for weka/cluster/train_type here
 
 
