@@ -159,7 +159,7 @@ def generate_weights_dirichlet(
         logger.info(grouped_bounds)
 
 
-    # split prior distribution into source and topic distributions 
+    # split prior distribution into source and topic distributions and tweak it according to the manual prior
     topic_distributions = {}
     source_distribution = []
     for source_config in sorted(sources, key=lambda x: x.name):
