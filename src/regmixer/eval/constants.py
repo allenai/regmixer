@@ -2,209 +2,61 @@ from enum import Enum
 
 BASE_METRICS_PATH = "ai2-llm/regmixer"
 
-
 class WandbMetrics(Enum):
-    arc_challenge_len_norm = "eval/downstream/arc_challenge (length-normalized accuracy)"
-    arc_challenge_mc_5shot_accuracy = "eval/downstream/arc_challenge_mc_5shot (accuracy)"
-    arc_challenge_mc_5shot_bpb = "eval/downstream/arc_challenge_mc_5shot_bpb (BPB)"
-    arc_challenge_rc_5shot_bpb = "eval/downstream/arc_challenge_rc_5shot_bpb (BPB)"
-    arc_challenge_rc_5shot_len_norm = (
-        "eval/downstream/arc_challenge_rc_5shot (length-normalized accuracy)"
-    )
-    arc_challenge_test_rc_5shot_bpb = "eval/downstream/arc_challenge_test_rc_5shot (BPB)"
-    arc_easy_test_rc_5shot_bpb = "eval/downstream/arc_easy_test_rc_5shot (BPB)"
-    arc_easy_accuracy = "eval/downstream/arc_easy (accuracy)"
-    arc_easy_mc_5shot_accuracy = "eval/downstream/arc_easy_mc_5shot (accuracy)"
-    arc_easy_mc_5shot_bpb = "eval/downstream/arc_easy_mc_5shot_bpb (BPB)"
-    arc_easy_ppl_ce_loss = "eval/downstream/arc_easy_ppl (CE loss)"
-    arc_easy_rc_5shot_accuracy = "eval/downstream/arc_easy_rc_5shot (accuracy)"
-    arc_easy_rc_5shot_bpb = "eval/downstream/arc_easy_rc_5shot_bpb (BPB)"
-    basic_arithmetic_accuracy = "eval/downstream/basic_arithmetic (accuracy)"
-    boolq_accuracy = "eval/downstream/boolq (accuracy)"
-    boolq_mc_5shot_accuracy = "eval/downstream/boolq_mc_5shot (accuracy)"
-    boolq_mc_5shot_bpb = "eval/downstream/boolq_mc_5shot_bpb (BPB)"
-    boolq_rc_5shot_accuracy = "eval/downstream/boolq_rc_5shot (accuracy)"
-    boolq_rc_5shot_bpb = "eval/downstream/boolq_rc_5shot_bpb (BPB)"
-    c4_en_validation_ce_loss = "eval/lm/c4_en-validation/CE loss"
-    c4_en_validation_ppl = "eval/lm/c4_en-validation/PPL"
-    codex_humaneval_gold_bpb_0shot = "eval/downstream/codex_humaneval_gold_bpb_0shot (BPB)"
-    codex_mbpp_gold_bpb_0shot = "eval/downstream/codex_mbpp_gold_bpb_0shot (BPB)"
-    commonsense_qa_len_norm = "eval/downstream/commonsense_qa (length-normalized accuracy)"
-    copa_accuracy = "eval/downstream/copa (accuracy)"
-    csqa_mc_5shot_accuracy = "eval/downstream/csqa_mc_5shot (accuracy)"
-    csqa_mc_5shot_bpb = "eval/downstream/csqa_mc_5shot_bpb (BPB)"
-    csqa_rc_5shot_bpb = "eval/downstream/csqa_rc_5shot_bpb (BPB)"
-    csqa_rc_5shot_len_norm = "eval/downstream/csqa_rc_5shot (length-normalized accuracy)"
-    csqa_val_rc_5shot_bpb = "eval/downstream/csqa_val_rc_5shot (BPB)"
-    dolma_books_validation_ce_loss = "eval/lm/dolma_books-validation/CE loss"
-    dolma_books_validation_ppl = "eval/lm/dolma_books-validation/PPL"
-    dolma_common_crawl_validation_ce_loss = "eval/lm/dolma_common-crawl-validation/CE loss"
-    dolma_common_crawl_validation_ppl = "eval/lm/dolma_common-crawl-validation/PPL"
-    dolma_pes2o_validation_ce_loss = "eval/lm/dolma_pes2o-validation/CE loss"
-    dolma_pes2o_validation_ppl = "eval/lm/dolma_pes2o-validation/PPL"
-    dolma_reddit_validation_ce_loss = "eval/lm/dolma_reddit-validation/CE loss"
-    dolma_reddit_validation_ppl = "eval/lm/dolma_reddit-validation/PPL"
-    dolma_stack_validation_ce_loss = "eval/lm/dolma_stack-validation/CE loss"
-    dolma_stack_validation_ppl = "eval/lm/dolma_stack-validation/PPL"
-    dolma_wiki_validation_ce_loss = "eval/lm/dolma_wiki-validation/CE loss"
-    dolma_wiki_validation_ppl = "eval/lm/dolma_wiki-validation/PPL"
-    gsm8k_gold_bpb_5shot = "eval/downstream/gsm8k_gold_bpb_5shot (BPB)"
-    hellaswag_len_norm = "eval/downstream/hellaswag (length-normalized accuracy)"
-    hellaswag_len_norm_accuracy = "eval/downstream/hellaswag (length-normalized accuracy)"
-    hellaswag_mc_5shot_accuracy = "eval/downstream/hellaswag_mc_5shot (accuracy)"
-    hellaswag_mc_5shot_bpb = "eval/downstream/hellaswag_mc_5shot_bpb (BPB)"
-    hellaswag_rc_5shot_bpb = "eval/downstream/hellaswag_rc_5shot (BPB)"
-    hellaswag_rc_5shot_bpb_v2 = "eval/downstream/hellaswag_rc_5shot_bpb (BPB v2)"
-    hellaswag_rc_5shot_len_norm = "eval/downstream/hellaswag_rc_5shot (length-normalized accuracy)"
-    ice_validation_ce_loss = "eval/lm/ice-validation/CE loss"
-    ice_validation_ppl = "eval/lm/ice-validation/PPL"
-    m2d2_s2orc_validation_ce_loss = "eval/lm/m2d2_s2orc-validation/CE loss"
-    m2d2_s2orc_validation_ppl = "eval/lm/m2d2_s2orc-validation/PPL"
-    minerva_math_precalculus_gold_bpb_0shot = "eval/downstream/minerva_math_precalculus_gold_bpb_0shot (BPB)"
-    minerva_math_prealgebra_gold_bpb_0shot = "eval/downstream/minerva_math_prealgebra_gold_bpb_0shot (BPB)"
-    minerva_math_number_theory_gold_0shot = "eval/downstream/minerva_math_number_theory_gold_bpb_0shot (BPB)"
-    minerva_math_intermediate_algebra_gold_bpb_0shot = "eval/downstream/minerva_math_intermediate_algebra_gold_bpb_0shot (BPB)"
-    minerva_math_geometry_gold_bpb_0shot = "eval/downstream/minerva_math_geometry_gold_bpb_0shot (BPB)"
-    minerva_math_counting_and_probability_gold_bpb_0shot = "eval/downstream/minerva_math_counting_and_probability_gold_bpb_0shot (BPB)"
-    minerva_math_algebra_gold_bpb_0shot = "eval/downstream/minerva_math_algebra_gold_bpb_0shot (BPB)"
-    mmlu_humanities_bpb = "eval/downstream/mmlu_humanities_bpb (BPB)"
-    mmlu_humanities_test_rc_5shot_bpb = "eval/downstream/mmlu_humanities_test_rc_5shot (BPB)"
-    mmlu_humanities_mc_5shot_len_norm = (
-        "eval/downstream/mmlu_humanities_mc_5shot (length-normalized accuracy)"
-    )
-    mmlu_humanities_mc_5shot_test_len_norm = (
-        "eval/downstream/mmlu_humanities_mc_5shot_test (length-normalized accuracy)"
-    )
-    mmlu_humanities_var_bpb = "eval/downstream/mmlu_humanities_var_bpb (BPB)"
-    mmlu_humanities_var_len_norm = (
-        "eval/downstream/mmlu_humanities_var (length-normalized accuracy)"
-    )
-    mmlu_other_bpb = "eval/downstream/mmlu_other_bpb (BPB)"
-    mmlu_other_test_rc_5shot_bpb = "eval/downstream/mmlu_other_test_rc_5shot (BPB)"
-    mmlu_other_mc_5shot_len_norm = (
-        "eval/downstream/mmlu_other_mc_5shot (length-normalized accuracy)"
-    )
-    mmlu_other_mc_5shot_test_len_norm = (
-        "eval/downstream/mmlu_other_mc_5shot_test (length-normalized accuracy)"
-    )
-    mmlu_other_var_bpb = "eval/downstream/mmlu_other_var_bpb (BPB)"
-    mmlu_other_var_len_norm = "eval/downstream/mmlu_other_var (length-normalized accuracy)"
-    mmlu_social_sciences_bpb = "eval/downstream/mmlu_social_sciences_bpb (BPB)"
-    mmlu_social_sciences_test_rc_5shot_bpb = "eval/downstream/mmlu_social_sciences_test_rc_5shot (BPB)"
-    mmlu_social_sciences_mc_5shot_len_norm = (
-        "eval/downstream/mmlu_social_sciences_mc_5shot (length-normalized accuracy)"
-    )
-    mmlu_social_sciences_mc_5shot_test_len_norm = (
-        "eval/downstream/mmlu_social_sciences_mc_5shot_test (length-normalized accuracy)"
-    )
-    mmlu_social_sciences_var_bpb = "eval/downstream/mmlu_social_sciences_var_bpb (BPB)"
-    mmlu_social_sciences_var_len_norm = (
-        "eval/downstream/mmlu_social_sciences_var (length-normalized accuracy)"
-    )
-    mmlu_stem_bpb = "eval/downstream/mmlu_stem_bpb (BPB)"
-    mmlu_stem_test_rc_5shot_bpb = "eval/downstream/mmlu_stem_test_rc_5shot (BPB)"
-    mmlu_stem_mc_5shot_len_norm = "eval/downstream/mmlu_stem_mc_5shot (length-normalized accuracy)"
-    mmlu_stem_mc_5shot_test_len_norm = (
-        "eval/downstream/mmlu_stem_mc_5shot_test (length-normalized accuracy)"
-    )
-    mmlu_stem_var_bpb = "eval/downstream/mmlu_stem_var_bpb (BPB)"
-    mmlu_stem_var_len_norm = "eval/downstream/mmlu_stem_var (length-normalized accuracy)"
-    natural_qs_open_ppl_ce_loss = "eval/downstream/natural_qs_open_ppl (CE loss)"
-    openbook_qa_len_norm = "eval/downstream/openbook_qa (length-normalized accuracy)"
-    openbookqa_mc_5shot_accuracy = "eval/downstream/openbookqa_mc_5shot (accuracy)"
-    openbookqa_mc_5shot_bpb = "eval/downstream/openbookqa_mc_5shot_bpb (BPB)"
-    openbookqa_rc_5shot_bpb = "eval/downstream/openbookqa_rc_5shot_bpb (BPB)"
-    openbookqa_rc_5shot_len_norm = (
-        "eval/downstream/openbookqa_rc_5shot (length-normalized accuracy)"
-    )
-    pile_validation_ce_loss = "eval/lm/pile-validation/CE loss"
-    pile_validation_ppl = "eval/lm/pile-validation/PPL"
-    piqa_len_norm = "eval/downstream/piqa (length-normalized accuracy)"
-    piqa_mc_5shot_accuracy = "eval/downstream/piqa_mc_5shot (accuracy)"
-    piqa_mc_5shot_bpb = "eval/downstream/piqa_mc_5shot_bpb (BPB)"
-    piqa_rc_5shot_bpb = "eval/downstream/piqa_rc_5shot_bpb (BPB)"
-    piqa_rc_5shot_len_norm = "eval/downstream/piqa_rc_5shot (length-normalized accuracy)"
-    piqa_val_rc_5shot_bpb = "eval/downstream/piqa_val_rc_5shot (BPB)"
-    sciq_accuracy = "eval/downstream/sciq (accuracy)"
-    social_iqa_len_norm = "eval/downstream/social_iqa (length-normalized accuracy)"
-    socialiqa_mc_5shot_accuracy = "eval/downstream/socialiqa_mc_5shot (accuracy)"
-    socialiqa_mc_5shot_bpb = "eval/downstream/socialiqa_mc_5shot_bpb (BPB)"
-    socialiqa_rc_5shot_bpb = "eval/downstream/socialiqa_rc_5shot_bpb (BPB)"
-    socialiqa_val_rc_5shot_bpb = "eval/downstream/socialiqa_val_rc_5shot (BPB)"
-    socialiqa_rc_5shot_len_norm = "eval/downstream/socialiqa_rc_5shot (length-normalized accuracy)"
-    throughput_device_bps = "throughput/device/BPS"
-    train_ppl = "train/PPL"
-    train_loss = "train/CE loss"
-    trivia_qa_wiki_ppl_ce_loss = "eval/downstream/trivia_qa_wiki_ppl (CE loss)"
-    wikitext_103_validation_ce_loss = "eval/lm/wikitext_103-validation/CE loss"
-    wikitext_103_validation_ppl = "eval/lm/wikitext_103-validation/PPL"
-    winogrande_accuracy = "eval/downstream/winogrande (accuracy)"
-    winogrande_mc_5shot_accuracy = "eval/downstream/winogrande_mc_5shot (accuracy)"
-    winogrande_mc_5shot_bpb = "eval/downstream/winogrande_mc_5shot_bpb (BPB)"
-    winogrande_rc_5shot_accuracy = "eval/downstream/winogrande_rc_5shot (accuracy)"
-    winogrande_val_rc_5shot_bpb = "eval/downstream/winogrande_val_rc_5shot (BPB)"
+    arc_challenge_test_rc_5shot_bpb = "eval/downstream/arc_challenge_test_rc_5shot (BPB v2)"
+    arc_easy_test_rc_5shot_bpb = "eval/downstream/arc_easy_test_rc_5shot (BPB v2)"
+    codex_humaneval_gold_bpb_0shot = "eval/downstream/codex_humaneval_gold_bpb_0shot (BPB v2)"
+    codex_mbpp_gold_bpb_0shot = "eval/downstream/codex_mbpp_gold_bpb_0shot (BPB v2)"
+    csqa_val_rc_5shot_bpb = "eval/downstream/csqa_val_rc_5shot (BPB v2)"
+    gsm8k_gold_bpb_5shot = "eval/downstream/gsm8k_gold_bpb_5shot (BPB v2)"
+    hellaswag_rc_5shot_bpb = "eval/downstream/hellaswag_rc_5shot (BPB v2)"
+    minerva_math_precalculus_gold_bpb_0shot = "eval/downstream/minerva_math_precalculus_gold_bpb_0shot (BPB v2)"
+    minerva_math_prealgebra_gold_bpb_0shot = "eval/downstream/minerva_math_prealgebra_gold_bpb_0shot (BPB v2)"
+    minerva_math_number_theory_gold_0shot = "eval/downstream/minerva_math_number_theory_gold_bpb_0shot (BPB v2)"
+    minerva_math_intermediate_algebra_gold_bpb_0shot = "eval/downstream/minerva_math_intermediate_algebra_gold_bpb_0shot (BPB v2)"
+    minerva_math_geometry_gold_bpb_0shot = "eval/downstream/minerva_math_geometry_gold_bpb_0shot (BPB v2)"
+    minerva_math_counting_and_probability_gold_bpb_0shot = "eval/downstream/minerva_math_counting_and_probability_gold_bpb_0shot (BPB v2)"
+    minerva_math_algebra_gold_bpb_0shot = "eval/downstream/minerva_math_algebra_gold_bpb_0shot (BPB v2)"
+    mmlu_humanities_test_rc_5shot_bpb = "eval/downstream/mmlu_humanities_test_rc_5shot (BPB v2)"
+    mmlu_other_test_rc_5shot_bpb = "eval/downstream/mmlu_other_test_rc_5shot (BPB v2)"
+    mmlu_social_sciences_test_rc_5shot_bpb = "eval/downstream/mmlu_social_sciences_test_rc_5shot (BPB v2)"
+    mmlu_stem_test_rc_5shot_bpb = "eval/downstream/mmlu_stem_test_rc_5shot (BPB v2)"
+    piqa_val_rc_5shot_bpb = "eval/downstream/piqa_val_rc_5shot (BPB v2)"
+    socialiqa_val_rc_5shot_bpb = "eval/downstream/socialiqa_val_rc_5shot (BPB v2)"
+    winogrande_val_rc_5shot_bpb = "eval/downstream/winogrande_val_rc_5shot (BPB v2)"
+
+    arc_challenge_test_rc_5shot_bpb_v1 = "eval/downstream/arc_challenge_test_rc_5shot (BPB)"
+    arc_easy_test_rc_5shot_bpb_v1 = "eval/downstream/arc_easy_test_rc_5shot (BPB)"
+    codex_humaneval_gold_bpb_0shot_v1 = "eval/downstream/codex_humaneval_gold_bpb_0shot (BPB)"
+    codex_mbpp_gold_bpb_0shot_v1 = "eval/downstream/codex_mbpp_gold_bpb_0shot (BPB)"
+    csqa_val_rc_5shot_bpb_v1 = "eval/downstream/csqa_val_rc_5shot (BPB)"
+    gsm8k_gold_bpb_5shot_v1 = "eval/downstream/gsm8k_gold_bpb_5shot (BPB)"
+    hellaswag_rc_5shot_bpb_v1 = "eval/downstream/hellaswag_rc_5shot (BPB)"
+    minerva_math_precalculus_gold_bpb_0shot_v1 = "eval/downstream/minerva_math_precalculus_gold_bpb_0shot (BPB)"
+    minerva_math_prealgebra_gold_bpb_0shot_v1 = "eval/downstream/minerva_math_prealgebra_gold_bpb_0shot (BPB)"
+    minerva_math_number_theory_gold_0shot_v1 = "eval/downstream/minerva_math_number_theory_gold_bpb_0shot (BPB)"
+    minerva_math_intermediate_algebra_gold_bpb_0shot_v1 = "eval/downstream/minerva_math_intermediate_algebra_gold_bpb_0shot (BPB)"
+    minerva_math_geometry_gold_bpb_0shot_v1 = "eval/downstream/minerva_math_geometry_gold_bpb_0shot (BPB)"
+    minerva_math_counting_and_probability_gold_bpb_0shot_v1 = "eval/downstream/minerva_math_counting_and_probability_gold_bpb_0shot (BPB)"
+    minerva_math_algebra_gold_bpb_0shot_v1 = "eval/downstream/minerva_math_algebra_gold_bpb_0shot (BPB)"
+    mmlu_humanities_test_rc_5shot_bpb_v1 = "eval/downstream/mmlu_humanities_test_rc_5shot (BPB)"
+    mmlu_other_test_rc_5shot_bpb_v1 = "eval/downstream/mmlu_other_test_rc_5shot (BPB)"
+    mmlu_social_sciences_test_rc_5shot_bpb_v1 = "eval/downstream/mmlu_social_sciences_test_rc_5shot (BPB)"
+    mmlu_stem_test_rc_5shot_bpb_v1 = "eval/downstream/mmlu_stem_test_rc_5shot (BPB)"
+    piqa_val_rc_5shot_bpb_v1 = "eval/downstream/piqa_val_rc_5shot (BPB)"
+    socialiqa_val_rc_5shot_bpb_v1 = "eval/downstream/socialiqa_val_rc_5shot (BPB)"
+    winogrande_val_rc_5shot_bpb_v1 = "eval/downstream/winogrande_val_rc_5shot (BPB)"
 
 
 class GroupedWandbMetrics(Enum):
-    val_loss = [
-        WandbMetrics.wikitext_103_validation_ce_loss.value,
-        WandbMetrics.pile_validation_ce_loss.value,
-        WandbMetrics.m2d2_s2orc_validation_ce_loss.value,
-        WandbMetrics.ice_validation_ce_loss.value,
-        WandbMetrics.dolma_wiki_validation_ce_loss.value,
-        WandbMetrics.dolma_stack_validation_ce_loss.value,
-        WandbMetrics.dolma_reddit_validation_ce_loss.value,
-        WandbMetrics.dolma_pes2o_validation_ce_loss.value,
-        WandbMetrics.dolma_common_crawl_validation_ce_loss.value,
-        WandbMetrics.dolma_books_validation_ce_loss.value,
-        WandbMetrics.c4_en_validation_ce_loss.value,
-    ]
-    books = [
-        WandbMetrics.dolma_books_validation_ce_loss.value
-    ]
-    c4 = [
-        WandbMetrics.c4_en_validation_ce_loss.value
-    ]
     hellaswag = [
         WandbMetrics.hellaswag_rc_5shot_bpb.value,
-    ]
-    hellaswag_v2 = [
-        WandbMetrics.hellaswag_rc_5shot_bpb_v2.value,
     ]
     winogrande = [
         WandbMetrics.winogrande_val_rc_5shot_bpb.value,
     ]
-    arc_challenge = [
-        WandbMetrics.arc_challenge_len_norm.value,
-        WandbMetrics.arc_challenge_mc_5shot_accuracy.value,
-        WandbMetrics.arc_challenge_rc_5shot_len_norm.value,
-    ]
-    arc_challenge_bpb = [
-        WandbMetrics.arc_challenge_mc_5shot_bpb.value,
-        WandbMetrics.arc_challenge_rc_5shot_bpb.value,
-    ]
-    arc_easy = [
-        WandbMetrics.arc_easy_accuracy.value,
-        WandbMetrics.arc_easy_mc_5shot_accuracy.value,
-        WandbMetrics.arc_easy_ppl_ce_loss.value,
-        WandbMetrics.arc_easy_rc_5shot_accuracy.value,
-    ]
     arc_easy_new = [
         WandbMetrics.arc_easy_test_rc_5shot_bpb.value
-    ]
-    arc_easy_bpb = [
-        WandbMetrics.arc_easy_mc_5shot_bpb.value,
-        WandbMetrics.arc_easy_rc_5shot_bpb.value,
-    ]
-    mmlu_bpb = [
-        WandbMetrics.mmlu_humanities_bpb.value,
-        WandbMetrics.mmlu_humanities_var_bpb.value,
-        WandbMetrics.mmlu_other_bpb.value,
-        WandbMetrics.mmlu_other_var_bpb.value,
-        WandbMetrics.mmlu_social_sciences_bpb.value,
-        WandbMetrics.mmlu_social_sciences_var_bpb.value,
-        WandbMetrics.mmlu_stem_bpb.value,
-        WandbMetrics.mmlu_stem_var_bpb.value,
     ]
     mmlu_bpb_new = [
         WandbMetrics.mmlu_humanities_test_rc_5shot_bpb.value,
@@ -212,85 +64,8 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.mmlu_social_sciences_test_rc_5shot_bpb.value,
         WandbMetrics.mmlu_stem_test_rc_5shot_bpb.value,
     ]
-    mmlu_len_norm = [
-        WandbMetrics.mmlu_humanities_mc_5shot_len_norm.value,
-        WandbMetrics.mmlu_humanities_mc_5shot_test_len_norm.value,
-        WandbMetrics.mmlu_humanities_var_len_norm.value,
-        WandbMetrics.mmlu_other_mc_5shot_len_norm.value,
-        WandbMetrics.mmlu_other_mc_5shot_test_len_norm.value,
-        WandbMetrics.mmlu_other_var_len_norm.value,
-        WandbMetrics.mmlu_social_sciences_mc_5shot_len_norm.value,
-        WandbMetrics.mmlu_social_sciences_mc_5shot_test_len_norm.value,
-        WandbMetrics.mmlu_social_sciences_var_len_norm.value,
-        WandbMetrics.mmlu_stem_mc_5shot_len_norm.value,
-        WandbMetrics.mmlu_stem_mc_5shot_test_len_norm.value,
-        WandbMetrics.mmlu_stem_var_len_norm.value,
-    ]
-    few_shot = [
-        WandbMetrics.arc_challenge_mc_5shot_accuracy.value,
-        WandbMetrics.arc_challenge_rc_5shot_len_norm.value,
-        WandbMetrics.arc_easy_mc_5shot_accuracy.value,
-        WandbMetrics.arc_easy_rc_5shot_accuracy.value,
-        WandbMetrics.boolq_mc_5shot_accuracy.value,
-        WandbMetrics.boolq_rc_5shot_accuracy.value,
-        WandbMetrics.csqa_mc_5shot_accuracy.value,
-        WandbMetrics.csqa_rc_5shot_len_norm.value,
-        WandbMetrics.hellaswag_mc_5shot_accuracy.value,
-        WandbMetrics.hellaswag_rc_5shot_len_norm.value,
-        WandbMetrics.mmlu_humanities_mc_5shot_len_norm.value,
-        WandbMetrics.mmlu_humanities_mc_5shot_test_len_norm.value,
-        WandbMetrics.mmlu_other_mc_5shot_len_norm.value,
-        WandbMetrics.mmlu_other_mc_5shot_test_len_norm.value,
-        WandbMetrics.mmlu_social_sciences_mc_5shot_len_norm.value,
-        WandbMetrics.mmlu_social_sciences_mc_5shot_test_len_norm.value,
-        WandbMetrics.mmlu_stem_mc_5shot_len_norm.value,
-        WandbMetrics.mmlu_stem_mc_5shot_test_len_norm.value,
-        WandbMetrics.openbookqa_mc_5shot_accuracy.value,
-        WandbMetrics.openbookqa_rc_5shot_len_norm.value,
-        WandbMetrics.piqa_mc_5shot_accuracy.value,
-        WandbMetrics.piqa_rc_5shot_len_norm.value,
-        WandbMetrics.socialiqa_mc_5shot_accuracy.value,
-        WandbMetrics.socialiqa_rc_5shot_len_norm.value,
-        WandbMetrics.winogrande_mc_5shot_accuracy.value,
-        WandbMetrics.winogrande_rc_5shot_accuracy.value,
-    ]
-    few_shot_bpb_mc = [
-        WandbMetrics.arc_challenge_mc_5shot_bpb.value,
-        WandbMetrics.arc_easy_mc_5shot_bpb.value,
-        WandbMetrics.boolq_mc_5shot_bpb.value,
-        WandbMetrics.csqa_mc_5shot_bpb.value,
-        WandbMetrics.hellaswag_mc_5shot_bpb.value,
-        WandbMetrics.openbookqa_mc_5shot_bpb.value,
-        WandbMetrics.piqa_mc_5shot_bpb.value,
-        WandbMetrics.socialiqa_mc_5shot_bpb.value,
-        WandbMetrics.winogrande_mc_5shot_bpb.value,
-    ]
-    few_shot_bpb_rc = [
-        WandbMetrics.arc_challenge_rc_5shot_bpb.value,
-        WandbMetrics.arc_easy_rc_5shot_bpb.value,
-        WandbMetrics.boolq_rc_5shot_bpb.value,
-        WandbMetrics.csqa_rc_5shot_bpb.value,
-        WandbMetrics.hellaswag_rc_5shot_bpb.value,
-        WandbMetrics.openbookqa_rc_5shot_bpb.value,
-        WandbMetrics.piqa_rc_5shot_bpb.value,
-        WandbMetrics.socialiqa_rc_5shot_bpb.value,
-        WandbMetrics.winogrande_val_rc_5shot_bpb.value,
-    ]
-    validation_loss = [
-        WandbMetrics.c4_en_validation_ce_loss.value,
-        WandbMetrics.dolma_books_validation_ce_loss.value,
-        WandbMetrics.dolma_common_crawl_validation_ce_loss.value,
-        WandbMetrics.dolma_pes2o_validation_ce_loss.value,
-        WandbMetrics.dolma_reddit_validation_ce_loss.value,
-        WandbMetrics.dolma_stack_validation_ce_loss.value,
-        WandbMetrics.dolma_wiki_validation_ce_loss.value,
-        WandbMetrics.ice_validation_ce_loss.value,
-        WandbMetrics.m2d2_s2orc_validation_ce_loss.value,
-        WandbMetrics.pile_validation_ce_loss.value,
-    ]
-    train_loss = [WandbMetrics.train_loss.value]
     all_metrics = [metric.value for metric in WandbMetrics]
-    all_bpb = [
+    all_bpb_v2 = [
         WandbMetrics.mmlu_social_sciences_test_rc_5shot_bpb.value,
         WandbMetrics.mmlu_humanities_test_rc_5shot_bpb.value,
         WandbMetrics.mmlu_other_test_rc_5shot_bpb.value,
@@ -313,7 +88,7 @@ class GroupedWandbMetrics(Enum):
         WandbMetrics.arc_easy_test_rc_5shot_bpb.value,
         WandbMetrics.arc_challenge_test_rc_5shot_bpb.value,
     ]
-    all_bpb_with_offline = [
+    all_bpb_with_offline_v2 = [
         WandbMetrics.mmlu_social_sciences_test_rc_5shot_bpb.value,
         WandbMetrics.mmlu_humanities_test_rc_5shot_bpb.value,
         WandbMetrics.mmlu_other_test_rc_5shot_bpb.value,
@@ -358,7 +133,179 @@ class GroupedWandbMetrics(Enum):
         'mt_mbpp:scala',
         'mt_mbpp:swift',
         'mt_mbpp:typescript',
-]
+    ]
+
+
+    all_bpb_with_offline_extended_v2 = [
+        WandbMetrics.mmlu_social_sciences_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_humanities_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_other_test_rc_5shot_bpb.value,
+        WandbMetrics.mmlu_stem_test_rc_5shot_bpb.value,
+        WandbMetrics.winogrande_val_rc_5shot_bpb.value,
+        WandbMetrics.socialiqa_val_rc_5shot_bpb.value,
+        WandbMetrics.piqa_val_rc_5shot_bpb.value,
+        WandbMetrics.minerva_math_algebra_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_counting_and_probability_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_geometry_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_intermediate_algebra_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_number_theory_gold_0shot.value,
+        WandbMetrics.minerva_math_prealgebra_gold_bpb_0shot.value,
+        WandbMetrics.minerva_math_precalculus_gold_bpb_0shot.value,
+        WandbMetrics.gsm8k_gold_bpb_5shot.value,
+        WandbMetrics.hellaswag_rc_5shot_bpb.value, 
+        WandbMetrics.csqa_val_rc_5shot_bpb.value,
+        WandbMetrics.codex_mbpp_gold_bpb_0shot.value,
+        WandbMetrics.codex_humaneval_gold_bpb_0shot.value,
+        WandbMetrics.arc_easy_test_rc_5shot_bpb.value,
+        WandbMetrics.arc_challenge_test_rc_5shot_bpb.value,
+        'basic_skills_arithmetic:rc::olmes',
+        'basic_skills_coding:rc::olmes',
+        'basic_skills_common_knowledge:rc::olmes',
+        'basic_skills_logical_reasoning:rc::olmes',
+        'basic_skills_string_operations:rc::olmes',
+        'basic_skills_pattern:rc::olmes',
+        'mt_mbpp:bash',
+        'mt_mbpp:c',
+        'mt_mbpp:cpp',
+        'mt_mbpp:csharp',
+        'mt_mbpp:go',
+        'mt_mbpp:haskell',
+        'mt_mbpp:java',
+        'mt_mbpp:javascript',
+        'mt_mbpp:matlab',
+        'mt_mbpp:php',
+        'mt_mbpp:python',
+        'mt_mbpp:r',
+        'mt_mbpp:ruby',
+        'mt_mbpp:rust',
+        'mt_mbpp:scala',
+        'mt_mbpp:swift',
+        'mt_mbpp:typescript',
+        "medmcqa:rc:bpb::none",
+        "lambada",
+        "sciq:bpb::olmo1",
+        "squad:rc:bpb::gen2mc",
+        "naturalqs:rc:bpb::gen2mc",
+        "jeopardy:rc:bpb::gen2mc",
+        "drop:rc:bpb::gen2mc",
+        "coqa:rc:bpb::gen2mc",
+        "ultrachat_masked_ppl",
+        "wildchat_masked_ppl",
+    ]
+
+
+
+
+    superswarm_offline = [
+        'arc_challenge:rc::olmes:full',
+        'arc_easy:rc::olmes:full',
+        'basic_skills:rc::olmes',
+        'basic_skills_arithmetic:rc::olmes',
+        'basic_skills_coding:rc::olmes',
+        'basic_skills_common_knowledge:rc::olmes',
+        'basic_skills_logical_reasoning:rc::olmes',
+        'basic_skills_pattern:rc::olmes',
+        'basic_skills_string_operations:rc::olmes',
+        'codex_humaneval:3shot:bpb::none',
+        'coqa:rc:bpb::gen2mc',
+        'csqa:rc::olmes:full',
+        'drop:rc:bpb::gen2mc',
+        'hellaswag:rc::olmes',
+        'jeopardy:rc:bpb::gen2mc',
+        'lambada',
+        'mbpp:3shot:bpb::none',
+        'medmcqa:rc:bpb::none',
+        'minerva_math_algebra::olmes',
+        'minerva_math_counting_and_probability::olmes',
+        'minerva_math_geometry::olmes',
+        'minerva_math_intermediate_algebra::olmes',
+        'minerva_math_number_theory::olmes',
+        'minerva_math_prealgebra::olmes',
+        'minerva_math_precalculus::olmes',
+        'mmlu_abstract_algebra:rc::olmes',
+        'mmlu_anatomy:rc::olmes',
+        'mmlu_astronomy:rc::olmes',
+        'mmlu_business_ethics:rc::olmes',
+        'mmlu_clinical_knowledge:rc::olmes',
+        'mmlu_college_biology:rc::olmes',
+        'mmlu_college_chemistry:rc::olmes',
+        'mmlu_college_computer_science:rc::olmes',
+        'mmlu_college_mathematics:rc::olmes',
+        'mmlu_college_medicine:rc::olmes',
+        'mmlu_college_physics:rc::olmes',
+        'mmlu_computer_security:rc::olmes',
+        'mmlu_conceptual_physics:rc::olmes',
+        'mmlu_econometrics:rc::olmes',
+        'mmlu_electrical_engineering:rc::olmes',
+        'mmlu_elementary_mathematics:rc::olmes',
+        'mmlu_formal_logic:rc::olmes',
+        'mmlu_global_facts:rc::olmes',
+        'mmlu_high_school_biology:rc::olmes',
+        'mmlu_high_school_chemistry:rc::olmes',
+        'mmlu_high_school_computer_science:rc::olmes',
+        'mmlu_high_school_european_history:rc::olmes',
+        'mmlu_high_school_geography:rc::olmes',
+        'mmlu_high_school_government_and_politics:rc::olmes',
+        'mmlu_high_school_macroeconomics:rc::olmes',
+        'mmlu_high_school_mathematics:rc::olmes',
+        'mmlu_high_school_microeconomics:rc::olmes',
+        'mmlu_high_school_physics:rc::olmes',
+        'mmlu_high_school_psychology:rc::olmes',
+        'mmlu_high_school_statistics:rc::olmes',
+        'mmlu_high_school_us_history:rc::olmes',
+        'mmlu_high_school_world_history:rc::olmes',
+        'mmlu_human_aging:rc::olmes',
+        'mmlu_human_sexuality:rc::olmes',
+        'mmlu_international_law:rc::olmes',
+        'mmlu_jurisprudence:rc::olmes',
+        'mmlu_logical_fallacies:rc::olmes',
+        'mmlu_machine_learning:rc::olmes',
+        'mmlu_management:rc::olmes',
+        'mmlu_marketing:rc::olmes',
+        'mmlu_medical_genetics:rc::olmes',
+        'mmlu_miscellaneous:rc::olmes',
+        'mmlu_moral_disputes:rc::olmes',
+        'mmlu_moral_scenarios:rc::olmes',
+        'mmlu_nutrition:rc::olmes',
+        'mmlu_philosophy:rc::olmes',
+        'mmlu_prehistory:rc::olmes',
+        'mmlu_professional_accounting:rc::olmes',
+        'mmlu_professional_law:rc::olmes',
+        'mmlu_professional_medicine:rc::olmes',
+        'mmlu_professional_psychology:rc::olmes',
+        'mmlu_public_relations:rc::olmes',
+        'mmlu_security_studies:rc::olmes',
+        'mmlu_sociology:rc::olmes',
+        'mmlu_us_foreign_policy:rc::olmes',
+        'mmlu_virology:rc::olmes',
+        'mmlu_world_religions:rc::olmes',
+        'mt_mbpp:bash',
+        'mt_mbpp:c',
+        'mt_mbpp:cpp',
+        'mt_mbpp:csharp',
+        'mt_mbpp:go',
+        'mt_mbpp:haskell',
+        'mt_mbpp:java',
+        'mt_mbpp:javascript',
+        'mt_mbpp:matlab',
+        'mt_mbpp:php',
+        'mt_mbpp:python',
+        'mt_mbpp:r',
+        'mt_mbpp:ruby',
+        'mt_mbpp:rust',
+        'mt_mbpp:scala',
+        'mt_mbpp:swift',
+        'mt_mbpp:typescript',
+        'naturalqs:rc:bpb::gen2mc',
+        'piqa:rc::olmes:full',
+        'sciq:bpb::olmo1',
+        'socialiqa:rc::olmes:full',
+        'squad:rc:bpb::gen2mc',
+        'ultrachat_masked_ppl',
+        'wildchat_masked_ppl',
+        'winogrande:rc::olmes:full'
+    ]
+
 
 
 # arc_easy, arc_challenge, hellaswag, MMLU macro average, 
@@ -636,6 +583,53 @@ class ObjectiveWeights(Enum):
         'eval/downstream/hellaswag_rc_5shot (BPB)': 0.1224062008755367
     }
 
+    correlation_weighting_dclm_sparse = {
+        'eval/downstream/minerva_math_geometry_gold_bpb_0shot (BPB)': 0.005239520930643196,
+        'mt_mbpp:r': 0.005245586098461745,
+        'eval/downstream/minerva_math_precalculus_gold_bpb_0shot (BPB)': 0.00537951931199167,
+        'mt_mbpp:matlab': 0.005456034168930605,
+        'eval/downstream/minerva_math_intermediate_algebra_gold_bpb_0shot (BPB)': 0.005553213742435863,
+        'eval/downstream/minerva_math_prealgebra_gold_bpb_0shot (BPB)': 0.005629442025380779,
+        'eval/downstream/minerva_math_counting_and_probability_gold_bpb_0shot (BPB)': 0.0056366462349045215,
+        'mt_mbpp:javascript': 0.005644954761429247,
+        'eval/downstream/minerva_math_number_theory_gold_bpb_0shot (BPB)': 0.005646712935048898,
+        'eval/downstream/codex_humaneval_gold_bpb_0shot (BPB)': 0.005672471672771108,
+        'eval/downstream/minerva_math_algebra_gold_bpb_0shot (BPB)': 0.0056954750244375485,
+        'mt_mbpp:go': 0.00569706813051838,
+        'mt_mbpp:c': 0.005704097891551834,
+        'mt_mbpp:typescript': 0.00573072119065053,
+        'mt_mbpp:python': 0.005842732531490182,
+        'mt_mbpp:rust': 0.00585724280693954,
+        'mt_mbpp:cpp': 0.0058618922789339225,
+        'mt_mbpp:swift': 0.005887438045530573,
+        'mt_mbpp:java': 0.0059244265606680745,
+        'mt_mbpp:scala': 0.005944786265517205,
+        'eval/downstream/codex_mbpp_gold_bpb_0shot (BPB)': 0.005959389357859868,
+        'mt_mbpp:ruby': 0.006066397887090289,
+        'mt_mbpp:haskell': 0.006084006582854514,
+        'mt_mbpp:php': 0.006116356312643322,
+        'mt_mbpp:csharp': 0.006125595044432074,
+        'basic_skills_coding:rc::olmes': 0.006438849885747199,
+        'mt_mbpp:bash': 0.0065327121690752195,
+        'basic_skills_string_operations:rc::olmes': 0.006762693899027194,
+        'eval/downstream/mmlu_stem_test_rc_5shot (BPB)': 0.008639159171155012,
+        'basic_skills_arithmetic:rc::olmes': 0.008758413518277837,
+        'eval/downstream/gsm8k_gold_bpb_5shot (BPB)': 0.010390182921614012,
+        'basic_skills_pattern:rc::olmes': 0.012363294243874137,
+        'basic_skills_logical_reasoning:rc::olmes': 0.012798094406359782,
+        'eval/downstream/arc_challenge_test_rc_5shot (BPB)': 0.02147275532174113,
+        'eval/downstream/arc_easy_test_rc_5shot (BPB)': 0.02352599395769746,
+        'basic_skills_common_knowledge:rc::olmes': 0.02856753880559205,
+        'eval/downstream/mmlu_other_test_rc_5shot (BPB)': 0.04159610758211104,
+        'eval/downstream/mmlu_social_sciences_test_rc_5shot (BPB)': 0.044858139940140616,
+        'eval/downstream/piqa_val_rc_5shot (BPB)': 0.054194436859425696,
+        'eval/downstream/hellaswag_rc_5shot (BPB)': 0.05858747247246967,
+        'eval/downstream/csqa_val_rc_5shot (BPB)': 0.0650531945429434,
+        'eval/downstream/mmlu_humanities_test_rc_5shot (BPB)': 0.08341136701331242,
+        'eval/downstream/socialiqa_val_rc_5shot (BPB)': 0.09317032882648811,
+        'eval/downstream/winogrande_val_rc_5shot (BPB)': 0.2692775366698324
+    }
+
 
     mbpp_dummy = {
         #'eval/downstream/codex_mbpp_gold_bpb_0shot (BPB)': 0,
@@ -684,4 +678,159 @@ class ObjectiveWeights(Enum):
         'eval/downstream/arc_challenge_test_rc_5shot (BPB)': 0,
         'eval/downstream/mmlu_other_test_rc_5shot (BPB)': 0,
 
+    }
+
+    superswarm_aggregation ={
+        # basic skills
+        'basic_skills:rc::olmes': 1.0/7,
+        'basic_skills_arithmetic:rc::olmes': 1.0/7,
+        'basic_skills_coding:rc::olmes': 1.0/7,
+        'basic_skills_common_knowledge:rc::olmes': 1.0/7,
+        'basic_skills_logical_reasoning:rc::olmes': 1.0/7,
+        'basic_skills_pattern:rc::olmes': 1.0/7,
+        'basic_skills_string_operations:rc::olmes': 1.0/7,
+        # minerva
+        'minerva_math_algebra::olmes': 1.0/7,
+        'minerva_math_counting_and_probability::olmes': 1.0/7,
+        'minerva_math_geometry::olmes': 1.0/7,
+        'minerva_math_intermediate_algebra::olmes': 1.0/7,
+        'minerva_math_number_theory::olmes': 1.0/7,
+        'minerva_math_prealgebra::olmes': 1.0/7,
+        'minerva_math_precalculus::olmes': 1.0/7,
+        # stem 
+        'mmlu_abstract_algebra:rc::olmes': 0.03313452617627568, 
+        'mmlu_astronomy:rc::olmes': 0.05036447978793903, 
+        'mmlu_college_biology:rc::olmes': 0.04771371769383698, 
+        'mmlu_college_chemistry:rc::olmes': 0.03313452617627568, 
+        'mmlu_college_computer_science:rc::olmes': 0.03313452617627568, 
+        'mmlu_college_mathematics:rc::olmes': 0.03313452617627568, 
+        'mmlu_college_physics:rc::olmes': 0.033797216699801194, 
+        'mmlu_computer_security:rc::olmes': 0.03313452617627568, 
+        'mmlu_conceptual_physics:rc::olmes': 0.07786613651424784, 
+        'mmlu_electrical_engineering:rc::olmes': 0.04804506295559974, 
+        'mmlu_elementary_mathematics:rc::olmes': 0.12524850894632206, 
+        'mmlu_high_school_biology:rc::olmes': 0.10271703114645461, 
+        'mmlu_high_school_chemistry:rc::olmes': 0.06726308813783963, 
+        'mmlu_high_school_computer_science:rc::olmes': 0.03313452617627568, 
+        'mmlu_high_school_mathematics:rc::olmes': 0.08946322067594434, 
+        'mmlu_high_school_physics:rc::olmes': 0.050033134526176276, 
+        'mmlu_high_school_statistics:rc::olmes': 0.07157057654075547, 
+        'mmlu_machine_learning:rc::olmes': 0.03711066931742876,
+        # other 
+        'mmlu_anatomy:rc::olmes': 0.04164096236890808, 
+        'mmlu_business_ethics:rc::olmes': 0.030845157310302282, 
+        'mmlu_clinical_knowledge:rc::olmes': 0.08173966687230105, 
+        'mmlu_college_medicine:rc::olmes': 0.05336212214682295, 
+        'mmlu_global_facts:rc::olmes': 0.030845157310302282, 
+        'mmlu_human_aging:rc::olmes': 0.06878470080197409, 
+        'mmlu_management:rc::olmes': 0.03177051202961135, 
+        'mmlu_marketing:rc::olmes': 0.07217766810610735, 
+        'mmlu_medical_genetics:rc::olmes': 0.030845157310302282, 
+        'mmlu_miscellaneous:rc::olmes': 0.24151758173966686, 
+        'mmlu_nutrition:rc::olmes': 0.09438618136952498, 
+        'mmlu_professional_accounting:rc::olmes': 0.08698334361505243, 
+        'mmlu_professional_medicine:rc::olmes': 0.08389882788402221, 
+        'mmlu_virology:rc::olmes': 0.05120296113510179,
+        # social sciences 
+        'mmlu_econometrics:rc::olmes': 0.03704907377315567, 
+        'mmlu_high_school_geography:rc::olmes': 0.06434839129021774, 
+        'mmlu_high_school_government_and_politics:rc::olmes': 0.06272343191420214, 
+        'mmlu_high_school_macroeconomics:rc::olmes': 0.12674683132921677, 
+        'mmlu_high_school_microeconomics:rc::olmes': 0.07734806629834254, 
+        'mmlu_high_school_psychology:rc::olmes': 0.17712057198570036, 
+        'mmlu_human_sexuality:rc::olmes': 0.04257393565160871, 
+        'mmlu_professional_psychology:rc::olmes': 0.19889502762430938, 
+        'mmlu_public_relations:rc::olmes': 0.03574910627234319, 
+        'mmlu_security_studies:rc::olmes': 0.07962300942476438, 
+        'mmlu_sociology:rc::olmes': 0.0653233669158271, 
+        'mmlu_us_foreign_policy:rc::olmes': 0.032499187520311994,
+        # mmlu humanities
+        'mmlu_formal_logic:rc::olmes': 0.026780021253985122, 
+        'mmlu_high_school_european_history:rc::olmes': 0.03506907545164718, 
+        'mmlu_high_school_us_history:rc::olmes': 0.04335812964930925, 
+        'mmlu_high_school_world_history:rc::olmes': 0.050371944739638685, 
+        'mmlu_international_law:rc::olmes': 0.0257173219978746, 
+        'mmlu_jurisprudence:rc::olmes': 0.022954303931987247, 
+        'mmlu_logical_fallacies:rc::olmes': 0.034643995749202974, 
+        'mmlu_moral_disputes:rc::olmes': 0.07353878852284804, 
+        'mmlu_moral_scenarios:rc::olmes': 0.1902231668437832, 
+        'mmlu_philosophy:rc::olmes': 0.06609989373007438,
+        'mmlu_prehistory:rc::olmes': 0.06886291179596174, 
+        'mmlu_professional_law:rc::olmes': 0.32603613177470775, 
+        'mmlu_world_religions:rc::olmes': 0.03634431455897981,
+        # mt_mbpp
+        'mt_mbpp:bash': 1.0/17,
+        'mt_mbpp:c': 1.0/17,
+        'mt_mbpp:cpp': 1.0/17,
+        'mt_mbpp:csharp': 1.0/17,
+        'mt_mbpp:go': 1.0/17,
+        'mt_mbpp:haskell': 1.0/17,
+        'mt_mbpp:java': 1.0/17,
+        'mt_mbpp:javascript': 1.0/17,
+        'mt_mbpp:matlab': 1.0/17,
+        'mt_mbpp:php': 1.0/17,
+        'mt_mbpp:python': 1.0/17,
+        'mt_mbpp:r': 1.0/17,
+        'mt_mbpp:ruby': 1.0/17,
+        'mt_mbpp:rust': 1.0/17,
+        'mt_mbpp:scala': 1.0/17,
+        'mt_mbpp:swift': 1.0/17,
+        'mt_mbpp:typescript': 1.0/17,
+    }
+
+    correlation_weighting_dclm_extended_offline = {
+        'eval/downstream/minerva_math_geometry_gold_bpb_0shot (BPB v2)': 0.0029589791703501047,
+        'eval/downstream/minerva_math_precalculus_gold_bpb_0shot (BPB v2)': 0.0030275798154705013,
+        'eval/downstream/minerva_math_intermediate_algebra_gold_bpb_0shot (BPB v2)': 0.003111356868574844,
+        'eval/downstream/minerva_math_number_theory_gold_bpb_0shot (BPB v2)': 0.0031595880240788037,
+        'eval/downstream/minerva_math_prealgebra_gold_bpb_0shot (BPB v2)': 0.0031670497151016965,
+        'eval/downstream/minerva_math_counting_and_probability_gold_bpb_0shot (BPB v2)': 0.0031752325055313777,
+        'eval/downstream/minerva_math_algebra_gold_bpb_0shot (BPB v2)': 0.003191955969918212,
+        'mt_mbpp:r': 0.003414208146878201,
+        'mt_mbpp:matlab': 0.00358249916054894,
+        'wildchat_masked_ppl': 0.003678911895055936,
+        'mt_mbpp:javascript': 0.003753168416833777,
+        'eval/downstream/codex_humaneval_gold_bpb_0shot (BPB v2)': 0.0037587131893723562,
+        'mt_mbpp:c': 0.0037835682111721685,
+        'mt_mbpp:go': 0.003786298387483953,
+        'mt_mbpp:typescript': 0.003832162381184278,
+        'mt_mbpp:cpp': 0.00391335444325111,
+        'mt_mbpp:python': 0.003914600489936723,
+        'mt_mbpp:rust': 0.003928436122297528,
+        'mt_mbpp:swift': 0.003946893926393939,
+        'mt_mbpp:java': 0.003969814790805483,
+        'mt_mbpp:scala': 0.004004753140900555,
+        'eval/downstream/codex_mbpp_gold_bpb_0shot (BPB v2)': 0.004028054041512725,
+        'mt_mbpp:haskell': 0.004055788260868774,
+        'mt_mbpp:ruby': 0.0040810224620352106,
+        'eval/downstream/mmlu_stem_test_rc_5shot (BPB v2)': 0.004113866516312608,
+        'mt_mbpp:csharp': 0.004129450015547077,
+        'mt_mbpp:php': 0.004140908435008496,
+        'basic_skills_coding:rc::olmes': 0.00438834857562022,
+        'basic_skills_string_operations:rc::olmes': 0.004397297119380164,
+        'mt_mbpp:bash': 0.004514727113091162,
+        'basic_skills_arithmetic:rc::olmes': 0.004843323025965316,
+        'eval/downstream/gsm8k_gold_bpb_5shot (BPB v2)': 0.005384481825221689,
+        'basic_skills_pattern:rc::olmes': 0.006590641261453129,
+        'basic_skills_logical_reasoning:rc::olmes': 0.006646412482116519,
+        'ultrachat_masked_ppl': 0.006754150112395063,
+        'sciq:bpb::olmo1': 0.008615166982853502,
+        'eval/downstream/arc_challenge_test_rc_5shot (BPB v2)': 0.009668141114376683,
+        'eval/downstream/arc_easy_test_rc_5shot (BPB v2)': 0.010921643704559392,
+        'basic_skills_common_knowledge:rc::olmes': 0.01337122273232816,
+        'squad:rc:bpb::gen2mc': 0.01620389258607839,
+        'eval/downstream/mmlu_other_test_rc_5shot (BPB v2)': 0.019248439744917467,
+        'eval/downstream/mmlu_social_sciences_test_rc_5shot (BPB v2)': 0.021822293427776623,
+        'medmcqa:rc:bpb::none': 0.022030125431545176,
+        'eval/downstream/hellaswag_rc_5shot (BPB v2)': 0.028283441206632464,
+        'eval/downstream/piqa_val_rc_5shot (BPB v2)': 0.028342011817943016,
+        'eval/downstream/csqa_val_rc_5shot (BPB v2)': 0.032729084116394004,
+        'eval/downstream/mmlu_humanities_test_rc_5shot (BPB v2)': 0.045196926144744985,
+        'drop:rc:bpb::gen2mc': 0.053133861091565315,
+        'eval/downstream/socialiqa_val_rc_5shot (BPB v2)': 0.05521000431340725,
+        'jeopardy:rc:bpb::gen2mc': 0.06728628093625913,
+        'coqa:rc:bpb::gen2mc': 0.08753279680094589,
+        'lambada': 0.1049828142485315,
+        'naturalqs:rc:bpb::gen2mc': 0.10937475688102147,
+        'eval/downstream/winogrande_val_rc_5shot (BPB v2)': 0.12291950070045095
     }
