@@ -1,0 +1,257 @@
+sources:
+  - domain: finemath-3plus
+    paths:
+      - s3://ai2-llm/preprocessed/finemath/finemath-3plus/allenai/dolma2-tokenizer/*.npy
+    weight: 0.006734006734
+  - domain: arxiv
+    paths:
+      - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/dolma2-tokenizer/*.npy
+    weight: 0.003961180432
+  - domain: pes2o
+    paths:
+      - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+    weight: 0.0118835413
+  - domain: wikipedia
+    paths:
+      - s3://ai2-llm/preprocessed/structured-wikipedia/concat_with_links/allenai/dolma2-tokenizer/*.npy
+    weight: 0.001980590216
+  - domain: s2pdf:adult
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/adult/*.npy
+    weight: 0
+  - domain: s2pdf:art_design
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/art_design/*.npy
+    weight: 0
+  - domain: s2pdf:crime_law
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/crime_law/*.npy
+    weight: 0
+  - domain: s2pdf:education_jobs
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/education_jobs/*.npy
+    weight: 0
+  - domain: s2pdf:entertainment
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/entertainment/*.npy
+    weight: 0
+  - domain: s2pdf:fashion_beauty
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/fashion_beauty/*.npy
+    weight: 0
+  - domain: s2pdf:finance_business
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/finance_business/*.npy
+    weight: 0
+  - domain: s2pdf:food_dining
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/food_dining/*.npy
+    weight: 0
+  - domain: s2pdf:games
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/games/*.npy
+    weight: 0
+  - domain: s2pdf:health  
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/health/*.npy
+    weight: 0
+  - domain: s2pdf:home_hobbies
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/home_hobbies/*.npy
+    weight: 0
+  - domain: s2pdf:industrial
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/industrial/*.npy
+    weight: 0
+  - domain: s2pdf:literature
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/literature/*.npy
+    weight: 0
+  - domain: s2pdf:politics
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/politics/*.npy
+    weight: 0
+  - domain: s2pdf:religion
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/religion/*.npy
+    weight: 0
+  - domain: s2pdf:science_tech
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/science_tech/*.npy
+    weight: 0
+  - domain: s2pdf:software_dev
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/software_dev/*.npy
+    weight: 0
+  - domain: s2pdf:software
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/software/*.npy
+    weight: 0
+  - domain: s2pdf:sports_fitness
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/sports_fitness/*.npy
+    weight: 0
+  - domain: s2pdf:transportation
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/transportation/*.npy
+    weight: 0
+  - domain: s2pdf:travel
+    paths:
+      - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/travel/*.npy
+    weight: 0
+  - domain: stack-edu:C
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/C/*.npy
+    weight: 0
+  - domain: stack-edu:Cpp
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Cpp/*.npy
+    weight: 0
+  - domain: stack-edu:CSharp
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/CSharp/*.npy
+    weight: 0
+  - domain: stack-edu:Go
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Go/*.npy
+    weight: 0
+  - domain: stack-edu:Java
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Java/*.npy
+    weight: 0
+  - domain: stack-edu:JavaScript
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/JavaScript/*.npy
+    weight: 0
+  - domain: stack-edu:Markdown
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Markdown/*.npy
+    weight: 0
+  - domain: stack-edu:PHP
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/PHP/*.npy
+    weight: 0
+  - domain: stack-edu:Python
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Python/*.npy
+    weight: 0
+  - domain: stack-edu:Ruby
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Ruby/*.npy
+    weight: 0
+  - domain: stack-edu:Rust
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Rust/*.npy
+    weight: 0
+  - domain: stack-edu:Shell 
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Shell/*.npy
+    weight: 0
+  - domain: stack-edu:SQL
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/SQL/*.npy
+    weight: 0
+  - domain: stack-edu:Swift
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Swift/*.npy
+    weight: 0
+  - domain: stack-edu:TypeScript
+    paths:
+      - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/TypeScript/*.npy
+    weight: 0
+  - domain: dclm:adult_content
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/adult_content/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:art_and_design
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/art_and_design/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:crime_and_law
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/crime_and_law/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:education_and_jobs
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/education_and_jobs/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:electronics_and_hardware
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/electronics_and_hardware/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:entertainment
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/entertainment/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:fashion_and_beauty
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/fashion_and_beauty/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:finance_and_business
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/finance_and_business/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:food_and_dining
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/food_and_dining/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:games
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/games/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:health
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/health/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:history_and_geography
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/history_and_geography/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:home_and_hobbies
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/home_and_hobbies/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:industrial
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/industrial/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:literature
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/literature/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:politics
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/politics/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:religion
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/religion/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:science_math_and_technology
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/science_math_and_technology/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:social_life
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/social_life/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:software
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:software_development
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software_development/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:sports_and_fitness
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/sports_and_fitness/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:transportation
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/transportation/dolma2-tokenizer/*.npy
+    weight: 0
+  - domain: dclm:travel_and_tourism
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/travel_and_tourism/dolma2-tokenizer/*.npy
+    weight: 0

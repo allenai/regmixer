@@ -160,6 +160,7 @@ class TransformerConfigBuilder:
         self.dataset_dtype = NumpyDatasetDType[dtype]
         self.root_dir = f"/tmp/{self.run_name}"
         self.cluster = cluster
+        self.weka = weka
 
         # Default will always be s3 for checkpoints, and we override if Augusta or AUS+Weka
         self.checkpoint_dir = (
