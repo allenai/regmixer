@@ -72,7 +72,7 @@ class Regressor():
 
 
 class LightGBMRegressor(Regressor):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.model = lgb.LGBMRegressor(**LGBM_HPS)
 
     def fit(self, x, y, idx, **kwargs):
@@ -86,7 +86,7 @@ class LightGBMRegressor(Regressor):
     
 
 class LinearRegressor(Regressor):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.model = LinearRegression()
 
     def fit(self, x, y, idx, **kwargs):
@@ -95,7 +95,7 @@ class LinearRegressor(Regressor):
 
     
 class LogLinearRegressor(Regressor):
-    def __init__(self, params=None):
+    def __init__(self, params=None, **kwargs):
         np.random.seed(42)
         random.seed(42)
 
@@ -109,7 +109,7 @@ class LogLinearRegressor(Regressor):
         self.model = self.model.fit(
             x,
             target,
-            init_params_law(idx, num_domains = x.shape[-1]),
+            init_params_log_linear_law(idx, num_domains = x.shape[-1]),
             max_step=max_step,
             delta=delta,
             eps=early_stopping
@@ -118,8 +118,41 @@ class LogLinearRegressor(Regressor):
     def predict(self, x):
         return mixing_law(torch.tensor(x, dtype=torch.float), torch.tensor(self.model, dtype=torch.float)).numpy()
     
+class LogNonLinearRegressor(Regressor):
+    def __init__(self, params=None, B_mask = None, **kwargs):
+        np.random.seed(42)
+        random.seed(42)
+
+        self.B_mask = B_mask
+        if params is None:
+            self.model = ScalingLaw(nonlinear_mixing_law)
+        else:
+            self.model = params
+
+    def fit(self, x, y, idx, early_stopping=0.0, max_step=100, delta=0.02):
+        for i, params in enumerate(init_params_log_nonlinear_law(idx, self.B_mask, num_domains = x.shape[-1])):
+            print(nonlinear_mixing_law(torch.tensor(x, dtype=torch.float), torch.tensor(params, dtype=torch.float), B_mask=self.B_mask))
+            if i == 0:
+                break
+        
+        target = y[:, idx]
+        self.model = self.model.fit(
+            x,
+            target,
+            init_params_log_nonlinear_law(idx, self.B_mask, num_domains = x.shape[-1]),
+            B_mask=self.B_mask,
+            max_step=max_step,
+            delta=delta,
+            eps=early_stopping
+        )
+
+    def predict(self, x):
+        breakpoint()
+        return nonlinear_mixing_law(torch.tensor(x, dtype=torch.float), torch.tensor(self.model, dtype=torch.float), B_mask=self.B_mask).numpy()
+
+
 class SearchRegressor(Regressor):
-    def __init__(self):
+    def __init__(self, **kwargs):
         pass 
 
     def fit(self, x, y, idx):
@@ -140,7 +173,7 @@ class SearchRegressor(Regressor):
         return [np.array(weight) for weight, _ in self.model.items()]
 
 
-def mixing_law(x, param):
+def mixing_law(x, param, **kwargs):
     log_c_i = param[0]
     t_i = param[1:]
     result = torch.exp(log_c_i) + torch.exp(torch.matmul(x, t_i))
@@ -162,31 +195,42 @@ def nonlinear_mixing_law(x, param, B_mask=None):
     """
     log_c_i = param[0]
     d = x.shape[1]
-    t_i = param[1:1 + d]                      # Linear weights
-    B_params = param[1 + d:]                  # Quadratic weights
+    t_i = param[1:1 + d]                      # Linear weights len(domains)
+    B_params = param[1 + d:]                  # Quadratic weights len(B_mask)
 
     lin_term = torch.matmul(x, t_i)           # (batch_size,)
 
-    quad_term = 0.0
+    quad_term = None
     if B_mask is not None and len(B_mask) > 0:
         B_mask = torch.tensor(B_mask, dtype=torch.long, device=x.device)  # (num_terms, 2)
         x_i = x[:, B_mask[:, 0]]              # (batch_size, num_terms)
         x_j = x[:, B_mask[:, 1]]              # (batch_size, num_terms)
         quad_term = (x_i * x_j) @ B_params    # (batch_size,)
 
-    return torch.exp(log_c_i) + torch.exp(lin_term + quad_term)
+    if quad_term is None:
+        return torch.exp(log_c_i) + torch.exp(lin_term)
+    else:
+        return torch.exp(log_c_i) + torch.exp(lin_term) + torch.exp(quad_term)
 
-def init_params_law(idx, num_domains=3):
+def init_params_log_linear_law(idx, num_domains=3):
     for log_c_i in np.linspace(-2, 1.5, 10): # originally (-2, 1.5, 10)
         for _ in range(30):
             ts = [-np.random.rand() if i == idx else np.random.rand() * 0.1 for i in range(num_domains)]
             yield [log_c_i] + ts
+
+def init_params_log_nonlinear_law(idx, B_mask, num_domains=3):
+    for log_c_i in np.linspace(-2, 1.5, 10): # originally (-2, 1.5, 10)
+        for _ in range(30):
+            lin_params = [-np.random.rand() if i == idx else np.random.rand() * 0.1 for i in range(num_domains)]
+            quadratic_params = [np.random.rand() * 0.1 for i in range(len(B_mask))]
+            yield [log_c_i] + lin_params + quadratic_params
 
 
 REGRESSION_TYPES = {
     "lightgbm": LightGBMRegressor,
     "linear": LinearRegressor,
     "log_linear": LogLinearRegressor,
+    "log_nonlinear": LogNonLinearRegressor,
     "search": SearchRegressor 
 }
 
@@ -212,6 +256,8 @@ class SimulationProposer(Proposer):
         opt_avg_metric: bool = False,
         constrain_objective: bool = False,
         final_cookbook_path: Optional[Path] = None,
+        manual_token_constraint_path: Optional[Path] = None,
+        repetition_factor: float = 1.0,
         obj_weights: Optional[list] = None,
         temperature: Optional[float] = None,
         reference_scores: Optional[np.ndarray] = None,
@@ -236,21 +282,26 @@ class SimulationProposer(Proposer):
         best_weights = np.zeros(len(prior_distributions))
 
         if constrain_objective:
-            assert final_cookbook_path is not None, "final_cookbook_path must be set to determine how to construct swarm to be unconstrained."
+            # just need a desired token count and available token count 
+            assert final_cookbook_path is not None or manual_token_constraint_path is not None
+            if final_cookbook_path is not None:
+                with open(final_cookbook_path, "r") as f:
+                    data = yaml.safe_load(f)
 
-            with open(final_cookbook_path, "r") as f:
-                data = yaml.safe_load(f)
+                final_config = CookbookExperimentConfig(**data, path=final_cookbook_path)
+                desired_tokens = final_config.max_tokens
 
-            final_config = CookbookExperimentConfig(**data, path=final_cookbook_path)
-            desired_tokens = final_config.max_tokens
-
-            token_universe = get_token_counts_and_ratios(
-                final_config.dataset.sources, final_config.dataset.dtype, True
-            )
-            available_tokens_per_source = {path: relative_size * token_universe[1] for path, relative_size in token_universe[0].items()}
-            # ensures that order of sources in simulations and in the constraint dictionary are aligned
-            available_tokens_per_source = {source: available_tokens_per_source[source] for source, _ in prior_distributions.items()}
-
+                token_universe = get_token_counts_and_ratios(
+                    final_config.dataset.sources, final_config.dataset.dtype, True
+                )
+                available_tokens_per_source = {path: relative_size * token_universe[1] for path, relative_size in token_universe[0].items()}
+                # ensures that order of sources in simulations and in the constraint dictionary are aligned
+                available_tokens_per_source = {source: available_tokens_per_source[source] for source, _ in prior_distributions.items()}
+            elif manual_token_constraint_path is not None:
+                with open(manual_token_constraint_path, "r") as f:
+                    data = yaml.safe_load(f)
+                desired_tokens = data['requested_tokens']
+                available_tokens_per_source = {source: data['available_tokens'][source] for source, _ in prior_distributions.items()}
 
         # Multi-step search leveraging iterative prior results
         for search_step in tqdm(
@@ -279,8 +330,11 @@ class SimulationProposer(Proposer):
 
             if constrain_objective:
                 original_simulation_size = len(simulations)
-                simulations = simulations[((simulations*desired_tokens) <= list(available_tokens_per_source.values())).all(axis=1)]
+                simulations = simulations[((simulations*desired_tokens) <= np.array(list(available_tokens_per_source.values()))*repetition_factor).all(axis=1)]
                 logger.info(f"Removed {original_simulation_size - len(simulations)} out of {original_simulation_size} simulations that would repeat tokens at the final run scale.")
+
+                if len(simulations) == 0:
+                    continue 
 
             predictions = np.array([reg.predict(simulations) for reg in predictor])
             if reference_scores is not None:
@@ -295,6 +349,7 @@ class SimulationProposer(Proposer):
                         break 
 
                 if len(pareto_idxs) == 0:
+                    logger.info(f"No simulations passed the pareto filter.")
                     continue
 
                 # filter both the simulations and corresponding predictions down 
@@ -323,7 +378,7 @@ class SimulationProposer(Proposer):
             search_prior = (best_weights + search_prior) / 2
 
 
-        if constrain_objective and not all(best_weights * desired_tokens <= list(available_tokens_per_source.values())):
+        if constrain_objective and not all(best_weights * desired_tokens <= np.array(list(available_tokens_per_source.values()))* repetition_factor):
             raise ValueError(f"Best weights are out of bounds!")
 
         return best_weights
@@ -385,10 +440,11 @@ def build_regression(
     Y_train: np.ndarray,
     X_train: np.ndarray,
     regression_type: str,
-    early_stopping: float
+    early_stopping: float,
+    B_mask: Optional[List[Tuple[int, int]]] = None
 ) -> Regressor:
     logger.info(f"Building regression model, index: {idx}")
-    reg = REGRESSION_TYPES[regression_type]()
+    reg = REGRESSION_TYPES[regression_type](B_mask=B_mask)
     reg.fit(X_train, Y_train, idx, early_stopping=early_stopping)
     return reg
 

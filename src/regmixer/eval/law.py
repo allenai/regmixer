@@ -30,59 +30,67 @@ def calculate_r_squared(actuals, predictions):
     return r_squared
 
 
-def fit_scaling_laws(func, valid_split, x, y, max_step, eps, delta, init_param):
-    param = torch.nn.Parameter(init_param)
-    x, y = torch.tensor(x).to(param), torch.tensor(y).to(param)
-    if valid_split == 0:
-        train_x, eval_x = x, x[:0]
-        train_y, eval_y = y, y[:0]
-    else:
-        train_x, eval_x = x[:-valid_split], x[-valid_split:]
-        train_y, eval_y = y[:-valid_split], y[-valid_split:]
-    optimizer = torch.optim.LBFGS([param], lr=0.01, history_size=10, max_iter=20, line_search_fn="strong_wolfe")
-    # optimizer = torch.optim.AdamW([param], lr=1e-3)
-    def closure():
-        optimizer.zero_grad()
-        prediction = func(train_x, param)
-        loss = torch.nn.functional.huber_loss(train_y, prediction, delta=delta, reduction="sum")
-        loss.backward()
-        return loss
-    
-    min_loss, best_param = 1e10, None
-    best_step = 0
-    for i in range(max_step):
-        loss = float(optimizer.step(closure))
-        # prediction = func(train_x, param) 
-        # train_r2 = calculate_r_squared(train_y, prediction)
-        with torch.no_grad():
-            if len(eval_x) > 1:   
-                eval_prediction = func(eval_x, param)
-                eval_loss = torch.nn.functional.huber_loss(eval_prediction, eval_y, delta=delta).item() 
-                # eval_r2 = calculate_r_squared(eval_y, eval_prediction)
-                # eval_loss = -eval_r2
-            elif len(eval_x) == 1:
-                eval_prediction = func(eval_x, param)
-                eval_loss = torch.nn.functional.mse_loss(eval_prediction, eval_y).item()
-            else:
-                eval_prediction = func(train_x, param)
-                eval_loss = torch.nn.functional.huber_loss(eval_prediction, train_y, delta=delta).item() 
-                # eval_loss = -calculate_r_squared(train_y, eval_prediction)
-                # eval_loss = -eval_r2
-        improvement = abs(eval_loss - min_loss)
-        if eval_loss <= min_loss:
-            min_loss = eval_loss
-            best_param = param.detach().clone()
-            best_step = i
-        if improvement < eps:
-            #logger.info(f"step: {i}, eval_loss = {eval_loss}, diff = {improvement}")
-            break
+def fit_scaling_laws(func, valid_split, x, y, max_step, eps, delta, init_param, B_mask=None):
+    try:
+        param = torch.nn.Parameter(init_param)
+        x, y = torch.tensor(x).to(param), torch.tensor(y).to(param)
+        if valid_split == 0:
+            train_x, eval_x = x, x[:0]
+            train_y, eval_y = y, y[:0]
+        else:
+            train_x, eval_x = x[:-valid_split], x[-valid_split:]
+            train_y, eval_y = y[:-valid_split], y[-valid_split:]
+        optimizer = torch.optim.LBFGS([param], lr=0.01, history_size=10, max_iter=20, line_search_fn="strong_wolfe")
+        # optimizer = torch.optim.AdamW([param], lr=1e-3)
+        def closure():
+            optimizer.zero_grad()
+            prediction = func(train_x, param, B_mask=B_mask)
+            loss = torch.nn.functional.huber_loss(train_y, prediction, delta=delta, reduction="sum")
+            loss.backward()
+            return loss
+        
+        min_loss, best_param = 1e10, None
+        best_step = 0
+        for i in range(max_step):
+            loss = float(optimizer.step(closure))
+            # prediction = func(train_x, param) 
+            # train_r2 = calculate_r_squared(train_y, prediction)
+            with torch.no_grad():
+                if len(eval_x) > 1:   
+                    eval_prediction = func(eval_x, param, B_mask=B_mask)
+                    eval_loss = torch.nn.functional.huber_loss(eval_prediction, eval_y, delta=delta).item() 
+                    # eval_r2 = calculate_r_squared(eval_y, eval_prediction)
+                    # eval_loss = -eval_r2
+                elif len(eval_x) == 1:
+                    eval_prediction = func(eval_x, param, B_mask=B_mask)
+                    eval_loss = torch.nn.functional.mse_loss(eval_prediction, eval_y).item()
+                else:
+                    eval_prediction = func(train_x, param, B_mask=B_mask)
+                    eval_loss = torch.nn.functional.huber_loss(eval_prediction, train_y, delta=delta).item() 
+                    # eval_loss = -calculate_r_squared(train_y, eval_prediction)
+                    # eval_loss = -eval_r2
+            improvement = abs(eval_loss - min_loss)
+            if eval_loss <= min_loss:
+                min_loss = eval_loss
+                best_param = param.detach().clone()
+                best_step = i
+            if improvement < eps:
+                #logger.info(f"step: {i}, eval_loss = {eval_loss}, diff = {improvement}")
+                break
 
-    if best_param is None:
-        print(min_loss, eval_loss)
-        print(eval_prediction)
-        print(train_x, param)
+        if best_param is None:
+            print(min_loss, eval_loss)
+            print(eval_prediction)
+            print(train_x, param)
 
-    return min_loss, best_param.detach().cpu().numpy(), best_step
+        return min_loss, best_param.detach().cpu().numpy(), best_step
+
+    except Exception as e:
+        import traceback
+        print("Exception in fit_scaling_laws:", flush=True)
+        traceback.print_exc()
+        raise e  # Reraise to crash cleanly
+
 
 
 
@@ -93,12 +101,12 @@ class ScalingLaw:
         self.func = func
         self.params = None
         
-    def fit(self, x, y, init_params, max_step=20, eps=0.0, workers=-1, valid_split=0, delta=0.01):
+    def fit(self, x, y, init_params, B_mask=None, max_step=20, eps=0.0, workers=-1, valid_split=0, delta=0.01):
         if workers == -1:
             workers = min(4, mp.cpu_count())
         init_params = [torch.tensor(init_param, dtype=torch.float32) for init_param in init_params]
         minloss, optimal_param = 1e10, None
-        _fit = partial(fit_scaling_laws, self.func, valid_split, x, y, max_step, eps, delta)
+        _fit = partial(fit_scaling_laws, self.func, valid_split, x, y, max_step, eps, delta, B_mask=B_mask)
         if workers != 1:
             best_step = 0
             with mp.Pool(workers, maxtasksperchild=20) as p:
