@@ -195,7 +195,21 @@ def cli():
     type=click.Path(exists=True),
     help="Path to cookbook config containing information about the full run for which the proposed mix is used (number of tokens, dataset being used)",
     required=False,
-    default="/home/mayee/re/year6/ai2/olmo-cookbook/src/cookbook/recipes/train-1b-v2-5xC-dclm-larger-natural.yaml"
+    default=None
+)
+@click.option(
+    "--manual-token-constraint-path",
+    type=click.Path(exists=True),
+    help="Rather than using the requested and available tokens specified by a cookbook config, use a manually specified config",
+    required=False,
+    default=None
+)
+@click.option(
+    "--repetition-factor",
+    type=float,
+    help="Adjusts the document repetition constraint; i.e., find an optimal mix when we are allowed to 2x each domain",
+    required=False,
+    default=1
 )
 @click.option(
     "--constrain-swarm",
@@ -254,6 +268,13 @@ def cli():
     required=False,
     default=False
 )
+@click.option(
+    "--select-top-k-runs",
+    type=float,
+    help="If set, only use the metrics and ratios of the top k runs, where performance is the average BPB across all tasks",
+    required=False,
+    default=1.0
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -273,6 +294,8 @@ def fit(
     proposer_type: str,
     neighborhood: Optional[str],
     final_cookbook_path: Optional[Path],
+    manual_token_constraint_path: Optional[Path],
+    repetition_factor: float,
     constrain_swarm: bool,
     constrain_objective: bool ,
     obj_weights: Optional[str],
@@ -280,7 +303,8 @@ def fit(
     keep_sources: Optional[list[str]],
     early_stopping: float = 0.0,
     dro_reference_model_id: Optional[str] = None,
-    use_reference_model_predicted_scores: bool = False
+    use_reference_model_predicted_scores: bool = False,
+    select_top_k_runs: float = 1.0
 ):
 
     output_dir = get_output_dir(experiment_groups)
@@ -316,7 +340,13 @@ def fit(
         eval_config["final_cookbook_path"] = final_cookbook_path 
     if constrain_objective:
         eval_config["constrain_objective"] = True 
-        eval_config["final_cookbook_path"] = final_cookbook_path 
+        if final_cookbook_path is not None:
+            eval_config["final_cookbook_path"] = final_cookbook_path 
+        elif manual_token_constraint_path is not None:
+            eval_config["manual_token_constraint_path"] = manual_token_constraint_path
+
+        if repetition_factor != 1:
+            eval_config["repetition_factor"] = repetition_factor
     if obj_weights is not None:
         eval_config["obj_weights"] = obj_weights
     if temperature is not None:
@@ -343,6 +373,10 @@ def fit(
         "keep_sources": keep_sources,
         "early_stopping": early_stopping,
     }
+    if select_top_k_runs < 1.0:
+        eval_config["select_top_k_runs"] = select_top_k_runs
+        regression_config["select_top_k_runs"] = select_top_k_runs
+
 
     output_dir = save_eval_config(eval_config, output_dir)
 
@@ -441,6 +475,7 @@ def fit(
             for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name == "superswarm_offline" or len(run.samples) > 0
         ]
         if constrain_swarm:
+            raise NotImplementedError("Constrained swarm is implemented but out of date. We concluded that this is not the right way to enforce token repetition constraints.")
             run_ratios, run_metrics = filter_constrained_swarm(final_cookbook_path, run_ratios, run_metrics)
         ratios = pd.DataFrame(run_ratios)
         metrics = pd.DataFrame(run_metrics)
@@ -471,6 +506,13 @@ def fit(
         logger.info(f"Filtered out {old_len - len(ratios)} runs that were not only on {keep_sources}")
         metrics = metrics[metrics['name'].isin(ratios['name'])]
         ratios.drop(columns=other_columns, inplace=True)
+
+
+    if select_top_k_runs < 1.0:
+        metrics['all_bpb'] = metrics[metrics.columns[3:]].mean(axis=1)
+        keep_runs = metrics.sort_values(by="all_bpb").run.values[: int(len(metrics) * select_top_k_runs)]
+        metrics = metrics[metrics.run.isin(keep_runs)]
+        ratios = ratios[ratios.run.isin(keep_runs)]
 
     # X = Domain weights
     X_train = ratios[ratios.columns[3:]].values
@@ -531,7 +573,7 @@ def fit(
             predictors.append(reg)
     else:
         for idx, metric in indexed_metrics:
-            predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping))
+            predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping, B_mask if regression_type == "log_nonlinear" else None))
 
         if regression_type == "log_linear":
             parameters = {metric: predictors[idx].model for idx, metric in indexed_metrics}
@@ -609,6 +651,8 @@ def fit(
                 opt_avg_metric=opt_avg_metric,
                 constrain_objective=constrain_objective,
                 final_cookbook_path=final_cookbook_path,
+                manual_token_constraint_path=manual_token_constraint_path,
+                repetition_factor=repetition_factor,
                 obj_weights=obj_weights,
                 temperature=temperature,
                 reference_scores=reference_scores if dro_reference_model_id is not None else None
@@ -640,6 +684,8 @@ def fit(
             opt_avg_metric=opt_avg_metric,
             constrain_objective=constrain_objective,
             final_cookbook_path=final_cookbook_path,
+            manual_token_constraint_path=manual_token_constraint_path,
+            repetition_factor=repetition_factor,
             obj_weights=obj_weights,
             temperature=temperature,
             reference_scores=reference_scores if dro_reference_model_id is not None else None
