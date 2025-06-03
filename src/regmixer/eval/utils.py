@@ -302,15 +302,13 @@ class SimulationProposer(Proposer):
                 with open(manual_token_constraint_path, "r") as f:
                     data = yaml.safe_load(f)
                 desired_tokens = data['requested_tokens']
-
-                if set(data['available_tokens'].keys()) == set(prior_distributions.keys()):
+                leaf_level_constraints = data['leaf_level_constraints']
+                if leaf_level_constraints:
                     # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
                     available_tokens_per_source = {source: data['available_tokens'][source] for source, _ in prior_distributions.items()}
-                    leaf_level_constraints = True 
                 else:
                     # otherwise, our constraints are at the source level while prior_distribution is at the leaf level
                     available_tokens_per_source = data['available_tokens']
-                    leaf_level_constraints = False
 
         # Multi-step search leveraging iterative prior results
         for search_step in tqdm(
