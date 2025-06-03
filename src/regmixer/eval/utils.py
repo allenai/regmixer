@@ -20,6 +20,7 @@ import hashlib
 import os 
 import yaml
 import boto3
+from collections import defaultdict
 
 from cookbook.aliases import ExperimentConfig as CookbookExperimentConfig
 from cookbook.utils.data import get_token_counts_and_ratios
@@ -301,7 +302,15 @@ class SimulationProposer(Proposer):
                 with open(manual_token_constraint_path, "r") as f:
                     data = yaml.safe_load(f)
                 desired_tokens = data['requested_tokens']
-                available_tokens_per_source = {source: data['available_tokens'][source] for source, _ in prior_distributions.items()}
+
+                if set(data['available_tokens'].keys()) == set(prior_distributions.keys()):
+                    # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
+                    available_tokens_per_source = {source: data['available_tokens'][source] for source, _ in prior_distributions.items()}
+                    leaf_level_constraints = True 
+                else:
+                    # otherwise, our constraints are at the source level while prior_distribution is at the leaf level
+                    available_tokens_per_source = data['available_tokens']
+                    leaf_level_constraints = False
 
         # Multi-step search leveraging iterative prior results
         for search_step in tqdm(
@@ -330,7 +339,28 @@ class SimulationProposer(Proposer):
 
             if constrain_objective:
                 original_simulation_size = len(simulations)
-                simulations = simulations[((simulations*desired_tokens) <= np.array(list(available_tokens_per_source.values()))*repetition_factor).all(axis=1)]
+
+                if leaf_level_constraints:
+                    # we can just directly do elementwise comparisons
+                    simulations = simulations[((simulations*desired_tokens) <= np.array(list(available_tokens_per_source.values()))*repetition_factor).all(axis=1)]
+                else:
+                    # the constraints are at the source level, so we need to aggregate the simulation vectors by source
+                    # we map from source to their indices in the probability vector
+                    source_to_indices = defaultdict(list)
+                    for idx, domain in enumerate(prior_distributions):
+                        source = domain.split(":", 1)[0]
+                        source_to_indices[source].append(idx)
+
+                    def passes_constraints(sim):
+                        # compute source weights 
+                        for source, indices in source_to_indices.items():
+                            source_weight = sim[indices].sum()
+                            if source_weight * desired_tokens > available_tokens_per_source[source] * repetition_factor:
+                                return False 
+                        return True 
+                    
+                    simulations = np.array([sim for sim in simulations if passes_constraints(sim)])
+
                 logger.info(f"Removed {original_simulation_size - len(simulations)} out of {original_simulation_size} simulations that would repeat tokens at the final run scale.")
 
                 if len(simulations) == 0:
@@ -378,8 +408,14 @@ class SimulationProposer(Proposer):
             search_prior = (best_weights + search_prior) / 2
 
 
-        if constrain_objective and not all(best_weights * desired_tokens <= np.array(list(available_tokens_per_source.values()))* repetition_factor):
-            raise ValueError(f"Best weights are out of bounds!")
+        if constrain_objective:
+            if leaf_level_constraints:
+                # we can just directly do elementwise comparisons
+                if not all(best_weights * desired_tokens <= np.array(list(available_tokens_per_source.values()))* repetition_factor):
+                    raise ValueError(f"Best weights are out of bounds!")
+            else:
+                if not passes_constraints(best_weights):
+                    raise ValueError(f"Best weights are out of bounds!")
 
         return best_weights
 
