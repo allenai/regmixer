@@ -23,6 +23,7 @@ class TopicConfig(BaseModel):
     paths: List[str]
     max_repetition_factor: float = 1.0
     max_topic_ratio: float = 1.0
+    weight: Optional[float] = None
 
 
 class SourceConfig(BaseModel):
