@@ -264,6 +264,22 @@ class TransformerConfigBuilder:
                 group=self.group_id.strip(),
                 enabled=True,
             ),
+            "lm_evaluator": LMEvaluatorCallbackConfig(
+                eval_dataset=NumpyDatasetConfig.from_data_mix(
+                    DataMix.v3_small_ppl_validation,
+                    name=NumpyDatasetType.padded_fsl,
+                    mix_base_dir=self.data_dir,
+                    sequence_length=self.sequence_length,
+                    tokenizer=self.tokenizer,
+                    work_dir=self.dataset_cache,
+                ),
+                eval_interval=self.model_config.eval_interval,
+            ),
+            "downstream_evaluator": DownstreamEvaluatorCallbackConfig(
+                tasks=[task.value for task in DownstreamEvaluatorsSmall],
+                tokenizer=self.tokenizer,
+                eval_interval=self.model_config.eval_interval,
+            ),
         }
 
     def build(self) -> ModelTrainConfig:
