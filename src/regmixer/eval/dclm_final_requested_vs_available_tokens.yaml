@@ -1,0 +1,27 @@
+requested_tokens: 6_000_000_000_000 # 6 trillion
+available_tokens: # 5 trillion x prior from dclm sample 
+  adult_content: 67760078203
+  art_and_design: 70659711995
+  crime_and_law: 170130914779
+  education_and_jobs: 184690792861
+  electronics_and_hardware: 80168541745
+  entertainment: 441768061760
+  fashion_and_beauty: 37256539512
+  finance_and_business: 310313927581
+  food_and_dining: 105937299687
+  games: 229992491702
+  health: 393496227836
+  history_and_geography: 161049719459
+  home_and_hobbies: 126910777314
+  industrial: 43572140450
+  literature: 364834344848
+  politics: 611198130192
+  religion: 277776929208
+  science_math_and_technology: 427131054341
+  social_life: 218731841124
+  software: 108039380021
+  software_development: 223384974282
+  sports_and_fitness: 196759999355
+  transportation: 90793306202
+  travel_and_tourism: 57642815530
+

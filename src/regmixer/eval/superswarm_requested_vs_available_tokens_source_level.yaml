@@ -1,0 +1,9 @@
+requested_tokens: 6_000_000_000_000 # 6 trillion
+available_tokens: # from information in spreadsheet 
+  arxiv: 20_000_000_000 # 20 billion
+  dclm: 5_000_000_000_000 # 5 trillion
+  finemath-3plus: 34_000_000_000 # 34 billion
+  pes2o: 60_000_000_000 # 60 billion
+  s2pdf: 1_000_000_000_000 # 1 trillion
+  stack-edu: 125_000_000_000 # 125 billion
+  wikipedia: 10_000_000_000 # 10 billion
