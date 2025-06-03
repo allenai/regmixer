@@ -18,6 +18,8 @@ import os
 import pickle 
 from olmo_core.utils import prepare_cli_environment
 
+import matplotlib.pyplot as plt
+
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -489,7 +491,7 @@ def fit(
     if group_average:
         metrics_to_index = [eval_metric_group_name]
 
-    if all("mmlu_stem" not in s for s in metrics.columns):
+    if all("mmlu_stem" not in s for s in metrics.columns) and any("mmlu" in s for s in metrics.columns):
         metrics, metrics_to_index = aggregate_mmlu(
             metrics,
             metrics_to_index
@@ -728,15 +730,31 @@ def fit(
 
     if n_test == 0:
         metric, weights = results[-1]
+        predictions = np.array([p.predict(weights[None])[0] for p in predictors])
         if obj_weights is not None:
-            predictions = [p.predict(weights[None])[0] for p in predictors]
             predicted_performance = np.average(predictions, axis=0, weights=obj_weights)
         else:
-            predicted_performance = np.array([p.predict(weights[None])[0] for p in predictors]).mean()
+            predicted_performance = predictions.mean(axis=0)
         logger.info(f"Metric: {metric}. Predicted performance using regression model: {predicted_performance}")
 
         with open(f"{output_dir}/predicted_performance.json", "w") as f:
             json.dump(float(predicted_performance), f)
+
+
+        if dro_reference_model_id is not None and use_reference_model_predicted_scores:
+            diff = reference_scores - predictions 
+            colors = ['green' if val > 0 else 'red' for val in diff]
+            x = np.arange(len(diff))
+
+            plt.figure(figsize=(10, 6))
+            plt.bar(x, diff, color=colors)
+            plt.title(f'Pareto Improvement')
+            plt.ylabel('PREDICTED Difference (BPB v2, 30M)')
+            plt.axhline(0, color='black', linewidth=0.8)
+            plt.xticks(ticks=x, labels=metrics.columns[3:].tolist(), rotation=90)
+            plt.tight_layout()
+            plt.savefig(f"{output_dir}/pareto_improvement.png")
+            plt.close()
 
 
     logger.info(f"Results saved to {output_dir}")

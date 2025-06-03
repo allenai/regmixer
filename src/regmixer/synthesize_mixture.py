@@ -50,7 +50,8 @@ def clip_candidates_by_level(
     idx_to_level,
     domains,
     minimum_source_weight,
-    minimum_topic_weight 
+    minimum_topic_weight,
+    fixed_topic_weights,
 ):
     assert len(candidates[0]) == len(idx_to_level), "Mismatch between weights and level types."
 
@@ -62,6 +63,10 @@ def clip_candidates_by_level(
         weight = candidates[0][idx]
         domain = domains[idx]
         source = domain.split(':', 1)[0] if ':' in domain else domain
+
+        if source in fixed_topic_weights:
+            # this source has fixed topic weights, so we don't clip it
+            continue 
 
         if level == "source" and weight < minimum_source_weight:
             candidates[0][idx] = 0.0
@@ -206,6 +211,15 @@ def generate_weights_dirichlet(
     if not allow_repetition and weight_bounds:
         logger.info("Limiting candidates to within bounds, repetition is disabled...")
 
+    fixed_topic_weights = {}
+    for source in sources:
+        if source.topics:
+            if source.topics[0].weight is not None:
+                # this source has topics with a fixed weight, so we use that weight as the prior
+                conditional_weight = np.array([[topic.weight for topic in source.topics]])
+                logger.info(f"Using fixed topic weights for source '{source.name}': {conditional_weight[0]}")
+                fixed_topic_weights[source.name] = conditional_weight
+
     sample_multiplier = sample_multiplier if sample_multiplier else ConfigDefaults.sample_multiplier
     for _ in tqdm(range(num_samples_out * sample_multiplier)):
         candidates = []
@@ -225,6 +239,16 @@ def generate_weights_dirichlet(
         # then, generate topic-level weights
         topic_samples = defaultdict(list)
         for source, topic_prior in topic_priors.items():
+            if source in fixed_topic_weights:
+                # this source has fixed topic weights, so we use those
+                conditional_weight = fixed_topic_weights[source]
+                if min_topic_strength == max_topic_strength:
+                    topic_samples[source].append(conditional_weight)
+                else:
+                    for _ in range(15):
+                        topic_samples[source].append(conditional_weight)
+                continue
+
             if min_topic_strength == max_topic_strength:
                 topic_samples[source].append(np.random.dirichlet(topic_prior * min_topic_strength, 1))
             else:
@@ -240,7 +264,7 @@ def generate_weights_dirichlet(
             leaf_level_sample = {source: samples[i][0]*source_sample[0, j] for j, (source, samples) in enumerate(topic_samples.items())}
             flattened_sample = np.concatenate([arr for arr in list(leaf_level_sample.values())]).reshape(1, -1)
             candidates.append(flattened_sample)
-
+            
         filtered_candidates = []
 
         # If we don't allow repetition, we need to filter out candidates that are outside the bounds
@@ -282,7 +306,8 @@ def generate_weights_dirichlet(
                 idx_to_level,
                 domains,
                 minimum_source_weight,
-                minimum_topic_weight
+                minimum_topic_weight,
+                fixed_topic_weights
             )
 
         if weight_bounds and not allow_repetition:

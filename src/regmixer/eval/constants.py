@@ -362,6 +362,29 @@ class GroupedWandbMetrics(Enum):
         'winogrande:rc::olmes:full'
     ]
 
+    code_tasks = [
+        WandbMetrics.codex_mbpp_gold_bpb_0shot.value,
+        WandbMetrics.codex_humaneval_gold_bpb_0shot.value,
+        'eval/downstream/basic_skills_coding_rc_5shot (BPB v2)',
+        'mt_mbpp:bash',
+        'mt_mbpp:c',
+        'mt_mbpp:cpp',
+        'mt_mbpp:csharp',
+        'mt_mbpp:go',
+        'mt_mbpp:haskell',
+        'mt_mbpp:java',
+        'mt_mbpp:javascript',
+        'mt_mbpp:matlab',
+        'mt_mbpp:php',
+        'mt_mbpp:python',
+        'mt_mbpp:r',
+        'mt_mbpp:ruby',
+        'mt_mbpp:rust',
+        'mt_mbpp:scala',
+        'mt_mbpp:swift',
+        'mt_mbpp:typescript',
+    ]
+
 
 
 # arc_easy, arc_challenge, hellaswag, MMLU macro average, 
