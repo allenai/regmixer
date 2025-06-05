@@ -258,7 +258,7 @@ sources:
           - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/TypeScript/**/*.npy
   - name: pes2o
     paths:
-      - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+      - s3://ai2-llm/preprocessed/pes2o/olmocr-s2orc-0325-ft-model_lr05_ng2_n3M6_ova/allenai/dolma2-tokenizer/**/*.npy
 nonzero_weight: # make sure all sources have nonzero weight
   - finemath-3plus
   - arxiv
