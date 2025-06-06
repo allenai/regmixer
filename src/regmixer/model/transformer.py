@@ -44,7 +44,7 @@ from regmixer.model.aliases import (
     SupportedModels,
     SupportedTokenizers,
 )
-from regmixer.model.evaluators import DownstreamEvaluatorsSmall, DownstreamEvaluators
+from regmixer.model.evaluators import DownstreamEvaluatorsSmall, DownstreamEvaluators, CodeTasks
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +263,11 @@ class TransformerConfigBuilder:
                 project="regmixer",
                 group=self.group_id.strip(),
                 enabled=True,
+            ),
+            "downstream_evaluator": DownstreamEvaluatorCallbackConfig(
+                tasks=[task.value for task in CodeTasks],
+                tokenizer=self.tokenizer,
+                eval_interval=self.model_config.eval_interval,
             ),
         }
 

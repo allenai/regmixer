@@ -1,6 +1,12 @@
 from enum import Enum
 
 
+class CodeTasks(Enum):
+    BASIC_SKILLS_CODING_RC_5SHOT = "basic_skills_coding_rc_5shot"
+    CODEX_HUMANEVAL = "codex_humaneval_gold_bpb_0shot"
+    CODEX_MBPP = "codex_mbpp_gold_bpb_0shot"
+
+
 class DownstreamEvaluatorsSmall(Enum):
     """Enum class enumerating in-loop evaluators for small models.
     This is the current set of evaluators used in https://github.com/allenai/OLMo-core/blob/main/src/olmo_core/train/config.py#L83 + basic_skills.
