@@ -20,6 +20,7 @@ import hashlib
 import os 
 import yaml
 import boto3
+from copy import deepcopy
 from collections import defaultdict
 
 from cookbook.aliases import ExperimentConfig as CookbookExperimentConfig
@@ -148,7 +149,6 @@ class LogNonLinearRegressor(Regressor):
         )
 
     def predict(self, x):
-        breakpoint()
         return nonlinear_mixing_law(torch.tensor(x, dtype=torch.float), torch.tensor(self.model, dtype=torch.float), B_mask=self.B_mask).numpy()
 
 
@@ -156,7 +156,7 @@ class SearchRegressor(Regressor):
     def __init__(self, **kwargs):
         pass 
 
-    def fit(self, x, y, idx):
+    def fit(self, x, y, idx, **kwargs):
         target = y[:, idx]
         self.model = {tuple(row): target[i] for i, row in enumerate(x)}
 
@@ -262,6 +262,7 @@ class SimulationProposer(Proposer):
         obj_weights: Optional[list] = None,
         temperature: Optional[float] = None,
         reference_scores: Optional[np.ndarray] = None,
+        fixed_weight: Optional[dict[str, float]] = None,
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -302,6 +303,7 @@ class SimulationProposer(Proposer):
                 with open(manual_token_constraint_path, "r") as f:
                     data = yaml.safe_load(f)
                 desired_tokens = data['requested_tokens']
+
                 leaf_level_constraints = data['leaf_level_constraints']
                 if leaf_level_constraints:
                     # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
@@ -405,6 +407,8 @@ class SimulationProposer(Proposer):
 
             search_prior = (best_weights + search_prior) / 2
 
+            logger.info(f"Current best weights is: {best_weights} and search prior is: {search_prior}")
+
 
         if constrain_objective:
             if leaf_level_constraints:
@@ -414,6 +418,9 @@ class SimulationProposer(Proposer):
             else:
                 if not passes_constraints(best_weights):
                     raise ValueError(f"Best weights are out of bounds!")
+                
+
+        # if best_weights was collapsed (because of conditioning on a topic-level p* mix), we need to expand it to the full prior distribution
 
         return best_weights
 
@@ -830,14 +837,37 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer"):
             )
         ]
         if len(task_data) == 0:
-            raise ValueError(f"Task {task} not found in JSONL data for {display_name}")
+            task = task.replace("bpb:", "")
+            task_data = [
+                data for data in all_jsonl_data
+                if (
+                    data['task_config'].get('metadata', {}).get('alias') == task
+                    or data['task_name'] == task
+                )
+            ]
+            if len(task_data) == 0:
+                task = task + ":full"
+                task_data = [
+                    data for data in all_jsonl_data
+                    if (
+                        data['task_config'].get('metadata', {}).get('alias') == task
+                        or data['task_name'] == task
+                    )
+                ]
+                if len(task_data) == 0:
+                    logger.warning(f"Task {task} not found in JSONL data for {display_name}")
+                    continue 
+
         data = task_data[0]
         if 'bits_per_byte_corr' in data['metrics']:
-            offline_results[data['task_config']['metadata']['alias']] = data['metrics']['bits_per_byte_corr']
+            name = data['task_config']['metadata']['alias'].replace("bpb:", "").replace(":full", "")
+            offline_results[name] = data['metrics']['bits_per_byte_corr']
         elif 'bits_per_byte_corr_macro' in data['metrics']:
-            offline_results[data['task_config']['metadata']['alias']] = data['metrics']['bits_per_byte_corr_macro']
+            name = data['task_config']['metadata']['alias'].replace("bpb:", "").replace(":full", "")
+            offline_results[name] = data['metrics']['bits_per_byte_corr_macro']
         elif 'bits_per_byte' in data['metrics']:
-            offline_results[data['task_name']] = data['metrics']['bits_per_byte'] 
+            name = data['task_name'].replace("bpb:", "").replace(":full", "")
+            offline_results[name] = data['metrics']['bits_per_byte'] 
         else:
             raise ValueError(f"{data['task_name']} does not have bits_per_byte_corr or bits_per_byte_corr_macro in metrics {data['metrics'].keys()}.")
             
@@ -853,8 +883,23 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
         .get("source_configs", [])
     }
     weights = {}
-    for source_name in priors[0].keys():
-        weights[source_name] = source_configs.get(source_name, {}).get("target_ratio", 0.0)
+    for domain in priors[0].keys():
+        if domain not in source_configs:
+            # two cases
+            if ":" in domain and domain.split(":")[0] in source_configs:
+                # 1) prior (i.e., swarm config) requests a leaf but mixes from the wandb (i.e. launched outside of the swarm, like natural distr) are specified at the source level 
+                source_name = domain.split(":")[0]
+                weights[domain] = source_configs[source_name].get("target_ratio", 0.0) * priors[0][domain]
+
+            elif ":" not in domain:
+                # 2) prior requests a source (i.e. when we condition on a topic-level p* mix) but wandb mixes are specified at the leaf level 
+                cfg = {k: v.get("target_ratio", 0.0) for k,v in source_configs.items() if domain in k}
+                weights[domain] = sum(cfg.values()) if cfg else 0.0
+            else:
+                # 3) prior's domain has 0 weight in the wandb config
+                weights[domain] = 0.0
+        else:
+            weights[domain] = source_configs.get(domain, {}).get("target_ratio", 0.0)
 
     return weights
 
@@ -1045,12 +1090,26 @@ def simulate2(
     return best_weights
 
 
+def expand_collapsed_weights(opt_weights: dict[str, float],
+                             original_prior: dict[str, float], collapsed_prior: dict[str, float]) -> dict[str, float]:
+
+    topics_to_expand = list(set(list(original_prior.keys())).difference(set(list(collapsed_prior.keys()))))
+    collapsed_sources = list(set(list(collapsed_prior.keys())).difference(set(list(original_prior.keys()))))
+
+    for source in collapsed_sources:
+        topics_per_source = sorted([t for t in topics_to_expand if source in t])
+        topic_weights = {t: original_prior[t] / collapsed_prior[source] * opt_weights[source] for t in topics_per_source}
+        del opt_weights[source]  # remove the source key
+        opt_weights.update(topic_weights)  # add the topic keys with their expanded weights
+
+    return opt_weights
 
 
 
 
 def plot_and_log_weights(
-    prior: np.ndarray,
+    prior: dict[str, float],
+    original_prior: dict[str, float],
     prediction: np.ndarray,
     metric_name: str,
     regression_type: str,
@@ -1061,24 +1120,38 @@ def plot_and_log_weights(
     alpha: float,
     df_config: pd.DataFrame,
     output_dir: str = BASE_OUTPUT_DIR,
+    fixed_weight: Optional[dict[str, float]] = None,
 ):
-    
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
 
-    columns = df_config.columns[3:].to_list()
-    with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json", "w") as f:
+    if set(list(original_prior.keys())) != set(list(prior.keys())):
+        # expand weights
+        opt_weight_dict = {k: prediction[i] for i, (k, v) in enumerate(prior.items())}
+        opt_weight_dict = expand_collapsed_weights(opt_weight_dict, original_prior, prior)
+        out = [{"domain": domain, "weight": weight} for domain, weight in opt_weight_dict.items()]
+        columns = list(prior.keys())
+    else:
+        columns = df_config.columns[3:].to_list()
         out = [
             {"domain": columns[idx], "weight": weight} for idx, weight in enumerate(prediction)
         ]
+
+    if fixed_weight is not None:
+        # If fixed weights are provided, we need to merge them with the predicted weights
+        remaining_weight = 1-sum(list(fixed_weight.values()))
+        out = [{'domain': entry['domain'], 'weight': entry['weight'] * remaining_weight } for entry in out]
+        for domain, weight in fixed_weight.items():
+            out.append({"domain": domain, "weight": weight})
+
+    with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json", "w") as f:
         logger.info(out)
         f.write(json.dumps(out))
-
 
     df = pd.DataFrame(
         data=np.concatenate(
             [
-                np.array([prior]),
+                np.array([list(prior.values())]),
                 np.array([prediction]),
             ],
             axis=0,
@@ -1232,7 +1305,6 @@ def calculate_priors_with_manual(
     use_cache: bool,
     manual_prior: Optional[dict[str, float]] = None,
 ):
-
     priors = calculate_priors(
         source_configs=source_configs,
         dtype=dtype,
@@ -1254,7 +1326,26 @@ def calculate_priors_with_manual(
                 if manual_prior is not None and source_config.name in manual_prior:
                     priors[0][source_config.name] = manual_prior[source_config.name]
 
-    return priors 
+    # if we conditioned any of the topic-level weights, we collapse them into source-level weights
+    for source_config in source_configs:
+        if source_config.topics:
+            if all([topic.weight is not None for topic in source_config.topics]):
+                # update prior with hardcoded topic weights 
+                source_weight = sum([priors[0][f"{source_config.name}:{topic.name}"] for topic in source_config.topics])
+                for topic in source_config.topics:
+                    priors[0][f"{source_config.name}:{topic.name}"] =  topic.weight * source_weight 
+
+    original_prior = deepcopy(priors)
+
+    for source_config in source_configs:
+        if source_config.topics:
+            if all([topic.weight is not None for topic in source_config.topics]):
+                source_weight = sum([priors[0][f"{source_config.name}:{topic.name}"] for topic in source_config.topics])
+                for topic in source_config.topics:
+                    del priors[0][f"{source_config.name}:{topic.name}"]
+                priors[0][source_config.name] = source_weight
+
+    return priors, original_prior
 
 
 def aggregate_mmlu(metrics: pd.DataFrame, metrics_to_index: list):

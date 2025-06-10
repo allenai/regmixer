@@ -1,0 +1,27 @@
+requested_tokens: 1_200_000_000_000 # 1.2 trillion (20%)
+leaf_level_constraints: true
+available_tokens: # from Jake's v2 counts 
+    adult: 303073226
+    art_design: 6833185034
+    crime_law: 42538674743
+    education_jobs: 138127926093
+    entertainment: 6069602783
+    fashion_beauty: 557917820
+    finance_business: 61150044703
+    food_dining: 2322982204
+    games: 2486095532
+    hardware: 7334608118
+    health: 108215933374
+    history: 26016611836
+    home_hobbies: 3924579643
+    industrial: 29389278657
+    literature: 31886391090
+    politics: 39234116889
+    religion: 24729732953
+    science_tech: 424245385160
+    social_life: 3181652910
+    software: 9146853216
+    software_dev: 41841278724
+    sports_fitness: 5450913796
+    transportation: 17149342957
+    travel: 2102425717

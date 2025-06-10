@@ -2,32 +2,32 @@ requested_tokens: 6_000_000_000_000 # 6 trillion
 leaf_level_constraints: true
 available_tokens: # from information in spreadsheet 
   arxiv: 20_000_000_000 # 20 billion
-  dclm:adult_content: 67760078203 # multiplied natural distribution by 5T guess
-  dclm:art_and_design: 70659711995
-  dclm:crime_and_law: 170130914779
-  dclm:education_and_jobs: 184690792861
-  dclm:electronics_and_hardware: 80168541745
-  dclm:entertainment: 441768061760
-  dclm:fashion_and_beauty: 37256539512
-  dclm:finance_and_business: 310313927581
-  dclm:food_and_dining: 105937299687
-  dclm:games: 229992491702
-  dclm:health: 393496227836
-  dclm:history_and_geography: 161049719459
-  dclm:home_and_hobbies: 126910777314
-  dclm:industrial: 43572140450
-  dclm:literature: 364834344848
-  dclm:politics: 611198130192
-  dclm:religion: 277776929208
-  dclm:science_math_and_technology: 427131054341
-  dclm:social_life: 218731841124
-  dclm:software: 108039380021
-  dclm:software_development: 223384974282
-  dclm:sports_and_fitness: 196759999355
-  dclm:transportation: 90793306202
-  dclm:travel_and_tourism: 57642815530
+  dclm: 5_000_000_000_000
   finemath-3plus: 34_000_000_000 # 34 billion
-  pes2o: 60_000_000_000 # 60 billion
+  pes2o:adult_content: 4854181
+  pes2o:art_and_design: 83530080
+  pes2o:crime_and_law: 162455715
+  pes2o:education_and_jobs: 2086236170
+  pes2o:electronics_and_hardware: 639354
+  pes2o:entertainment: 19444509
+  pes2o:fashion_and_beauty: 15778841
+  pes2o:finance_and_business: 1321636362
+  pes2o:food_and_dining: 61530980
+  pes2o:games: 30019521
+  pes2o:health: 18135551206
+  pes2o:history_and_geography: 253692703
+  pes2o:home_and_hobbies: 6558712
+  pes2o:industrial: 99897325
+  pes2o:literature: 348185517
+  pes2o:politics: 985403350
+  pes2o:religion: 121231408
+  pes2o:science_math_and_technology: 65272633993
+  pes2o:social_life: 30770706
+  pes2o:software: 123115906
+  pes2o:software_development: 79807488
+  pes2o:sports_and_fitness: 89282574
+  pes2o:transportation: 308741206
+  pes2o:travel_and_tourism: 126579755
   s2pdf:adult: 303073226
   s2pdf:art_design: 6833185034
   s2pdf:crime_law: 42538674743

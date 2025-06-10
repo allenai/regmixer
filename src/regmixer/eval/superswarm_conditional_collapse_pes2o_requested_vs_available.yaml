@@ -2,30 +2,7 @@ requested_tokens: 6_000_000_000_000 # 6 trillion
 leaf_level_constraints: true
 available_tokens: # from information in spreadsheet 
   arxiv: 20_000_000_000 # 20 billion
-  dclm:adult_content: 67760078203 # multiplied natural distribution by 5T guess
-  dclm:art_and_design: 70659711995
-  dclm:crime_and_law: 170130914779
-  dclm:education_and_jobs: 184690792861
-  dclm:electronics_and_hardware: 80168541745
-  dclm:entertainment: 441768061760
-  dclm:fashion_and_beauty: 37256539512
-  dclm:finance_and_business: 310313927581
-  dclm:food_and_dining: 105937299687
-  dclm:games: 229992491702
-  dclm:health: 393496227836
-  dclm:history_and_geography: 161049719459
-  dclm:home_and_hobbies: 126910777314
-  dclm:industrial: 43572140450
-  dclm:literature: 364834344848
-  dclm:politics: 611198130192
-  dclm:religion: 277776929208
-  dclm:science_math_and_technology: 427131054341
-  dclm:social_life: 218731841124
-  dclm:software: 108039380021
-  dclm:software_development: 223384974282
-  dclm:sports_and_fitness: 196759999355
-  dclm:transportation: 90793306202
-  dclm:travel_and_tourism: 57642815530
+  dclm: 5_000_000_000_000
   finemath-3plus: 34_000_000_000 # 34 billion
   pes2o: 60_000_000_000 # 60 billion
   s2pdf:adult: 303073226

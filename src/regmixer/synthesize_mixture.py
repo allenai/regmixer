@@ -116,6 +116,48 @@ def sample_has_required_sources(
         for source in nonzero_sources
     )
 
+def sample_has_required_sources_and_topics(
+    sample_vector,
+    domains,
+    nonzero_domains,
+    minimum_source_weight,
+    minimum_topic_weight 
+):    
+    # Compute source-level totals
+    source_weights = leaf_to_source(sample_vector, domains)
+
+    # Group topic weights under their sources
+    topic_weights = defaultdict(list)  # source -> list of (idx, weight)
+    for idx, weight in enumerate(sample_vector):
+        domain = domains[idx]
+        source = domain.split(':', 1)[0] if ':' in domain else domain
+        topic_weights[source].append((idx, weight))
+
+    # Clip topic weights below the dynamic per-topic threshold
+    clipped_source_sums = defaultdict(float)
+    topic_above_threshold = set()
+    for source, topics in topic_weights.items():
+        total = source_weights[source]
+        threshold = minimum_topic_weight * total
+        for idx, weight in topics:
+            if weight >= threshold:
+                clipped_source_sums[source] += weight
+                topic_above_threshold.add(domains[idx])
+
+    # Check all nonzero constraints
+    for required in nonzero_domains:
+        if ':' in required:
+            # Topic-level requirement
+            if required not in topic_above_threshold:
+                return False
+        else:
+            # Source-level requirement
+            if clipped_source_sums[required] <= minimum_source_weight:
+                return False
+
+    return True
+
+
 
 def generate_weights_dirichlet(
     sources: list[SourceConfig], # flat 
@@ -135,7 +177,8 @@ def generate_weights_dirichlet(
     manual_prior: Optional[dict[str, float]],
     sample_multiplier: Optional[int],
     enable_bound: bool = True,
-    nonzero_weight: Optional[list[str]] = None
+    nonzero_weight: Optional[list[str]] = None,
+    fixed_source_weights: Optional[dict[str, float]] = None
 ):
     """
     Generate weights for each domain group using a dirichlet distribution.
@@ -221,19 +264,31 @@ def generate_weights_dirichlet(
                 fixed_topic_weights[source.name] = conditional_weight
 
     sample_multiplier = sample_multiplier if sample_multiplier else ConfigDefaults.sample_multiplier
+
+    if fixed_source_weights is not None:
+        fixed_source_weights = [fixed_source_weights[source_config.name] for source_config in sorted(sources, key=lambda x: x.name)]
+
     for _ in tqdm(range(num_samples_out * sample_multiplier)):
         candidates = []
 
         # first, generate source-level weights
         if min_source_strength == max_source_strength:
-            source_samples = np.random.dirichlet(source_prior * min_source_strength, 1)
+            if fixed_source_weights is not None:
+                # if we have fixed source weights, we use those
+                source_samples = np.array([fixed_source_weights])
+            else:
+                source_samples = np.random.dirichlet(source_prior * min_source_strength, 1)
         else:
-            min_source_strength_log = np.log10(min_source_strength)
-            max_source_strength_log = np.log10(max_source_strength)
             source_samples = []
-            for strength in np.logspace(min_source_strength_log, max_source_strength_log, 15):
-                samples_per_strength = np.random.dirichlet(source_prior * strength, 1)
-                source_samples.append(samples_per_strength)
+            if fixed_source_weights is not None:
+                for _ in range(15):
+                    source_samples.append(np.array([fixed_source_weights]))
+            else:
+                min_source_strength_log = np.log10(min_source_strength)
+                max_source_strength_log = np.log10(max_source_strength)
+                for strength in np.logspace(min_source_strength_log, max_source_strength_log, 15):
+                    samples_per_strength = np.random.dirichlet(source_prior * strength, 1)
+                    source_samples.append(samples_per_strength)
 
 
         # then, generate topic-level weights
@@ -285,7 +340,7 @@ def generate_weights_dirichlet(
             # Filter candidates
             filtered_candidates = [
                 sample for sample in filtered_candidates
-                if sample_has_required_sources(sample[0], domains, source_names, minimum_source_weight, minimum_topic_weight)
+                if sample_has_required_sources_and_topics(sample[0], domains, source_names, minimum_source_weight, minimum_topic_weight)
             ]
 
         if not filtered_candidates:
@@ -293,7 +348,6 @@ def generate_weights_dirichlet(
             continue
 
         candidates = random.choice(filtered_candidates)
-
 
         if minimum_source_weight == minimum_topic_weight:
             candidates = np.where(candidates < minimum_source_weight, 0, candidates)
@@ -433,6 +487,7 @@ def mk_mixtures(
         available_tokens=available_tokens,
         enable_bound=True,
         nonzero_weight=config.nonzero_weight,
+        fixed_source_weights=config.fixed_source_weights,
         manual_prior=config.manual_prior,
         sample_multiplier=config.sample_multiplier
     )

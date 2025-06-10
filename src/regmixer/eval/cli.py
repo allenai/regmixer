@@ -277,6 +277,14 @@ def cli():
     required=False,
     default=1.0
 )
+@click.option(
+    '--fixed-weight',
+    type=str,
+    help="string dict of domains and their weights to fix",
+    required=False,
+    default=None
+)
+
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -306,7 +314,8 @@ def fit(
     early_stopping: float = 0.0,
     dro_reference_model_id: Optional[str] = None,
     use_reference_model_predicted_scores: bool = False,
-    select_top_k_runs: float = 1.0
+    select_top_k_runs: float = 1.0,
+    fixed_weight: Optional[str] = None,
 ):
 
     output_dir = get_output_dir(experiment_groups)
@@ -361,6 +370,10 @@ def fit(
         eval_config["dro_reference_model_id"] = dro_reference_model_id
     if use_reference_model_predicted_scores:
         eval_config["use_reference_model_predicted_scores"] = use_reference_model_predicted_scores
+    if fixed_weight is not None:
+        eval_config["fixed_weight"] = fixed_weight
+        fixed_weight_dict = json.loads(fixed_weight)
+
 
     # used for caching regression model
     regression_config = {
@@ -378,6 +391,9 @@ def fit(
     if select_top_k_runs < 1.0:
         eval_config["select_top_k_runs"] = select_top_k_runs
         regression_config["select_top_k_runs"] = select_top_k_runs
+
+    if fixed_weight is not None:
+        regression_config["fixed_weight"] = fixed_weight
 
 
     output_dir = save_eval_config(eval_config, output_dir)
@@ -437,12 +453,21 @@ def fit(
 
     logger.info(f"Calculating source weights...")
 
-    priors = calculate_priors_with_manual(
+    priors, original_priors = calculate_priors_with_manual(
         source_configs=launch_configs[0].sources,
         dtype=launch_configs[0].dtype,
         use_cache=(no_cache == False),
         manual_prior=launch_configs[0].manual_prior if hasattr(launch_configs[0], "manual_prior") else None,
     )
+    if fixed_weight is not None:
+        # remove the fixed weight domains from the priors, and renormalize the remaining domains to add to 1
+        new_priors = {k: v for k, v in priors[0].items() if k not in fixed_weight_dict}
+        total = sum(list(new_priors.values()))
+        new_priors = {k: v / total for k, v in new_priors.items()}  # normalize the weights
+        priors_list = list(priors)
+        priors_list[0] = new_priors
+        priors = tuple(priors_list)
+
     logger.info(f"Source weights:")
     logger.info(priors[0])
 
@@ -474,7 +499,7 @@ def fit(
                     average=group_average != None,
                 ),
             }
-            for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name == "superswarm_offline" or len(run.samples) > 0
+            for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name in ["superswarm_offline", "olmo3_offline_tasks", "pdf_tasks", "code_tasks_offline"] or len(run.samples) > 0
         ]
         if constrain_swarm:
             raise NotImplementedError("Constrained swarm is implemented but out of date. We concluded that this is not the right way to enforce token repetition constraints.")
@@ -485,6 +510,12 @@ def fit(
         pd.to_pickle(ratios, ratios_cache_path)
         pd.to_pickle(metrics, metrics_cache_path)
         logger.info(f"Saved ratios to {ratios_cache_path} and metrics to {metrics_cache_path}")
+
+    if fixed_weight is not None:
+        # remove the fixed weight domains from the ratios df, and renormalize the remaining domains to add to 1
+        ratios.drop(columns=[col for col in fixed_weight_dict], inplace=True)
+        domains = ratios.columns[3:]
+        ratios[domains] = ratios[domains].div(ratios[domains].sum(axis=1), axis=0)
 
     metrics_to_index = eval_metric_group.value
 
@@ -552,12 +583,11 @@ def fit(
         obj_weights = ObjectiveWeights[obj_weights]
         obj_weights = [obj_weights.value.get(metric, 1) for idx, metric in indexed_metrics]
         logger.info(f"Minimizing weighted average: {obj_weights}")
-
     # caching logic for regression model. Note that one regression model can be used for many different proposed mixes,
     # which is why we need to cache based on a separate subconfig, regression_config 
     regression_config_str = json.dumps(regression_config, sort_keys=True)
     hash_str = hashlib.sha256(regression_config_str.encode("utf-8")).hexdigest()[:16]
-    regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / hash_str 
+    regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / " ".join(experiment_groups) / hash_str 
     regression_model_cache_folder.mkdir(parents=True, exist_ok=True)
     regression_model_cache_path = regression_model_cache_folder / f"regression_params.pkl"
     if os.path.exists(regression_model_cache_path) and regression_type == "log_linear":
@@ -574,8 +604,17 @@ def fit(
             reg = LogLinearRegressor(params[metric])
             predictors.append(reg)
     else:
+        logger.info(f"Will save regression model to {regression_model_cache_path}")
         for idx, metric in indexed_metrics:
             predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping, B_mask if regression_type == "log_nonlinear" else None))
+            # save intermediate progress after each regression model
+            if regression_type == "log_linear":
+                parameters = {indexed_metrics[i][-1]: predictors[i].model for i in range(len(predictors))}
+                with open(str(regression_model_cache_path).split(".pkl")[0] + f"_{idx}.pkl", "wb") as f:
+                    pickle.dump(parameters, f)
+                logger.info(f"First {idx} regression models saved to {str(regression_model_cache_path).split('.pkl')[0] + f'_{idx}.pkl'}")
+                with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
+                    f.write(str(regression_model_cache_path))
 
         if regression_type == "log_linear":
             parameters = {metric: predictors[idx].model for idx, metric in indexed_metrics}
@@ -657,11 +696,13 @@ def fit(
                 repetition_factor=repetition_factor,
                 obj_weights=obj_weights,
                 temperature=temperature,
-                reference_scores=reference_scores if dro_reference_model_id is not None else None
+                reference_scores=reference_scores if dro_reference_model_id is not None else None,
+                fixed_weight=fixed_weight_dict if fixed_weight is not None else None
             )
 
             plot_and_log_weights(
-                prior=np.array(list(priors[0].values())),
+                prior=priors[0],
+                original_prior=original_priors[0],
                 prediction=weights,
                 metric_name=metric,
                 regression_type=regression_type,
@@ -672,6 +713,7 @@ def fit(
                 alpha=alpha,
                 df_config=ratios,
                 output_dir=output_dir,
+                fixed_weight=fixed_weight_dict if fixed_weight is not None else None
             )
 
             results.append((metric, weights))
@@ -690,10 +732,12 @@ def fit(
             repetition_factor=repetition_factor,
             obj_weights=obj_weights,
             temperature=temperature,
-            reference_scores=reference_scores if dro_reference_model_id is not None else None
+            reference_scores=reference_scores if dro_reference_model_id is not None else None,
+            fixed_weight=fixed_weight_dict if fixed_weight is not None else None
         )
         plot_and_log_weights(
-            prior=np.array(list(priors[0].values())),
+            prior=priors[0],
+            original_prior=original_priors[0],
             prediction=weights,
             metric_name=group_metrics,
             regression_type=regression_type,
@@ -704,6 +748,7 @@ def fit(
             alpha=alpha,
             df_config=ratios,
             output_dir=output_dir,
+            fixed_weight=fixed_weight_dict if fixed_weight is not None else None
         )
 
         results.append((group_metrics, weights))
@@ -713,7 +758,8 @@ def fit(
         avg_name = f"avg_{eval_metric_group_name}"
         average = np.mean([result[1] for result in results], axis=0)
         plot_and_log_weights(
-            prior=np.array(list(priors[0].values())),
+            prior=priors[0],
+            original_prior=original_priors[0],
             prediction=average,
             metric_name=avg_name,
             regression_type=regression_type,
@@ -724,6 +770,7 @@ def fit(
             alpha=alpha,
             df_config=ratios,
             output_dir=output_dir,
+            fixed_weight=fixed_weight_dict if fixed_weight is not None else None
         )
 
         results.append((avg_name, average))
@@ -740,7 +787,6 @@ def fit(
         with open(f"{output_dir}/predicted_performance.json", "w") as f:
             json.dump(float(predicted_performance), f)
 
-
         if dro_reference_model_id is not None and use_reference_model_predicted_scores:
             diff = reference_scores - predictions 
             colors = ['green' if val > 0 else 'red' for val in diff]
@@ -753,9 +799,8 @@ def fit(
             plt.axhline(0, color='black', linewidth=0.8)
             plt.xticks(ticks=x, labels=metrics.columns[3:].tolist(), rotation=90)
             plt.tight_layout()
-            plt.savefig(f"{output_dir}/pareto_improvement.png")
+            plt.savefig(f"{output_dir}/predicted_pareto_improvement.png")
             plt.close()
-
 
     logger.info(f"Results saved to {output_dir}")
 

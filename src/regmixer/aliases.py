@@ -78,6 +78,7 @@ class ExperimentConfig(BaseModel):
     min_topic_strength: Optional[float] = None
     max_topic_strength: Optional[float] = None
     nonzero_weight: Optional[list[str]] = None
+    fixed_source_weights: Optional[dict[str, float]] = None
     device_batch_size: int = 4
     global_batch_size: Optional[int] = None
     manual_prior: Optional[dict[str, float]] = None

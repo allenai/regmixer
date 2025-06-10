@@ -1,0 +1,18 @@
+requested_tokens: 480_000_000_000 # 480 billion
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet 
+  C: 4735074247
+  CSharp: 7204525343
+  Cpp: 12530445761
+  Go: 1398595118
+  Java: 31347725888
+  JavaScript: 8886972357
+  Markdown: 28916320218
+  PHP: 7395033318
+  Python: 18017832560
+  Ruby: 1386775805
+  Rust: 1418447132
+  SQL: 7063472860
+  Shell: 2542637875
+  Swift: 1510019025
+  TypeScript: 2495753789

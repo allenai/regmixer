@@ -44,7 +44,7 @@ from regmixer.model.aliases import (
     SupportedModels,
     SupportedTokenizers,
 )
-from regmixer.model.evaluators import DownstreamEvaluatorsSmall, DownstreamEvaluators
+from regmixer.model.evaluators import DownstreamEvaluatorsSmall, DownstreamEvaluators, CodeTasks
 
 logger = logging.getLogger(__name__)
 
