@@ -1,0 +1,18 @@
+requested_tokens: 480_000_000_000 # 480 billion
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet 
+  stack-edu:C: 4735074247
+  stack-edu:CSharp: 7204525343
+  stack-edu:Cpp: 12530445761
+  stack-edu:Go: 1398595118
+  stack-edu:Java: 31347725888
+  stack-edu:JavaScript: 8886972357
+  stack-edu:Markdown: 28916320218
+  stack-edu:PHP: 7395033318
+  stack-edu:Python: 18017832560
+  stack-edu:Ruby: 1386775805
+  stack-edu:Rust: 1418447132
+  stack-edu:SQL: 7063472860
+  stack-edu:Shell: 2542637875
+  stack-edu:Swift: 1510019025
+  stack-edu:TypeScript: 2495753789
