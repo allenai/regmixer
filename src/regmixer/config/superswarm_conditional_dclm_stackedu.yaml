@@ -305,7 +305,7 @@ sources:
         - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/environmental-science/**/*.npy
     - name: geography
       paths:
-        - s3://ai2-llm/preprocessed/olma3-final/s2orc/allenai/dolma2-tokenizer/geography/**/*.npy
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/geography/**/*.npy
     - name: geology
       paths:
         - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/geology/**/*.npy
