@@ -406,7 +406,29 @@ class GroupedWandbMetrics(Enum):
         'mt_mbpp:scala',
         'mt_mbpp:swift',
         'mt_mbpp:typescript',
+    ]
 
+    code_tasks_offline_fixed = [
+        'basic_skills_coding:rc::olmes',
+        'codex_humaneval:3shot:bpb::none',
+        'mbpp:3shot:bpb::none',
+        'mt_mbpp_v2fix:bash',
+        'mt_mbpp_v2fix:c',
+        'mt_mbpp_v2fix:cpp',
+        'mt_mbpp_v2fix:csharp',
+        'mt_mbpp_v2fix:go',
+        'mt_mbpp_v2fix:haskell',
+        'mt_mbpp_v2fix:java',
+        'mt_mbpp_v2fix:javascript',
+        'mt_mbpp_v2fix:matlab',
+        'mt_mbpp_v2fix:php',
+        'mt_mbpp_v2fix:python',
+        'mt_mbpp_v2fix:r',
+        'mt_mbpp_v2fix:ruby',
+        'mt_mbpp_v2fix:rust',
+        'mt_mbpp_v2fix:scala',
+        'mt_mbpp_v2fix:swift',
+        'mt_mbpp_v2fix:typescript',
     ]
 
 
