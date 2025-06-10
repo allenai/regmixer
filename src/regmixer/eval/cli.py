@@ -473,7 +473,6 @@ def fit(
 
     ratios_cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name}_ratios.pkl"
     metrics_cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name}_metrics.pkl"
-
     if os.path.exists(ratios_cache_path) and os.path.exists(metrics_cache_path):
         logger.info(f"Loading cached ratios and metrics from {ratios_cache_path} and {metrics_cache_path}")
         with open(ratios_cache_path, "rb") as f:
@@ -499,7 +498,7 @@ def fit(
                     average=group_average != None,
                 ),
             }
-            for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name in ["superswarm_offline", "olmo3_offline_tasks", "pdf_tasks", "code_tasks_offline"] or len(run.samples) > 0
+            for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name in ["superswarm_offline", "olmo3_offline_tasks", "pdf_tasks", "code_tasks_offline", "code_tasks_offline_fixed"] or len(run.samples) > 0
         ]
         if constrain_swarm:
             raise NotImplementedError("Constrained swarm is implemented but out of date. We concluded that this is not the right way to enforce token repetition constraints.")
@@ -507,15 +506,16 @@ def fit(
         ratios = pd.DataFrame(run_ratios)
         metrics = pd.DataFrame(run_metrics)
         ratios = ratios[ratios['run'].isin(metrics.run)]
+
+        if fixed_weight is not None:
+            # normalize the non-fixed-weight domains to add to 1 
+            domains = ratios.columns[3:]
+            ratios[domains] = ratios[domains].div(ratios[domains].sum(axis=1), axis=0)
+            
         pd.to_pickle(ratios, ratios_cache_path)
         pd.to_pickle(metrics, metrics_cache_path)
         logger.info(f"Saved ratios to {ratios_cache_path} and metrics to {metrics_cache_path}")
 
-    if fixed_weight is not None:
-        # remove the fixed weight domains from the ratios df, and renormalize the remaining domains to add to 1
-        ratios.drop(columns=[col for col in fixed_weight_dict], inplace=True)
-        domains = ratios.columns[3:]
-        ratios[domains] = ratios[domains].div(ratios[domains].sum(axis=1), axis=0)
 
     metrics_to_index = eval_metric_group.value
 
@@ -583,6 +583,7 @@ def fit(
         obj_weights = ObjectiveWeights[obj_weights]
         obj_weights = [obj_weights.value.get(metric, 1) for idx, metric in indexed_metrics]
         logger.info(f"Minimizing weighted average: {obj_weights}")
+
     # caching logic for regression model. Note that one regression model can be used for many different proposed mixes,
     # which is why we need to cache based on a separate subconfig, regression_config 
     regression_config_str = json.dumps(regression_config, sort_keys=True)
@@ -590,6 +591,7 @@ def fit(
     regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / " ".join(experiment_groups) / hash_str 
     regression_model_cache_folder.mkdir(parents=True, exist_ok=True)
     regression_model_cache_path = regression_model_cache_folder / f"regression_params.pkl"
+
     if os.path.exists(regression_model_cache_path) and regression_type == "log_linear":
         logger.info(f"Using log-linear regression model at {regression_model_cache_path}")
         with open(regression_model_cache_path, "rb") as f:
