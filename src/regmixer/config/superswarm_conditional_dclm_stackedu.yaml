@@ -350,14 +350,6 @@ nonzero_weight: # make sure all sources have nonzero weight
   - dclm
   - s2pdf
   - stack-edu
-# manual_prior: # enforce a manual prior based on the final sources' sizes
-#   finemath-3plus: 0.006734006734
-#   arxiv: 0.003961180432
-#   pes2o: 0.0118835413
-#   wikipedia: 0.001980590216
-#   dclm: 0.7922360864
-#   s2pdf: 0.1584472173
-#   stack-edu: 0.0247573777
 fixed_source_weights:
   finemath-3plus: 0.025340376929054265
   arxiv: 0.008284928006565282

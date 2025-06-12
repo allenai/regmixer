@@ -406,7 +406,10 @@ class SimulationProposer(Proposer):
                                 for j in range(len(usage))
                                 if usage[j] > token_limits[j]
                             ]
-                            logger.info(f"Filtered simulation {i+1}: {exceeding_sources}")
+                            exceeding_details = "\n".join(
+                                [f"    {detail}" for detail in exceeding_sources]
+                            )
+                            logger.info(f"Filtered simulation {i+1}:\n{exceeding_details}")
 
                     simulations = simulations[valid_mask]
                 else:
