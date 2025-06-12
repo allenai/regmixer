@@ -524,7 +524,7 @@ class GroupedWandbMetrics(Enum):
         'mt_mbpp:javascript',
         'mt_mbpp:matlab',
         'mt_mbpp:php',
-        'mt_mbpp:python',
+        #'mt_mbpp:python',
         'mt_mbpp:r',
         'mt_mbpp:ruby',
         'mt_mbpp:rust',

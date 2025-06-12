@@ -458,9 +458,10 @@ def fit(
         dtype=launch_configs[0].dtype,
         use_cache=(no_cache == False),
         manual_prior=launch_configs[0].manual_prior if hasattr(launch_configs[0], "manual_prior") else None,
+        fixed_source_weights=launch_configs[0].fixed_source_weights if hasattr(launch_configs[0], "fixed_source_weights") else None,
     )
     if fixed_weight is not None:
-        # remove the fixed weight domains from the priors, and renormalize the remaining domains to add to 1
+        # remove the fixed weight domains from the priors, and renormalize the remaining domains to add to 1 (this is needed for simulation)
         new_priors = {k: v for k, v in priors[0].items() if k not in fixed_weight_dict}
         total = sum(list(new_priors.values()))
         new_priors = {k: v / total for k, v in new_priors.items()}  # normalize the weights
@@ -507,15 +508,16 @@ def fit(
         metrics = pd.DataFrame(run_metrics)
         ratios = ratios[ratios['run'].isin(metrics.run)]
 
-        if fixed_weight is not None:
-            # normalize the non-fixed-weight domains to add to 1 
-            domains = ratios.columns[3:]
-            ratios[domains] = ratios[domains].div(ratios[domains].sum(axis=1), axis=0)
             
         pd.to_pickle(ratios, ratios_cache_path)
         pd.to_pickle(metrics, metrics_cache_path)
         logger.info(f"Saved ratios to {ratios_cache_path} and metrics to {metrics_cache_path}")
 
+
+    if fixed_weight is not None:
+        # normalize the non-fixed-weight domains to add to 1 
+        domains = ratios.columns[3:]
+        ratios[domains] = ratios[domains].div(ratios[domains].sum(axis=1), axis=0)
 
     metrics_to_index = eval_metric_group.value
 
@@ -591,7 +593,6 @@ def fit(
     regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / " ".join(experiment_groups) / hash_str 
     regression_model_cache_folder.mkdir(parents=True, exist_ok=True)
     regression_model_cache_path = regression_model_cache_folder / f"regression_params.pkl"
-
     if os.path.exists(regression_model_cache_path) and regression_type == "log_linear":
         logger.info(f"Using log-linear regression model at {regression_model_cache_path}")
         with open(regression_model_cache_path, "rb") as f:
