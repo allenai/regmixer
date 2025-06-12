@@ -1143,7 +1143,7 @@ def add_back_in_fixed_source_weights(
     final_weights = {}
     for source, weight in fixed_weight.items():
         if any([domain.startswith(source + ":") for domain in opt_weights]):
-            # this source is already in the opt_weights 
+            # this source is already in the opt_weights, we just need to normalize it 
             # get all the topics associated with this source, normalize the within-source distribution, and scale it by the fixed weights
             topics_per_source = {t : w for t, w in opt_weights.items() if t.startswith(source + ":")}
             total = sum(list(topics_per_source.values()))
@@ -1162,6 +1162,10 @@ def add_back_in_fixed_source_weights(
             total = sum(list(topics_per_source.values()))
             topics_per_source = {t: w / total * weight for t, w in topics_per_source.items()}
             final_weights.update(topics_per_source)
+
+    # normalize again just to fix any numerical issues
+    total = sum(final_weights.values())
+    final_weights = {k: v / total for k, v in final_weights.items()}
 
     return final_weights
 
