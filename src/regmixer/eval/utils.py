@@ -490,6 +490,32 @@ def build_regression(
     return reg
 
 
+def get_runs_without_wandb(full_group_name, dashboard="regmixer"):
+    bucket = 'ai2-llm'   
+    base_prefix = f'evaluation/{dashboard}/'
+ 
+    s3 = boto3.client('s3')
+    
+    paginator = s3.get_paginator('list_objects_v2')
+    pages = paginator.paginate(Bucket=bucket, Prefix=base_prefix)
+    
+    # Extract unique display names that match the pattern
+    display_names = set()
+    for page in pages:
+        if 'Contents' in page:
+            for obj in page['Contents']:
+                key = obj['Key']
+                # Extract the display name from the key
+                # Format: evaluation/{dashboard}/{display_name}/...
+                parts = key.split('/')
+                if len(parts) >= 3:
+                    display_name = parts[2]  # The display name part
+                    if display_name.startswith(full_group_name):
+                        display_names.add(display_name)
+    
+    print(f"Found display names: {sorted(display_names)}")
+    return display_names
+
 def get_runs_from_api(
     api, workspace: str, groups: list[str], cache_path: Path, no_cache: bool, num_samples: int, eval_metric_group: GroupedWandbMetrics
 ) -> list[RunInstance]:
@@ -1106,6 +1132,40 @@ def expand_collapsed_weights(opt_weights: dict[str, float],
 
 
 
+def add_back_in_fixed_source_weights(
+    opt_weights: dict[str, float],
+    original_prior: dict[str, float],
+    fixed_weight: dict[str, float]
+) -> dict[str, float]:
+
+    domains_to_add_back_in = list(set(list(original_prior.keys())).difference(set(list(opt_weights.keys()))))
+
+    final_weights = {}
+    for source, weight in fixed_weight.items():
+        if any([domain.startswith(source + ":") for domain in opt_weights]):
+            # this source is already in the opt_weights 
+            # get all the topics associated with this source, normalize the within-source distribution, and scale it by the fixed weights
+            topics_per_source = {t : w for t, w in opt_weights.items() if t.startswith(source + ":")}
+            total = sum(list(topics_per_source.values()))
+            topics_per_source = {t: w / total * weight for t, w in topics_per_source.items()}
+            final_weights.update(topics_per_source)
+
+        elif source in domains_to_add_back_in:
+            # this source is not in the opt_weights, but it is in the original prior and has a fixed weight
+            # we can just add it back in with its fixed weight
+            final_weights[source] = weight
+
+        elif any([domain.startswith(source + ":") for domain in domains_to_add_back_in]):
+            # this source is not in the opt_weights, but it has topics in the original prior
+            # we need to expand the fixed weight according to the original prior distribution
+            topics_per_source = {t : w for t, w in original_prior.items() if t.startswith(source + ":")}
+            total = sum(list(topics_per_source.values()))
+            topics_per_source = {t: w / total * weight for t, w in topics_per_source.items()}
+            final_weights.update(topics_per_source)
+
+    return final_weights
+
+
 
 def plot_and_log_weights(
     prior: dict[str, float],
@@ -1138,11 +1198,8 @@ def plot_and_log_weights(
         ]
 
     if fixed_weight is not None:
-        # If fixed weights are provided, we need to merge them with the predicted weights
-        remaining_weight = 1-sum(list(fixed_weight.values()))
-        out = [{'domain': entry['domain'], 'weight': entry['weight'] * remaining_weight } for entry in out]
-        for domain, weight in fixed_weight.items():
-            out.append({"domain": domain, "weight": weight})
+        opt_weight_dict = add_back_in_fixed_source_weights(opt_weight_dict, original_prior, fixed_weight)
+        out = [{"domain": domain, "weight": weight} for domain, weight in opt_weight_dict.items()]
 
     with open(f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json", "w") as f:
         logger.info(out)
@@ -1304,27 +1361,34 @@ def calculate_priors_with_manual(
     dtype,
     use_cache: bool,
     manual_prior: Optional[dict[str, float]] = None,
+    fixed_source_weights: Optional[dict[str, float]] = None,
 ):
     priors = calculate_priors(
         source_configs=source_configs,
         dtype=dtype,
         use_cache=use_cache,
-    )
+    )    
 
-    if manual_prior is not None:
-        logger.info(f"Adjusting priors with manual prior weights: {manual_prior}")
+    if manual_prior is not None or fixed_source_weights is not None:
+        if manual_prior is not None:
+            fixed_weights = manual_prior 
+        if fixed_source_weights is not None:
+            fixed_weights = fixed_source_weights
+
+
+        logger.info(f"Adjusting priors with manual prior weights: {fixed_weights}")
         for source_config in sorted(source_configs, key=lambda x: x.name):
             if source_config.topics:
                 # adjust each topic weight by the manual prior  
                 weights = np.array([priors[0][f"{source_config.name}:{topic.name}"] for topic in source_config.topics])
                 normalized_weights = weights / weights.sum()
-                if manual_prior is not None and source_config.name in manual_prior:
+                if fixed_weights is not None and source_config.name in fixed_weights:
                     for i, topic in enumerate(source_config.topics):
-                        priors[0][f"{source_config.name}:{topic.name}"] = manual_prior[source_config.name] * normalized_weights[i]
+                        priors[0][f"{source_config.name}:{topic.name}"] = fixed_weights[source_config.name] * normalized_weights[i]
             else:
                 # directly overwrite source weight with manual prior
-                if manual_prior is not None and source_config.name in manual_prior:
-                    priors[0][source_config.name] = manual_prior[source_config.name]
+                if fixed_weights is not None and source_config.name in fixed_weights:
+                    priors[0][source_config.name] = fixed_weights[source_config.name]
 
     # if we conditioned any of the topic-level weights, we collapse them into source-level weights
     for source_config in source_configs:
