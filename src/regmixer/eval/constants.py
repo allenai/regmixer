@@ -545,7 +545,7 @@ class GroupedWandbMetrics(Enum):
         "mmlu_us_foreign_policy:rc::olmes",
         "mmlu_virology:rc::olmes",
         "mmlu_world_religions:rc::olmes",
-        "mt_mbpp_v2fix_v2fix:bash",
+        "mt_mbpp_v2fix:bash",
         "mt_mbpp_v2fix:c",
         "mt_mbpp_v2fix:cpp",
         "mt_mbpp_v2fix:csharp",
