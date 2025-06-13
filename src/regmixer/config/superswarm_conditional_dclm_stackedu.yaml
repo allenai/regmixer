@@ -1,0 +1,360 @@
+name: "5xC-30m-superswarm-dclm-stackedu-conditional"
+description: "30M @ 5xC superswarm across sources with DCLM p* and stackedu p*; includes updated DCLM but pes2o is not partitioned"
+budget: "ai2/oe-data"
+workspace: "ai2/dolma2"
+nodes: 1
+gpus: 1
+variants: 512
+preemptible: true
+max_tokens: 2_910_233_600
+allow_repetition: false
+sequence_length: 2048 # we changed this from 4096 to 2048 to maintain batch size (?)
+seed: 42
+source_mix_temperature: 0.75 # lower temperature = closer to uniform --> this lets us sample more from the sources with lower priors
+topic_mix_temperature: 1.0  # keeping the temperature from the dclm sparse swarm
+minimum_weight: 0.0001 # ignore
+minimum_source_weight: 0.0001 # each source must have at least this weight
+minimum_topic_weight: 0.05 # each topic must be at least this proportion of its source. higher = more sparse
+min_source_strength: 0.1 # higher strength = sample more closely to the prior
+max_source_strength: 20
+min_topic_strength: 0.1
+max_topic_strength: 5
+sample_multiplier: 50 # how many tries per swarm run
+proxy_model_id: "olmo_30m"
+tokenizer: "dolma2"
+weka: false
+dtype: "uint32"
+priority: urgent
+cluster: ai2/augusta-google-1 #ai2/saturn-cirrascale, ai2/neptune-cirrascale
+device_batch_size: 32
+sources:
+  - name: finemath-3plus
+    paths:
+      - s3://ai2-llm/preprocessed/finemath/finemath-3plus/allenai/**/*.npy
+  - name: arxiv
+    paths:
+      - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/**/*.npy
+  - name: wikipedia
+    paths:
+      - s3://ai2-llm/preprocessed/structured-wikipedia/concat_with_links/allenai/**/*.npy
+  - name: dclm
+    topics:
+      - name: adult_content
+        weight: 0.001144117810399051
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/adult_content/**/*.npy
+      - name: art_and_design
+        weight: 0.01249707367344882
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/art_and_design/**/*.npy
+      - name: crime_and_law
+        weight: 0.02923482987563418
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
+      - name: education_and_jobs
+        weight: 0.042876790729263314
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+      - name: electronics_and_hardware
+        weight: 0.03452411494012139
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+      - name: entertainment
+        weight: 0.09598475243055875
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/entertainment/**/*.npy
+      - name: fashion_and_beauty
+        weight: 0.00012733666316416182
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/fashion_and_beauty/**/*.npy
+      - name: finance_and_business
+        weight: 0.04067027113145341
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
+      - name: food_and_dining
+        weight: 0.014086159108083668
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/food_and_dining/**/*.npy
+      - name: games
+        weight: 0.06891284699600658
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/games/**/*.npy
+      - name: health
+        weight: 0.09942183338931967
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/health/**/*.npy
+      - name: history_and_geography
+        weight: 0.027098556464741227
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
+      - name: home_and_hobbies
+        weight: 0.009226467887549798
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/home_and_hobbies/**/*.npy
+      - name: industrial
+        weight: 0.015745768366251897
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/industrial/**/*.npy
+      - name: literature
+        weight: 0.0682512927464629
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/literature/**/*.npy
+      - name: politics
+        weight: 0.02170366281584968
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/politics/**/*.npy
+      - name: religion
+        weight: 0.019765203386769094
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/religion/**/*.npy
+      - name: science_math_and_technology
+        weight: 0.2102541083699082
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
+      - name: social_life
+        weight: 0.00464628155954837
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/social_life/**/*.npy
+      - name: software
+        weight: 0.04733898713026143
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/software/**/*.npy
+      - name: software_development
+        weight: 0.11142142430705981
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/software_development/**/*.npy
+      - name: sports_and_fitness
+        weight: 0.013072140601763493
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
+      - name: transportation
+        weight: 0.009798609444870071
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/transportation/**/*.npy
+      - name: travel_and_tourism
+        weight: 0.002197370171511048
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
+  - name: s2pdf
+    topics:
+      - name: adult_content
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/adult_content/**/*.npy
+      - name: art_and_design
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/art_and_design/**/*.npy
+      - name: crime_and_law
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
+      - name: education_and_jobs
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+      - name: electronics_and_hardware
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+      - name: entertainment
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/entertainment/**/*.npy
+      - name: fashion_and_beauty
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/fashion_and_beauty/**/*.npy
+      - name: finance_and_business
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
+      - name: food_and_dining
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/food_and_dining/**/*.npy
+      - name: games
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/games/**/*.npy
+      - name: health
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/health/**/*.npy
+      - name: history_and_geography
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
+      - name: home_and_hobbies
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/home_and_hobbies/**/*.npy
+      - name: industrial
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/industrial/**/*.npy
+      - name: literature
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/literature/**/*.npy
+      - name: politics
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/politics/**/*.npy
+      - name: religion
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/religion/**/*.npy
+      - name: science_math_and_technology
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
+      - name: social_life
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/social_life/**/*.npy
+      - name: software_development
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/software_development/**/*.npy
+      - name: software
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/software/**/*.npy
+      - name: sports_and_fitness
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
+      - name: transportation
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/transportation/**/*.npy
+      - name: travel_and_tourism
+        paths:
+          - s3://ai2-llm/preprocessed/olmo3-final/s2pdfs/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
+  - name: stack-edu
+    topics:
+      - name: C
+        weight: 0.040545413474083136
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/C/**/*.npy
+      - name: Cpp
+        weight: 0.119924239905908544
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Cpp/**/*.npy
+      - name: CSharp
+        weight: 0.061456149022289624
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/CSharp/**/*.npy
+      - name: Go
+        weight: 0.013141668585880971
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Go/**/*.npy
+      - name: Java
+        weight: 0.15971742894160592
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Java/**/*.npy
+      - name: JavaScript
+        weight: 0.08711993898613768
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/JavaScript/**/*.npy
+      - name: Markdown
+        weight: 0.16641522916681814
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Markdown/**/*.npy
+      - name: PHP
+        weight: 0.060681232466575972
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/PHP/**/*.npy
+      - name: Python
+        weight: 0.18292382056422074
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Python/**/*.npy
+      - name: Ruby
+        weight: 0.01313841950835558
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Ruby/**/*.npy
+      - name: Rust
+        weight: 0.014023586747942062
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Rust/**/*.npy
+      - name: Shell
+        weight: 0.025543226210598952
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Shell/**/*.npy
+      - name: SQL
+        weight: 0.018239409453020124
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/SQL/**/*.npy
+      - name: Swift
+        weight: 0.014179755937669661
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Swift/**/*.npy
+      - name: TypeScript
+        weight: 0.02295048102888894
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/TypeScript/**/*.npy
+  - name: pes2o
+    topics:
+    - name: agricultural-and-food-sciences
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/agricultural-and-food-sciences/**/*.npy
+    - name: art
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/art/**/*.npy
+    - name: biology
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/biology/**/*.npy
+    - name: business
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/business/**/*.npy
+    - name: chemistry
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/chemistry/**/*.npy
+    - name: computer-science
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/computer-science/**/*.npy
+    - name: economics
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/economics/**/*.npy
+    - name: education
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/education/**/*.npy
+    - name: engineering
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/engineering/**/*.npy
+    - name: environmental-science
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/environmental-science/**/*.npy
+    - name: geography
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/geography/**/*.npy
+    - name: geology
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/geology/**/*.npy
+    - name: history
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/history/**/*.npy
+    - name: law
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/law/**/*.npy
+    - name: linguistics
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/linguistics/**/*.npy
+    - name: materials-science
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/materials-science/**/*.npy
+    - name: mathematics
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/mathematics/**/*.npy
+    - name: medicine
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/medicine/**/*.npy
+    - name: philosophy
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/philosophy/**/*.npy
+    - name: physics
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/physics/**/*.npy
+    - name: political-science
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/political-science/**/*.npy
+    - name: psychology
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/psychology/**/*.npy
+    - name: sociology
+      paths:
+        - s3://ai2-llm/preprocessed/olmo3-final/s2orc/allenai/dolma2-tokenizer/sociology/**/*.npy
+nonzero_weight: # make sure all sources have nonzero weight
+  - finemath-3plus
+  - arxiv
+  - pes2o
+  - wikipedia
+  - dclm
+  - s2pdf
+  - stack-edu
+fixed_source_weights:
+  finemath-3plus: 0.025340376929054265
+  arxiv: 0.008284928006565282
+  pes2o: 0.011392852484537662
+  wikipedia: 0.000416156026289699
+  dclm: 0.752076181317783
+  s2pdf: 0.134320140174659
+  stack-edu: 0.06816936506111054

@@ -1,0 +1,69 @@
+requested_tokens: 6_000_000_000_000 # 6 trillion
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet
+  arxiv: 20_000_000_000 # 20 billion
+  dclm: 5_000_000_000_000
+  finemath-3plus: 34_000_000_000 # 34 billion
+  pes2o:agricultural-and-food-sciences: 3302496958
+  pes2o:art: 1453979156
+  pes2o:biology: 23001809470
+  pes2o:business: 2679377624
+  pes2o:chemistry: 5462692358
+  pes2o:computer-science: 21107838509
+  pes2o:economics: 3680551096
+  pes2o:education: 2792799306
+  pes2o:engineering: 5640274150
+  pes2o:environmental-science: 5803852179
+  pes2o:geography: 189629274
+  pes2o:geology: 1682346333
+  pes2o:history: 2168543841
+  pes2o:law: 1249366832
+  pes2o:linguistics: 708489012
+  pes2o:materials-science: 6324957252
+  pes2o:mathematics: 17219770635
+  pes2o:medicine: 11149175764
+  pes2o:philosophy: 1466922612
+  pes2o:physics: 15092314924
+  pes2o:political-science: 3222848375
+  pes2o:psychology: 6125342965
+  pes2o:sociology: 1056445763
+  s2pdf:adult_content: 303073226
+  s2pdf:art_and_design: 6833185034
+  s2pdf:crime_and_law: 42538674743
+  s2pdf:education_and_jobs: 138127926093
+  s2pdf:electronics_and_hardware: 7334608118
+  s2pdf:entertainment: 6069602783
+  s2pdf:fashion_and_beauty: 557917820
+  s2pdf:finance_and_business: 61150044703
+  s2pdf:food_and_dining: 2322982204
+  s2pdf:games: 2486095532
+  s2pdf:health: 108215933374
+  s2pdf:history_and_geography: 26016611836
+  s2pdf:home_and_hobbies: 3924579643
+  s2pdf:industrial: 29389278657
+  s2pdf:literature: 31886391090
+  s2pdf:politics: 39234116889
+  s2pdf:religion: 24729732953
+  s2pdf:science_math_and_technology: 424245385160
+  s2pdf:social_life: 3181652910
+  s2pdf:software: 9146853216
+  s2pdf:software_development: 41841278724
+  s2pdf:sports_and_fitness: 5450913796
+  s2pdf:transportation: 17149342957
+  s2pdf:travel_and_tourism: 2102425717
+  stack-edu:C: 4735074247
+  stack-edu:CSharp: 7204525343
+  stack-edu:Cpp: 12530445761
+  stack-edu:Go: 1398595118
+  stack-edu:Java: 31347725888
+  stack-edu:JavaScript: 8886972357
+  stack-edu:Markdown: 28916320218
+  stack-edu:PHP: 7395033318
+  stack-edu:Python: 18017832560
+  stack-edu:Ruby: 1386775805
+  stack-edu:Rust: 1418447132
+  stack-edu:SQL: 7063472860
+  stack-edu:Shell: 2542637875
+  stack-edu:Swift: 1510019025
+  stack-edu:TypeScript: 2495753789
+  wikipedia: 10_000_000_000 # 10 billion
