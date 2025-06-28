@@ -206,6 +206,8 @@ def train(
     cast(WandBCallback, trainer.callbacks["wandb"]).config = config_dict
     cast(ConfigSaverCallback, trainer.callbacks["config_saver"]).config = config_dict
 
+    logger.info(f"Trainer max steps: {trainer.max_steps}")
+
     trainer.fit()
 
 
