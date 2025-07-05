@@ -23,7 +23,7 @@ from olmo_core.optim import (
     Scheduler,
 )
 from olmo_core.optim.scheduler import CosWithWarmupAndLinearDecay
-from olmo_core.train import TrainerConfig
+from olmo_core.train import TrainerConfig, Duration
 from olmo_core.train.common import LoadStrategy
 from olmo_core.train.callbacks import (
     Callback,
@@ -342,6 +342,7 @@ class TransformerConfigBuilder:
                 if self.train_type == TrainType.anneal
                 else LoadStrategy.if_available
             ),
+            max_duration=Duration.tokens(self.max_tokens),
         )
 
         for callback_name, callback in self.build_callbacks().items():
