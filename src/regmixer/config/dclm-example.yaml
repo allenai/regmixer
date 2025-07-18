@@ -1,0 +1,147 @@
+name: "5xC-30m-dclm-example"
+description: "30M @ 5xC example swarm on DCLM"
+budget: "ai2/oe-data"
+workspace: "ai2/dolma2"
+nodes: 1
+gpus: 1
+variants: 16 # 16 swarm runs 
+preemptible: true
+max_tokens: 2_910_233_600
+allow_repetition: false # if false, we never construct a swarm run that repeats documents from any source
+sequence_length: 2048 
+seed: 42
+source_temperature: 0.75 # lower temperature = closer to uniform --> this lets us sample more from the sources with lower priors
+minimum_weight: 0.0001 # minimum weight on each source 
+min_strength: 0.1 
+max_strength: 20 # defines a range of strengths = sample dirichlet(prior * s) for s in range(min_strength, max_strength) 
+sample_multiplier: 50 # how many attempts per swarm run 
+proxy_model_id: "olmo_30m" 
+tokenizer: "dolma2"
+weka: false
+dtype: "uint32"
+priority: urgent
+cluster: ai2/augusta-google-1 
+device_batch_size: 32
+sources:
+  - name: adult_content
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/adult_content/**/*.npy
+  - name: art_and_design
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/art_and_design/**/*.npy
+  - name: crime_and_law
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
+  - name: education_and_jobs
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+  - name: electronics_and_hardware
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+  - name: entertainment
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/entertainment/**/*.npy
+  - name: fashion_and_beauty
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/fashion_and_beauty/**/*.npy
+  - name: finance_and_business
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
+  - name: food_and_dining
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/food_and_dining/**/*.npy
+  - name: games
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/games/**/*.npy
+  - name: health
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/health/**/*.npy
+  - name: history_and_geography
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
+  - name: home_and_hobbies
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/home_and_hobbies/**/*.npy
+  - name: industrial
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/industrial/**/*.npy
+  - name: literature
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/literature/**/*.npy
+  - name: politics
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/politics/**/*.npy
+  - name: religion
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/religion/**/*.npy
+  - name: science_math_and_technology
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
+  - name: social_life
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/social_life/**/*.npy
+  - name: software
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/software/**/*.npy
+  - name: software_development
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/software_development/**/*.npy
+  - name: sports_and_fitness
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
+  - name: transportation
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/transportation/**/*.npy
+  - name: travel_and_tourism
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
+nonzero_weight: # you can specify which sources should never have 0 weight, i.e., most likely all 
+  - adult_content 
+  - art_and_design
+  - crime_and_law
+  - education_and_jobs
+  - electronics_and_hardware
+  - entertainment
+  - fashion_and_beauty   
+  - finance_and_business
+  - food_and_dining 
+  - games
+  - health
+  - history_and_geography
+  - home_and_hobbies
+  - industrial
+  - literature
+  - politics
+  - religion
+  - science_math_and_technology
+  - social_life
+  - software
+  - software_development
+  - sports_and_fitness
+  - transportation
+  - travel_and_tourism
+manual_prior: # enforce a manual prior. If this is not set, the prior will be computed from the sizes of each source above.
+  adult_content: 0.04678292
+  art_and_design: 0.0546466
+  crime_and_law: 0.05385335
+  education_and_jobs: 0.02483037
+  electronics_and_hardware: 0.0063239
+  entertainment: 0.06170162
+  fashion_and_beauty: 0.04643028
+  finance_and_business: 0.00699258
+  food_and_dining: 0.0356213
+  games: 0.01748264
+  health: 0.06418641
+  history_and_geography: 0.00627697
+  home_and_hobbies: 0.00524884
+  industrial: 0.05501339
+  literature: 0.05235052
+  politics: 0.02677786
+  religion: 0.05973228
+  science_math_and_technology: 0.03027925
+  social_life: 0.0570431
+  software: 0.05273227
+  software_development: 0.06207313
+  sports_and_fitness: 0.04661713
+  transportation: 0.06105669
+  travel_and_tourism: 0.0659466
