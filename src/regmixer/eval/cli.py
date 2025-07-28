@@ -40,7 +40,6 @@ from regmixer.eval.utils import (
     mk_weights_from_config,
     plot_correlation,
     plot_and_log_weights,
-    simulate2,
     save_eval_config,
     solve_log_linear,
     plot_interaction_matrix,
@@ -641,7 +640,7 @@ def fit(
         old_len = len(ratios)
         other_columns = list(set(ratios.columns[3:]).difference(set(keep_sources)))
         ratios = ratios[ratios[list(keep_sources)].ne(0).all(axis=1) &  # all specified columns nonzero
-            ratios[other_columns].eq(0).all(axis=1)  ]
+            ratios[other_columns].eq(0).all(axis=1)]
         logger.info(f"Filtered out {old_len - len(ratios)} runs that were not only on {keep_sources}")
         metrics = metrics[metrics['name'].isin(ratios['name'])]
         ratios.drop(columns=other_columns, inplace=True)
@@ -652,6 +651,21 @@ def fit(
         keep_runs = metrics.sort_values(by="all_bpb").run.values[: int(len(metrics) * select_top_k_runs)]
         metrics = metrics[metrics.run.isin(keep_runs)]
         ratios = ratios[ratios.run.isin(keep_runs)]
+
+    if metric_type == "primary_score":
+        logger.info("Doing z-score normalization on the primary scores...")
+        cols_to_normalize = metrics.columns[3:]
+        metrics[cols_to_normalize] = metrics[cols_to_normalize].apply(pd.to_numeric, errors='coerce')
+        metrics[cols_to_normalize] = metrics[cols_to_normalize].apply(
+            lambda col: (col - col.mean()) / col.std(ddof=0)
+        )
+
+    cols_to_check = metrics.columns[3:]
+    cols_with_nans = metrics[cols_to_check].columns[metrics[cols_to_check].isna().any()].tolist()
+    if len(cols_with_nans) > 0:
+        logger.warning(f"Found NaNs in the following columns, dropping them! {cols_with_nans}")
+        metrics = metrics.drop(columns=cols_with_nans)
+        metrics_to_index = [m for m in metrics_to_index if m not in cols_with_nans]
 
     # X = Domain weights
     X_train = ratios[ratios.columns[3:]].values
@@ -732,7 +746,7 @@ def fit(
             with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
                 f.write(str(regression_model_cache_path))
  
-    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist())
+    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios)
     results = []
 
     if dro_reference_model_id is not None: 
@@ -805,7 +819,8 @@ def fit(
                 obj_weights=obj_weights,
                 temperature=temperature,
                 reference_scores=reference_scores if dro_reference_model_id is not None else None,
-                fixed_weight=fixed_weight_dict if fixed_weight is not None else None
+                fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
+                metric_type=metric_type
             )
 
             plot_and_log_weights(
@@ -841,7 +856,8 @@ def fit(
             obj_weights=obj_weights,
             temperature=temperature,
             reference_scores=reference_scores if dro_reference_model_id is not None else None,
-            fixed_weight=fixed_weight_dict if fixed_weight is not None else None
+            fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
+            metric_type=metric_type
         )
         plot_and_log_weights(
             prior=priors[0],

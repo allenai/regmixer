@@ -60,20 +60,6 @@ LGBM_HPS = {
     "early_stopping_round": 3,
 }
 
-"""def mixing_law(x, param):
-    log_c_i, b_i = param[0], param[1]
-    t_i = param[2:]
-    result = torch.exp(log_c_i) + torch.exp(b_i + torch.matmul(x[:, :-1], t_i))
-    return result
-
-def init_params_law(idx, num_domains=3):
-    for log_c_i in np.linspace(-2, 1.5, 10):
-        for b_i in np.linspace(-10, 1, 20):
-            for _ in range(30):
-                ts = [-np.random.rand() if i == idx else np.random.rand() * 0.1 for i in range(num_domains-1)]
-                yield [log_c_i, b_i] + ts
-"""
-
 
 class Regressor:
     def fit(self, x, y, idx, **kwargs):
@@ -101,7 +87,7 @@ class LightGBMRegressor(Regressor):
 
 class LinearRegressor(Regressor):
     def __init__(self, **kwargs):
-        self.model = LinearRegression()
+        self.model = LinearRegression(fit_intercept=False)
 
     def fit(self, x, y, idx, **kwargs):
         target = y[:, idx]
@@ -200,12 +186,6 @@ class SearchRegressor(Regressor):
         return [np.array(weight) for weight, _ in self.model.items()]
 
 
-def mixing_law(x, param, **kwargs):
-    log_c_i = param[0]
-    t_i = param[1:]
-    result = torch.exp(log_c_i) + torch.exp(torch.matmul(x, t_i))
-    return result
-
 
 def nonlinear_mixing_law(x, param, B_mask=None):
     """
@@ -239,6 +219,13 @@ def nonlinear_mixing_law(x, param, B_mask=None):
         return torch.exp(log_c_i) + torch.exp(lin_term)
     else:
         return torch.exp(log_c_i) + torch.exp(lin_term) + torch.exp(quad_term)
+
+def mixing_law(x, param, **kwargs):
+    log_c_i = param[0]
+    t_i = param[1:]
+    result = torch.exp(log_c_i) + torch.exp(torch.matmul(x, t_i))
+    return result
+
 
 
 def init_params_log_linear_law(idx, num_domains=3):
@@ -297,6 +284,7 @@ class SimulationProposer(Proposer):
         temperature: Optional[float] = None,
         reference_scores: Optional[np.ndarray] = None,
         fixed_weight: Optional[dict[str, float]] = None,
+        metric_type: Optional[str] = None,
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -478,9 +466,12 @@ class SimulationProposer(Proposer):
             else:
                 objs = predictor[index].predict(simulations)
 
-            # Take the best loss prediction as an index unless it's greater than 1e-3
-            print(objs.min())
-            best_mask = (objs - objs.min()) < 1e-3
+            if metric_type == "primary_score":
+                best_mask = (objs.max() - objs) < 1e-3
+                print(objs.max())
+            else:
+                best_mask = (objs - objs.min()) < 1e-3
+                print(objs.min())
             best_weights = simulations[best_mask].mean(0)
 
             # Zero out weights below min_weight threshold and normalize
@@ -861,6 +852,7 @@ def plot_interaction_matrix(
     regression_type: str,
     domain_names: list[str],
     metric_names: list[str],
+    ratios: pd.DataFrame,
 ):
     metric_names = [metric.split("/")[-1].split(" ")[0] for metric in metric_names]
     interaction_matrix = np.zeros((len(metric_names), len(domain_names)))
@@ -869,6 +861,10 @@ def plot_interaction_matrix(
             interaction_matrix[i] = predictor.model.feature_importances_
         elif regression_type == "log_linear":
             interaction_matrix[i] = predictor.model[1:]
+        elif regression_type == "linear":
+            # normalize coefficients by the standard deviation of the corresponding domain
+            std = ratios[ratios.columns[3:]].std(ddof=0).values  # std for selected columns only
+            interaction_matrix[i] = predictor.model.coef_ * std
 
     plt.figure(figsize=(10, 8))
     plt.imshow(interaction_matrix, cmap="rainbow", aspect="auto")
