@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 import platform
 from typing import Any, Optional, Tuple, Union, List
-from sklearn.linear_model import LinearRegression
 import lightgbm as lgb
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,6 +23,7 @@ import boto3
 from copy import deepcopy
 from collections import defaultdict
 import pydantic_core
+import statsmodels.api as sm
 
 import subprocess
 from io import StringIO
@@ -86,12 +86,41 @@ class LightGBMRegressor(Regressor):
 
 
 class LinearRegressor(Regressor):
+    #def __init__(self, **kwargs):
+    #    self.model = LinearRegression(fit_intercept=False)
+
     def __init__(self, **kwargs):
-        self.model = LinearRegression(fit_intercept=False)
+        self.model = None 
+
+    #def fit(self, x, y, idx, **kwargs):
+    #    target = y[:, idx]
+    #    self.model = self.model.fit(x, target)
 
     def fit(self, x, y, idx, **kwargs):
         target = y[:, idx]
-        self.model = self.model.fit(x, target)
+        # we do not add intercept because this would make X linearly dependent.
+        self.model = sm.OLS(target, x).fit()
+
+class QuadraticRegressor(Regressor):
+    #def __init__(self, **kwargs):
+    #    self.model = LinearRegression(fit_intercept=False)
+
+    def __init__(self, B_mask=None, **kwargs):
+        self.model = None 
+
+    #def fit(self, x, y, idx, **kwargs):
+    #    target = y[:, idx]
+    #    self.model = self.model.fit(x, target)
+
+    def fit(self, x, y, idx, **kwargs):
+        target = y[:, idx]
+        # TODO: transform x according to interactions
+        # we do not add intercept because this would make X linearly dependent.
+        self.model = sm.OLS(target, x).fit()
+
+    def predict(self, x):
+        # TODO: transform x according to interactions 
+        pass 
 
 
 class LogLinearRegressor(Regressor):
@@ -272,6 +301,7 @@ class SimulationProposer(Proposer):
         index: int,
         predictor: list[Regressor],
         prior_distributions: dict,
+        ratios: pd.DataFrame,
         num_samples: int = 1_000_000,
         seed: int = 1337,
         search_iterations: int = 10,
@@ -370,6 +400,15 @@ class SimulationProposer(Proposer):
                     )
                 ]
 
+            # only search over mixes that are within bounds of the swarm ratios. We don't want the regression model to extrapolate.
+            """ratios_max = ratios[ratios.columns[3:]].max().values
+            simulations = simulations[
+                np.all(
+                    simulations < ratios_max,
+                    axis=1,
+                )  
+            ]"""
+
             if constrain_objective:
                 original_simulation_size = len(simulations)
 
@@ -439,9 +478,10 @@ class SimulationProposer(Proposer):
                 for tol in tol_range:
                     # we allow for predicted scores to be within a tolerance of the reference scores
                     # if the current tol results in no remaining simulations, we increase tol
-                    pareto_idxs = np.where(np.all(predictions.T < reference_scores + tol, axis=1))[
-                        0
-                    ]
+                    if metric_type == "primary_score":
+                        pareto_idxs = np.where(np.all(predictions.T > reference_scores - tol, axis=1))[0]
+                    else:
+                        pareto_idxs = np.where(np.all(predictions.T < reference_scores + tol, axis=1))[0]
                     if len(pareto_idxs) != 0:
                         logger.info(f"Using eps={tol} for enforcing pareto improvements")
                         break
@@ -620,8 +660,7 @@ def get_runs_from_api(
             logger.warning(f"Run {run.display_name} has crashed; still using its final result")
 
         if run.state == "running":
-            logger.warning(f"Run {run.display_name} is still running; skipping")
-            continue
+            logger.warning(f"Run {run.display_name} is still running; NOT skipping though")
 
         if run is not None:
             all_runs.append(mk_run_history(run, num_samples, eval_metric_group))
@@ -853,6 +892,7 @@ def plot_interaction_matrix(
     domain_names: list[str],
     metric_names: list[str],
     ratios: pd.DataFrame,
+    metric_type: Optional[str] = None,
 ):
     metric_names = [metric.split("/")[-1].split(" ")[0] for metric in metric_names]
     interaction_matrix = np.zeros((len(metric_names), len(domain_names)))
@@ -863,16 +903,44 @@ def plot_interaction_matrix(
             interaction_matrix[i] = predictor.model[1:]
         elif regression_type == "linear":
             # normalize coefficients by the standard deviation of the corresponding domain
-            std = ratios[ratios.columns[3:]].std(ddof=0).values  # std for selected columns only
-            interaction_matrix[i] = predictor.model.coef_ * std
+            #std = ratios[ratios.columns[3:]].std(ddof=0).values  # std for selected columns only
+            interaction_matrix[i] = predictor.model.params #* std
 
     plt.figure(figsize=(10, 8))
     plt.imshow(interaction_matrix, cmap="rainbow", aspect="auto")
-    plt.colorbar(label="Influence")
+    cmap = plt.cm.coolwarm
+    vlim = np.abs(interaction_matrix).max()
+    # Show color mesh
+    c = plt.imshow(interaction_matrix, cmap=cmap, vmin=-vlim, vmax=+vlim, aspect='auto')
+
+    bar_label = "Influence"
+    if metric_type == "primary_score":
+        bar_label += " (higher is better)"
+    else:
+        bar_label += " (lower is better)"
+
+    plt.colorbar(label=bar_label)
 
     plt.xticks(ticks=np.arange(len(domain_names)), labels=domain_names, rotation=90)
     plt.yticks(ticks=np.arange(len(metric_names)), labels=metric_names)
     plt.title(f"Interaction matrix for {regression_type}")
+
+    # Annotate each cell with its value
+    for i in range(len(metric_names)):
+        if regression_type == "linear":
+                p_values = predictors[i].model.pvalues
+        for j in range(len(domain_names)):
+            val = interaction_matrix[i, j]
+            text_str = f"β={val:.2f}"
+            if regression_type == "linear":
+                text_str += f"\np={p_values[j]:.2g}"
+            plt.text(
+                j, i, text_str,
+                ha='center', va='center',
+                color='black' if abs(val) < 0.5 * np.max(np.abs(interaction_matrix)) else 'white',
+                fontsize=8
+            )
+
     plt.tight_layout()
 
     plt.savefig(
@@ -926,15 +994,17 @@ def mk_run_metrics(
     return results
 
 def get_offline_evals_from_dashboard(display_name, tasks, dashboard):
-    breakpoint()
     command = [
         "olmo-cookbook-eval", "results",
-        "--dashboard", f"{dashboard}",
-        "--tasks", "olmo3:dev:7b:main:v1",
-        "--tasks", "olmo3:dev:midtrain:v1",
-        "--format", "csv",
-        "--skip-on-fail"
+        "--dashboard", f"{dashboard}",        
     ]
+
+    for task in tasks:
+        command.append("--tasks")
+        command.append(task)
+
+    command.extend(["--format", "csv", "--skip-on-fail"])
+
     result = subprocess.run(command, capture_output=True, text=True)
 
     # Check for errors
@@ -1026,7 +1096,7 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
                 if len(task_data) == 0:
                     all_available_tasks = [data['task_config'].get('metadata', {}).get('alias')  for data in all_jsonl_data]
                     logger.warning(f"Task {task} not found in JSONL data for {display_name}. Available tasks: {all_available_tasks}")
-                    continue
+                    break
                 else:
                     logger.info(
                         f"Task {task} found in JSONL data for {display_name} with alias {task_data[0]['task_config'].get('metadata', {}).get('alias')}"
@@ -1038,7 +1108,7 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
                 logger.warning(
                     f"Metric type {metric_type} not found in task {data['task_name']} metrics. Available metrics: {data['metrics'].keys()}"
                 )
-                continue
+                break
             else:
                 name = data["task_config"]["metadata"]["alias"].replace("bpb:", "").replace(":full", "")
                 metric_value = data["metrics"][metric_type]
@@ -1397,12 +1467,16 @@ def mk_output_prefix(
     )
 
 
-def save_eval_config(eval_config: dict, output_dir: str) -> str:
+def save_eval_config(eval_config: dict, output_dir: str, custom_name: Optional[str]= None) -> str:
     # Serialize dict in a stable way
     config_str = json.dumps(eval_config, sort_keys=True)
 
     # Hash it (short hash for readability)
     hash_str = hashlib.sha256(config_str.encode("utf-8")).hexdigest()[:16]
+
+
+    if custom_name is not None:
+        hash_str = hash_str + f"_{custom_name}"
 
     # Create directory
     folder_path = os.path.join(output_dir, hash_str)

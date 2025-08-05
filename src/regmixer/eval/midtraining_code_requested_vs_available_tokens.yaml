@@ -1,0 +1,7 @@
+requested_tokens: 10_000_000_000 # 10B
+leaf_level_constraints: true
+available_tokens:  
+  hqweb: 49_455_463_002
+  code:stackedu: 10706707124
+  code:stackedu-fim: 10652868078
+  code:swallowcode: 16115868402

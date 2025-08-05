@@ -5,7 +5,7 @@ import warnings
 from typing import Optional
 from copy import deepcopy 
 from sklearn.model_selection import train_test_split
-
+import re 
 from pathlib import Path
 import click
 import numpy as np
@@ -318,6 +318,27 @@ def cli():
     required=False,
     default=False
 )
+@click.option(
+    '--fit-only',
+    is_flag=True,
+    help="if set, only fit the regression model, do not propose a mix",
+    required=False,
+    default=False
+)
+@click.option(
+    '--custom-name',
+    type=str,
+    help="if set, use this custom name for the experiment",
+    required=False,
+    default=None
+)
+@click.option(
+    '--interactions', 
+    multiple=True, 
+    help="Feature interactions, like 1,2 ",
+    type=str,
+    default=None
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -353,6 +374,9 @@ def fit(
     pull_from_dashboard: bool = False,
     metric_type: Optional[str] = None,
     use_cookbook: bool = False,
+    fit_only: bool = False,
+    custom_name: Optional[str] = None,
+    interactions: Optional[list[str]] = None
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -446,9 +470,7 @@ def fit(
         regression_config["metric_type"] = metric_type
 
 
-    output_dir = save_eval_config(eval_config, output_dir)
-
-
+    output_dir = save_eval_config(eval_config, output_dir, custom_name)
 
     api = wandb.Api()
 
@@ -537,14 +559,13 @@ def fit(
                 logger.info(f"Pulling results from dashboard {d}...")
                 command = [
                     "olmo-cookbook-eval", "results",
-                    "--dashboard", f"{d}",
-                    "--tasks", "olmo3:dev:7b:main:v1",
-                    "--tasks", "olmo3:dev:midtrain:v1",
-                "--format", "csv",
-                "--skip-on-fail"
+                    "--dashboard", f"{d}",        
                 ]
+                for task in eval_metric_group.value:
+                    command.append("--tasks")
+                    command.append(task)
+                command.extend(["--format", "csv", "--skip-on-fail"])
                 result = subprocess.run(command, capture_output=True, text=True)
-
                 # Check for errors
                 if result.returncode != 0:
                     print("Error:", result.stderr)
@@ -554,29 +575,32 @@ def fit(
                     df = pd.read_csv(StringIO(csv_data))
                     all_dashboard_results = pd.concat([all_dashboard_results, df], ignore_index=True)
             
-            run_metrics = [
-                {
-                    "run": run.id,
-                    "name": run.display_name, 
-                    "index": idx,
-                    **{
+
+            run_metrics = []
+            for idx, run in tqdm(enumerate(run_instances)):
+                # Filter the dashboard results
+                matched = all_dashboard_results[all_dashboard_results['name'].str.contains(re.escape(run.display_name), regex=True)]
+
+                if matched.empty:
+                    logger.warning(f"No matching results found for run {run.display_name}")
+                    continue
+
+                try:
+                    metrics = {
                         k: next(iter(v.values()))
-                        for k, v in all_dashboard_results[
-                            all_dashboard_results['name'].str.contains(run.display_name)
-                        ][eval_metric_group.value].to_dict().items()
-                    },
-                }
-                for idx, run in tqdm(enumerate(run_instances))
-                if eval_metric_group_name in [
-                    "superswarm_offline", 
-                    "olmo3_offline_tasks", 
-                    "pdf_tasks", 
-                    "code_tasks_offline", 
-                    "code_tasks_offline_fixed", 
-                    "olmo3_offline_tasks_0630",
-                    "midtraining_aggregate_evals"
-                ] or len(run.samples) > 0
-            ]
+                        for k, v in matched[eval_metric_group.value].to_dict().items()
+                    }
+                except StopIteration:
+                    logger.warning(f"Empty values found when parsing metrics for {run.display_name}")
+                    continue
+
+                run_metrics.append({
+                    "run": run.id,
+                    "name": run.display_name,
+                    "index": idx,
+                    **metrics,
+                })
+
         else:
             run_metrics = [
                 {
@@ -602,6 +626,7 @@ def fit(
                 "code_tasks_offline_fixed", 
                 "olmo3_offline_tasks_0630",
                 "midtraining_aggregate_evals"
+                "midtraining_finegrained_evals"
                 ] or len(run.samples) > 0
             ]
 
@@ -611,13 +636,15 @@ def fit(
 
         ratios = pd.DataFrame(run_ratios)
         metrics = pd.DataFrame(run_metrics)
+        numerical_cols = metrics.columns[3:]
+        metrics[numerical_cols] = metrics[numerical_cols].apply(pd.to_numeric, errors='coerce')
         ratios = ratios[ratios['run'].isin(metrics.run)]
 
         if fixed_weight is not None:
             # normalize the non-fixed-weight domains to add to 1 
             domains = ratios.columns[3:]
             ratios[domains] = ratios[domains].div(ratios[domains].sum(axis=1), axis=0)
-            
+                    
         pd.to_pickle(ratios, ratios_cache_path)
         pd.to_pickle(metrics, metrics_cache_path)
         logger.info(f"Saved ratios to {ratios_cache_path} and metrics to {metrics_cache_path}")
@@ -645,6 +672,11 @@ def fit(
         metrics = metrics[metrics['name'].isin(ratios['name'])]
         ratios.drop(columns=other_columns, inplace=True)
 
+    if experiment_groups[0] == "870881c8":
+        # hardcoded logic: drop outlier for reasoning swarm 
+        ratios = ratios.drop(index=27)
+        metrics = metrics.drop(index=27)
+
 
     if select_top_k_runs < 1.0:
         metrics['all_bpb'] = metrics[metrics.columns[3:]].mean(axis=1)
@@ -666,6 +698,11 @@ def fit(
         logger.warning(f"Found NaNs in the following columns, dropping them! {cols_with_nans}")
         metrics = metrics.drop(columns=cols_with_nans)
         metrics_to_index = [m for m in metrics_to_index if m not in cols_with_nans]
+
+    if regression_type == "log_linear":
+        if (metrics[metrics.columns[3:]] < 0).any().any():
+            logger.info("Log-linear regression requires non-negative metrics, shifting metrics to be non-negative.")
+            metrics[metrics.columns[3:]] = metrics[metrics.columns[3:]].subtract(metrics[metrics.columns[3:]].min())
 
     # X = Domain weights
     X_train = ratios[ratios.columns[3:]].values
@@ -745,8 +782,8 @@ def fit(
             logger.info(f"Log linear regression model saved to {regression_model_cache_path}")
             with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
                 f.write(str(regression_model_cache_path))
- 
-    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios)
+
+    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type)
     results = []
 
     if dro_reference_model_id is not None: 
@@ -820,7 +857,8 @@ def fit(
                 temperature=temperature,
                 reference_scores=reference_scores if dro_reference_model_id is not None else None,
                 fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
-                metric_type=metric_type
+                metric_type=metric_type,
+                ratios=ratios
             )
 
             plot_and_log_weights(
@@ -841,6 +879,10 @@ def fit(
 
             results.append((metric, weights))
 
+    if fit_only:
+        logger.info("Fit only mode, not proposing a mix.")
+        return
+
     if opt_avg_metric and n_test == 0:
         assert group_metrics is not None and group_average is None # need to have this set
         weights = PROPOSER_TYPES[proposer_type]().propose(
@@ -857,7 +899,8 @@ def fit(
             temperature=temperature,
             reference_scores=reference_scores if dro_reference_model_id is not None else None,
             fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
-            metric_type=metric_type
+            metric_type=metric_type,
+            ratios=ratios
         )
         plot_and_log_weights(
             prior=priors[0],

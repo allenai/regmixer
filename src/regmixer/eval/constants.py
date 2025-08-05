@@ -1376,13 +1376,116 @@ class GroupedWandbMetrics(Enum):
     ]
 
 
-    midtraining_aggregate_evals = [
+    midtraining_aggregate_evals_v2 = [
        'olmo3:dev:7b:code_fim',
-       'olmo3:dev:7b:code_gen:v1',
-       'olmo3:dev:7b:code_gen_mini:v1:n32:pass_at_16', 'olmo3:dev:7b:gen',
-       'olmo3:dev:7b:math:v1', 'olmo3:dev:7b:mcqa:non_stem',
+       'olmo3:dev:7b:code_gen:v2',
+       'olmo3:dev:7b:code_gen_mini:v2:n32:pass_at_16', 'olmo3:dev:7b:gen',
+       'olmo3:dev:7b:math:v2', 'olmo3:dev:7b:mcqa:non_stem',
        'olmo3:dev:7b:mcqa:stem'
     ]
+
+    midtraining_code_math_aggregate_evals_v2 = [
+       'olmo3:dev:7b:code_fim',
+       'olmo3:dev:7b:code_gen:v2',
+       'olmo3:dev:7b:code_gen_mini:v2:n32:pass_at_16',
+       'olmo3:dev:7b:math:v2', 
+    ]
+
+    midtraining_code_math_aggregate_evals_v2_for_reasoning = [
+       'olmo3:dev:7b:code_gen_mini:v2:n32:pass_at_16',
+       'olmo3:dev:7b:math:v2', 
+    ]
+
+    midtraining_math_aggregate_evals_v2 = [
+       'olmo3:dev:7b:math:v2', 
+    ]
+
+
+    midtraining_finegrained_evals_v2 = [
+        "arc:mc::xlarge",
+        "mmlu_stem:mc",
+        "medmcqa:mc::none",
+        "medqa_en:mc::none",
+        "sciq:mc::xlarge",
+        #
+        "mmlu_humanities:mc",
+        "mmlu_social_sciences:mc",
+        "mmlu_other:mc",
+        "csqa:mc::xlarge",
+        "piqa:mc::xlarge",
+        "socialiqa:mc::xlarge",
+        "coqa:mc::gen2mc",
+        "drop:mc::gen2mc",
+        "jeopardy:mc::gen2mc",
+        "naturalqs:mc::gen2mc",
+        "squad:mc::gen2mc",
+        'hellaswag:rc::xlarge', 
+        'winogrande:rc::xlarge', 
+        'lambada',
+        'basic_skills_arithmetic:rc::olmes', 
+        'basic_skills_coding:rc::olmes', 
+        'basic_skills_common_knowledge:rc::olmes', 
+        'basic_skills_logical_reasoning:rc::olmes', 
+        'basic_skills_string_operations:rc::olmes', 
+        'basic_skills_pattern:rc::olmes', 
+        'drop::xlarge', 
+        'jeopardy::xlarge', 
+        'naturalqs::xlarge', 
+        'squad::xlarge', 
+        'coqa::xlarge',
+        "gsm8k::olmo3:n8:v2",
+        "gsm-symb:n8:v2",
+        "minerva:n4:v2",
+        'bigcodebench:3shot::olmo3:v2', 
+        'codex_humaneval:3shot::olmo3:n32:v2', 
+        'deepseek_leetcode::olmo3:n32:v2', 
+        'ds1000:3shot::olmo3:v2', 
+        'mbpp:3shot::olmo3:n32:v2',
+        "multipl-e-humaneval:n32:v2",
+        "multipl-e-mbpp:n32:v2",
+        #
+        'deepseek_leetcode::olmo3:n32:v2:pass_at_16', 
+        'codex_humaneval:3shot::olmo3:n32:v2:pass_at_16',
+        'mbpp:3shot::olmo3:n32:v2:pass_at_16',
+        "multipl-e-humaneval:n32:v2:pass_at_16",
+        "multipl-e-mbpp:n32:v2:pass_at_16",
+        #
+        "fim::olmo3",
+        #
+        "minerva_math_500::olmo3:n32:v2",
+        "minerva_math_500::olmo3:n32:v2:pass_at_16",
+        "crux-eval",
+    ]
+    
+
+    midtraining_code_math_finegrained_evals_v2 = [
+        #
+        'basic_skills_arithmetic:rc::olmes', 
+        'basic_skills_coding:rc::olmes', 
+        "gsm8k::olmo3:n8:v2",
+        "gsm-symb:n8:v2",
+        "minerva:n4:v2",
+        'bigcodebench:3shot::olmo3:v2', 
+        'codex_humaneval:3shot::olmo3:n32:v2', 
+        'deepseek_leetcode::olmo3:n32:v2', 
+        'ds1000:3shot::olmo3:v2', 
+        'mbpp:3shot::olmo3:n32:v2',
+        "multipl-e-humaneval:n32:v2",
+        "multipl-e-mbpp:n32:v2",
+        #
+        'deepseek_leetcode::olmo3:n32:v2:pass_at_16', 
+        'codex_humaneval:3shot::olmo3:n32:v2:pass_at_16',
+        'mbpp:3shot::olmo3:n32:v2:pass_at_16',
+        "multipl-e-humaneval:n32:v2:pass_at_16",
+        "multipl-e-mbpp:n32:v2:pass_at_16",
+        #
+        "fim::olmo3",
+        #
+        "minerva_math_500::olmo3:n32:v2",
+        "minerva_math_500::olmo3:n32:v2:pass_at_16",
+        #"crux-eval",
+    ]
+
 
 
 # arc_easy, arc_challenge, hellaswag, MMLU macro average,

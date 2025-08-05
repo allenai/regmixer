@@ -1,0 +1,11 @@
+requested_tokens: 10_000_000_000 # 10B
+leaf_level_constraints: true
+available_tokens:  
+  hqweb: 49_455_463_002
+  math:dolmino-math-1124: 10_698_993_447
+  math:finemath3: 34_057_973_953
+  math:megamath-web-pro-max: 73_851_211_835
+  math:openmathreasoning-fullthoughts-rewrite: 850_859_688
+  math:tinymath-mind: 898_733_958
+  math:tinymath-pot: 240_590_634
+
