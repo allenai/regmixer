@@ -5,7 +5,7 @@ import warnings
 from typing import Optional
 from copy import deepcopy 
 from sklearn.model_selection import train_test_split
-
+import re 
 from pathlib import Path
 import click
 import numpy as np
@@ -17,6 +17,11 @@ import hashlib
 import os 
 import pickle 
 from olmo_core.utils import prepare_cli_environment
+
+import subprocess
+from io import StringIO
+
+
 
 import matplotlib.pyplot as plt
 
@@ -35,7 +40,6 @@ from regmixer.eval.utils import (
     mk_weights_from_config,
     plot_correlation,
     plot_and_log_weights,
-    simulate2,
     save_eval_config,
     solve_log_linear,
     plot_interaction_matrix,
@@ -44,7 +48,8 @@ from regmixer.eval.utils import (
     calculate_priors_with_manual,
     aggregate_mmlu,
     PROPOSER_TYPES, 
-    LogLinearRegressor
+    LogLinearRegressor,
+    swarm_config_from_cookbook_or_regmixer_path
 )
 
 from tqdm import tqdm
@@ -284,7 +289,56 @@ def cli():
     required=False,
     default=None
 )
-
+@click.option(
+    '--pull-from-dashboard',
+    is_flag=True,
+    help="if set, pull eval results from dashboard",
+    required=False,
+    default=False
+)
+@click.option(
+    '--dashboard',
+    type=str,
+    help="the dashboard where offline evals are stored",
+    required=False,
+    multiple=True,
+    default=["regmixer"]
+)
+@click.option(
+    '--metric-type',
+    type=str,
+    help="the metric type to use for evaluation",
+    required=False,
+    default=None
+)
+@click.option(
+    '--use-cookbook',
+    is_flag=True,
+    help="if set, use a series of params designed for olmo-cookbook, not regmixer swarm",
+    required=False,
+    default=False
+)
+@click.option(
+    '--fit-only',
+    is_flag=True,
+    help="if set, only fit the regression model, do not propose a mix",
+    required=False,
+    default=False
+)
+@click.option(
+    '--custom-name',
+    type=str,
+    help="if set, use this custom name for the experiment",
+    required=False,
+    default=None
+)
+@click.option(
+    '--interactions', 
+    multiple=True, 
+    help="Feature interactions, like 1,2 ",
+    type=str,
+    default=None
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -311,13 +365,19 @@ def fit(
     obj_weights: Optional[str],
     temperature: Optional[float],
     keep_sources: Optional[list[str]],
+    dashboard: list[str],
     early_stopping: float = 0.0,
     dro_reference_model_id: Optional[str] = None,
     use_reference_model_predicted_scores: bool = False,
     select_top_k_runs: float = 1.0,
     fixed_weight: Optional[str] = None,
+    pull_from_dashboard: bool = False,
+    metric_type: Optional[str] = None,
+    use_cookbook: bool = False,
+    fit_only: bool = False,
+    custom_name: Optional[str] = None,
+    interactions: Optional[list[str]] = None
 ):
-
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
     pathlib.Path(BASE_CACHE_DIR).mkdir(parents=True, exist_ok=True)
@@ -328,6 +388,11 @@ def fit(
     if proposer_type == "search" and regression_type != "search":
         raise ValueError("Proposer type search only works with regression type search")
     
+    if use_cookbook:
+        workspace = "ai2-llm/olmo-cookbook"
+        assert pull_from_dashboard, "If using olmo-cookbook, pull_from_dashboard must be set to True"
+        assert metric_type=="primary_score", "If using olmo-cookbook, metric_type must be set to primary_score"
+
     eval_config = {
         "config": config[0] if len(config) == 1 else config,
         "alpha": alpha,
@@ -373,6 +438,12 @@ def fit(
     if fixed_weight is not None:
         eval_config["fixed_weight"] = fixed_weight
         fixed_weight_dict = json.loads(fixed_weight)
+    if pull_from_dashboard:
+        eval_config["pull_from_dashboard"] = pull_from_dashboard
+    if dashboard[0] != "regmixer":
+        eval_config["dashboard"] = dashboard
+    if metric_type is not None:
+        eval_config["metric_type"] = metric_type
 
 
     # used for caching regression model
@@ -395,10 +466,11 @@ def fit(
     if fixed_weight is not None:
         regression_config["fixed_weight"] = fixed_weight
 
+    if metric_type is not None:
+        regression_config["metric_type"] = metric_type
 
-    output_dir = save_eval_config(eval_config, output_dir)
 
-
+    output_dir = save_eval_config(eval_config, output_dir, custom_name)
 
     api = wandb.Api()
 
@@ -417,8 +489,7 @@ def fit(
         
 
     cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name}_runs_cache.json"
-
-    launch_configs = [config_from_path(c) for c in config]
+    launch_configs = [swarm_config_from_cookbook_or_regmixer_path(c, use_cookbook) for c in config]
     full_group_names = [f"{launch_config.name}-{group}" for group, launch_config in zip(experiment_groups, launch_configs)]
     if no_cache:
         logger.info(f"Cache disabled, will not use cache for run samples...")
@@ -443,27 +514,24 @@ def fit(
     #run_instances = [run for run in run_instances if run.samples.shape[0] > 0]
 
     logger.info(
-        f"Found {len(run_instances)} runs in {workspace} that match group id filter, gathering samples..."
-    )
-
-    logger.info(f"Building correlation for metric group: {eval_metric_group_name}")
-    logger.info(
-        f"Found {len(run_instances)} valid run instances for group(s) {experiment_groups} to fit regression..."
+        f"Found {len(run_instances)} runs in {workspace} that match group id filter {experiment_groups}..."
     )
 
     logger.info(f"Calculating source weights...")
-
     priors, original_priors = calculate_priors_with_manual(
-        source_configs=launch_configs[0].sources,
-        dtype=launch_configs[0].dtype,
+        source_configs=launch_configs[0].dataset.sources if use_cookbook else launch_configs[0].sources,
+        dtype=launch_configs[0].dataset.dtype if use_cookbook else launch_configs[0].dtype,
         use_cache=(no_cache == False),
         manual_prior=launch_configs[0].manual_prior if hasattr(launch_configs[0], "manual_prior") else None,
+        fixed_source_weights= launch_configs[0].fixed_source_weights if hasattr(launch_configs[0], "fixed_source_weights") else None,
     )
+
     if fixed_weight is not None:
         # remove the fixed weight domains from the priors, and renormalize the remaining domains to add to 1
         new_priors = {k: v for k, v in priors[0].items() if k not in fixed_weight_dict}
         total = sum(list(new_priors.values()))
         new_priors = {k: v / total for k, v in new_priors.items()}  # normalize the weights
+        # hack to update the tuple
         priors_list = list(priors)
         priors_list[0] = new_priors
         priors = tuple(priors_list)
@@ -485,10 +553,59 @@ def fit(
             {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors)}
             for idx, run in enumerate(run_instances)
         ]
-        run_metrics = [
-            {
-                "run": run.id,
-                "name": run.display_name, 
+        if pull_from_dashboard:
+            all_dashboard_results = pd.DataFrame()
+            for d in dashboard:
+                logger.info(f"Pulling results from dashboard {d}...")
+                command = [
+                    "olmo-cookbook-eval", "results",
+                    "--dashboard", f"{d}",        
+                ]
+                for task in eval_metric_group.value:
+                    command.append("--tasks")
+                    command.append(task)
+                command.extend(["--format", "csv", "--skip-on-fail"])
+                result = subprocess.run(command, capture_output=True, text=True)
+                # Check for errors
+                if result.returncode != 0:
+                    print("Error:", result.stderr)
+                else:
+                    # Load CSV content into a DataFrame
+                    csv_data = result.stdout
+                    df = pd.read_csv(StringIO(csv_data))
+                    all_dashboard_results = pd.concat([all_dashboard_results, df], ignore_index=True)
+            
+
+            run_metrics = []
+            for idx, run in tqdm(enumerate(run_instances)):
+                # Filter the dashboard results
+                matched = all_dashboard_results[all_dashboard_results['name'].str.contains(re.escape(run.display_name), regex=True)]
+
+                if matched.empty:
+                    logger.warning(f"No matching results found for run {run.display_name}")
+                    continue
+
+                try:
+                    metrics = {
+                        k: next(iter(v.values()))
+                        for k, v in matched[eval_metric_group.value].to_dict().items()
+                    }
+                except StopIteration:
+                    logger.warning(f"Empty values found when parsing metrics for {run.display_name}")
+                    continue
+
+                run_metrics.append({
+                    "run": run.id,
+                    "name": run.display_name,
+                    "index": idx,
+                    **metrics,
+                })
+
+        else:
+            run_metrics = [
+                {
+                    "run": run.id,
+                    "name": run.display_name, 
                 "index": idx,
                 **mk_run_metrics(
                     history=run.samples,
@@ -496,26 +613,41 @@ def fit(
                     metrics=(eval_metric_group_name, eval_metric_group.value),
                     display_name=run.display_name,
                     average=group_average != None,
+                    pull_from_dashboard=pull_from_dashboard,
+                    dashboard=dashboard,
+                    metric_type=metric_type
                 ),
             }
-            for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name in ["superswarm_offline", "olmo3_offline_tasks", "pdf_tasks", "code_tasks_offline", "code_tasks_offline_fixed"] or len(run.samples) > 0
-        ]
+            for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name in [
+                "superswarm_offline", 
+                "olmo3_offline_tasks", 
+                "pdf_tasks", 
+                "code_tasks_offline", 
+                "code_tasks_offline_fixed", 
+                "olmo3_offline_tasks_0630",
+                "midtraining_aggregate_evals"
+                "midtraining_finegrained_evals"
+                ] or len(run.samples) > 0
+            ]
+
         if constrain_swarm:
             raise NotImplementedError("Constrained swarm is implemented but out of date. We concluded that this is not the right way to enforce token repetition constraints.")
             run_ratios, run_metrics = filter_constrained_swarm(final_cookbook_path, run_ratios, run_metrics)
+
         ratios = pd.DataFrame(run_ratios)
         metrics = pd.DataFrame(run_metrics)
+        numerical_cols = metrics.columns[3:]
+        metrics[numerical_cols] = metrics[numerical_cols].apply(pd.to_numeric, errors='coerce')
         ratios = ratios[ratios['run'].isin(metrics.run)]
 
         if fixed_weight is not None:
             # normalize the non-fixed-weight domains to add to 1 
             domains = ratios.columns[3:]
             ratios[domains] = ratios[domains].div(ratios[domains].sum(axis=1), axis=0)
-            
+                    
         pd.to_pickle(ratios, ratios_cache_path)
         pd.to_pickle(metrics, metrics_cache_path)
         logger.info(f"Saved ratios to {ratios_cache_path} and metrics to {metrics_cache_path}")
-
 
     metrics_to_index = eval_metric_group.value
 
@@ -535,10 +667,15 @@ def fit(
         old_len = len(ratios)
         other_columns = list(set(ratios.columns[3:]).difference(set(keep_sources)))
         ratios = ratios[ratios[list(keep_sources)].ne(0).all(axis=1) &  # all specified columns nonzero
-            ratios[other_columns].eq(0).all(axis=1)  ]
+            ratios[other_columns].eq(0).all(axis=1)]
         logger.info(f"Filtered out {old_len - len(ratios)} runs that were not only on {keep_sources}")
         metrics = metrics[metrics['name'].isin(ratios['name'])]
         ratios.drop(columns=other_columns, inplace=True)
+
+    if experiment_groups[0] == "870881c8":
+        # hardcoded logic: drop outlier for reasoning swarm 
+        ratios = ratios.drop(index=27)
+        metrics = metrics.drop(index=27)
 
 
     if select_top_k_runs < 1.0:
@@ -546,6 +683,26 @@ def fit(
         keep_runs = metrics.sort_values(by="all_bpb").run.values[: int(len(metrics) * select_top_k_runs)]
         metrics = metrics[metrics.run.isin(keep_runs)]
         ratios = ratios[ratios.run.isin(keep_runs)]
+
+    if metric_type == "primary_score":
+        logger.info("Doing z-score normalization on the primary scores...")
+        cols_to_normalize = metrics.columns[3:]
+        metrics[cols_to_normalize] = metrics[cols_to_normalize].apply(pd.to_numeric, errors='coerce')
+        metrics[cols_to_normalize] = metrics[cols_to_normalize].apply(
+            lambda col: (col - col.mean()) / col.std(ddof=0)
+        )
+
+    cols_to_check = metrics.columns[3:]
+    cols_with_nans = metrics[cols_to_check].columns[metrics[cols_to_check].isna().any()].tolist()
+    if len(cols_with_nans) > 0:
+        logger.warning(f"Found NaNs in the following columns, dropping them! {cols_with_nans}")
+        metrics = metrics.drop(columns=cols_with_nans)
+        metrics_to_index = [m for m in metrics_to_index if m not in cols_with_nans]
+
+    if regression_type == "log_linear":
+        if (metrics[metrics.columns[3:]] < 0).any().any():
+            logger.info("Log-linear regression requires non-negative metrics, shifting metrics to be non-negative.")
+            metrics[metrics.columns[3:]] = metrics[metrics.columns[3:]].subtract(metrics[metrics.columns[3:]].min())
 
     # X = Domain weights
     X_train = ratios[ratios.columns[3:]].values
@@ -625,8 +782,8 @@ def fit(
             logger.info(f"Log linear regression model saved to {regression_model_cache_path}")
             with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
                 f.write(str(regression_model_cache_path))
- 
-    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist())
+
+    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type)
     results = []
 
     if dro_reference_model_id is not None: 
@@ -699,7 +856,9 @@ def fit(
                 obj_weights=obj_weights,
                 temperature=temperature,
                 reference_scores=reference_scores if dro_reference_model_id is not None else None,
-                fixed_weight=fixed_weight_dict if fixed_weight is not None else None
+                fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
+                metric_type=metric_type,
+                ratios=ratios
             )
 
             plot_and_log_weights(
@@ -720,6 +879,10 @@ def fit(
 
             results.append((metric, weights))
 
+    if fit_only:
+        logger.info("Fit only mode, not proposing a mix.")
+        return
+
     if opt_avg_metric and n_test == 0:
         assert group_metrics is not None and group_average is None # need to have this set
         weights = PROPOSER_TYPES[proposer_type]().propose(
@@ -735,7 +898,9 @@ def fit(
             obj_weights=obj_weights,
             temperature=temperature,
             reference_scores=reference_scores if dro_reference_model_id is not None else None,
-            fixed_weight=fixed_weight_dict if fixed_weight is not None else None
+            fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
+            metric_type=metric_type,
+            ratios=ratios
         )
         plot_and_log_weights(
             prior=priors[0],

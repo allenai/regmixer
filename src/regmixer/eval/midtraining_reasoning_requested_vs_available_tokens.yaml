@@ -1,0 +1,10 @@
+requested_tokens: 10_000_000_000 # 10B
+leaf_level_constraints: true
+available_tokens:  
+  hqweb: 49_455_463_002
+  reasoning:big-reasoning-traces: 2_514_194_466
+  reasoning:code-meta-reasoning: 1_198_181_281
+  reasoning:gemini: 257_784_266
+  reasoning:math-meta-reasoning: 1_144_531_442
+  reasoning:qwq: 4_779_547_858
+  reasoning:verifiable: 366_757_554

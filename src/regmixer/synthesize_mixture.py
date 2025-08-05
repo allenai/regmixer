@@ -4,15 +4,20 @@ import os
 import pathlib
 import random
 from collections import defaultdict
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union, List, Any
 from copy import deepcopy
 
 import numpy as np
+import gcsfs
 import s3fs
 from olmo_core.aliases import PathOrStr
 from olmo_core.data.types import NumpyDatasetDType
-from olmo_core.io import get_file_size
+from olmo_core.io import get_file_size, is_url, normalize_path
+from olmo_core.utils import OLMoEnvironmentError
 from tqdm import tqdm
+
+from urllib.parse import urlparse
+
 
 logger = logging.getLogger(__name__)
 logging.getLogger("botocore").setLevel(logging.WARNING)
@@ -579,33 +584,66 @@ def calculate_priors(
         except FileNotFoundError:
             logger.info("No cache file found, calculating from source files...")
 
-    fs = s3fs.S3FileSystem(anon=False)
-
     token_counts = defaultdict(int)
+
     # Count tokens in each "leaf": the prior distribution is represented at the leaf level.
-    leaf_configs = []
-    for source_config in source_configs:
-        leaf_configs.extend(get_leaf_configs(source_config))
+    filesystems = {}
+    leaf_configs: list[SourceConfig] = [] 
+    for sc in source_configs:                         
+        leaf_configs.extend(
+            SourceConfig(name=leaf_name, paths=leaf_paths)
+            for leaf_name, leaf_paths in get_leaf_configs(sc)
+        )
+    source_configs = leaf_configs
+
+    for source in source_configs:
+        schemes = {urlparse(path).scheme for path in source.paths}
+
+        # Check for mixed schemes within a source
+        if len(schemes) > 1 and any(scheme for scheme in schemes):
+            raise OLMoEnvironmentError(
+                f"Mixed URL schemes in source '{source.name}': {schemes}. Each source must use a consistent scheme."
+            )
+
+        # Get the scheme (or None for local paths)
+        scheme = next(iter(schemes)) if schemes and next(iter(schemes)) else "local"
+
+        if scheme not in filesystems:
+            filesystems[scheme] = get_filesystem_for_scheme(scheme)
+
+
 
     # Multithreaded token counting at leaf level
     with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-        future_to_leaf = {
-            executor.submit(count_tokens, paths, dtype, fs): name
-            for name, paths in leaf_configs
+
+        for source in source_configs:
+            scheme = next(iter({urlparse(path).scheme for path in source.paths}), "local")
+            fs = filesystems.get(scheme)
+
+            globs = [path for path in source.paths if "*" in path]
+            paths = [path for path in source.paths if path not in globs]
+            source.paths = paths + expand_globs(fs, globs) if globs else paths
+
+        
+        futures = {
+            executor.submit(_count_tokens_for_file, path, dtype): source
+            for source in source_configs
+            for path in source.paths
         }
+        
 
         for future in tqdm(
-            concurrent.futures.as_completed(future_to_leaf),
-            total=len(future_to_leaf),
+            concurrent.futures.as_completed(futures),
+            total=len(futures),
             desc="Counting tokens (leaf level)",
         ):
-            name = future_to_leaf[future]
+            source_future = futures[future]
             try:
-                count = future.result()
-                token_counts[name] = count
+                result = future.result()
+                token_counts[source_future.name] += result
             except Exception as e:
-                logger.info(f"Error processing {name}: {str(e)}, exiting!")
-                raise e
+                logger.info(f"Error processing {source_future.name}: {str(e)}")
+                token_counts[source_future.name] = 0
 
     # Calculate relative sizes
     total_tokens = sum(token_counts.values())
@@ -674,3 +712,115 @@ def sort_and_deduplicate_with_hash(
         f"Filtered {len(samples) - len(unique_samples)} duplicate distributions from candidate pool..."
     )
     return unique_samples
+
+
+
+def get_filesystem_for_scheme(scheme: str):
+    """
+    Get the appropriate filesystem for a given URL scheme.
+
+    Args:
+        scheme: The URL scheme (e.g., 's3', 'gs', 'local', 'weka')
+
+    Returns:
+        The appropriate filesystem object for the scheme or None for local paths
+
+    Raises:
+        OLMoEnvironmentError: If the scheme is not supported or not configured correctly
+        NotImplementedError: If the scheme is recognized but not currently supported
+    """
+    if scheme in ("s3", "weka"):
+        client_kwargs = {}
+        profile_name = os.environ.get("AWS_PROFILE", None)
+
+        if scheme == "weka":
+            profile_name = "WEKA"
+            client_kwargs["endpoint_url"] = os.environ.get("WEKA_ENDPOINT_URL")
+
+        return s3fs.S3FileSystem(client_kwargs={**client_kwargs}, profile=profile_name)
+
+    elif scheme == "gs":
+        try:
+            gs_project = os.environ.get("GOOGLE_CLOUD_PROJECT", None)
+
+            if not gs_project:
+                raise OLMoEnvironmentError("GOOGLE_CLOUD_PROJECT environment variable is not set!")
+
+            try:
+                return gcsfs.GCSFileSystem(token="google_default")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to create GCS filesystem with default credentials: {str(e)}. Retrying with metadata server..."
+                )
+                return gcsfs.GCSFileSystem()
+
+        except Exception as e:
+            raise OLMoEnvironmentError(
+                f"Failed to create GCS filesystem: {str(e)}. Ensure GOOGLE_APPLICATION_CREDENTIALS_JSON and GOOGLE_CLOUD_PROJECT are set correctly."
+            )
+
+    elif scheme in ("r2", "http", "https"):
+        raise NotImplementedError(f"'{scheme}' scheme is not currently supported")
+
+    elif scheme == "local":
+        return None  # No remote filesystem needed for local paths
+
+    else:
+        raise OLMoEnvironmentError(f"Unsupported URL scheme: {scheme}")
+
+
+def expand_globs(
+    fs: Optional[Union[s3fs.S3FileSystem, gcsfs.GCSFileSystem]] = s3fs.S3FileSystem(), sources: List[str] = []
+) -> Any:
+    results = []
+
+    for source in sources:
+        if is_url(source):
+            results.extend(_expand_remote(source, fs))
+        else:
+            results.extend(_expand_local(source))
+
+    # Filter the globs from the expanded list
+    return [r for r in results if "*" not in r]
+
+
+def _expand_local(pattern: str) -> List[str]:
+    """
+    Expand a local glob pattern.
+    """
+    from glob import glob
+
+    logger.info(f"Expanding '{pattern}'...")
+    matches = sorted(glob(pattern, recursive=True))
+
+    if not matches:
+        raise FileNotFoundError(pattern)
+
+    return [normalize_path(match) for match in matches]
+
+
+def _expand_remote(pattern: str, fs: Optional[Union[s3fs.S3FileSystem, gcsfs.GCSFileSystem]]) -> List[str]:
+    """
+    Expand a remote glob pattern.
+    """
+    if not fs:
+        fs = s3fs.S3FileSystem()
+
+    parsed = urlparse(pattern)
+    logger.info(f"Expanding remote glob '{pattern}'...")
+
+    if parsed.scheme == "s3":
+        return [f"s3://{obj}" for obj in fs.glob(pattern)]
+    elif parsed.scheme == "weka":
+        return [f"weka://{obj}" for obj in fs.glob(pattern.replace("weka://", "s3://"))]
+    elif parsed.scheme == "gs":
+        return [f"gs://{obj}" for obj in fs.glob(pattern)]
+    elif parsed.scheme == "r2":
+        raise NotImplementedError("'r2' types are not currently supported")
+    elif parsed.scheme in ("http", "https"):
+        raise NotImplementedError("'http' types are not currently supported")
+    elif parsed.scheme == "file":
+        raise NotImplementedError("Remote 'file' types are not currently supported")
+    else:
+        raise NotImplementedError(f"Glob expansion is not currently supported for '{parsed.scheme}' files")
+
