@@ -18,7 +18,8 @@ dependencies = [
     "click",
     "pydantic",
     "s3fs",
-    "yaspin"
+    "yaspin",
+    "gcsfs"
 ]
 [project.optional-dependencies]
 dev = [
@@ -40,6 +41,7 @@ eval = [
     "pandas",
     "scipy",
     "seaborn",
+    "statsmodels"
 ]
 all = [
     "regmixer[dev,beaker,wandb,eval]",
@@ -138,3 +140,5 @@ filterwarnings = [
     'ignore::DeprecationWarning:google\.rpc',
     'ignore::FutureWarning:torch\.distributed\.checkpoint\.default_planner',
 ]
+
+

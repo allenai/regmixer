@@ -677,6 +677,10 @@ def fit(
         ratios = ratios.drop(index=27)
         metrics = metrics.drop(index=27)
 
+    if experiment_groups[0] == "a09b2bf1":
+        ratios = ratios.drop(index=[30, 47, 49])
+        metrics = metrics.drop(index=[30, 47, 49])
+
 
     if select_top_k_runs < 1.0:
         metrics['all_bpb'] = metrics[metrics.columns[3:]].mean(axis=1)
@@ -788,40 +792,52 @@ def fit(
 
     if dro_reference_model_id is not None: 
         # load in metrics of the reference model 
-        reference_model_run_instance = get_runs_from_api(
-            api, workspace, [dro_reference_model_id], cache_path, True, num_samples, eval_metric_group
-        )[0]
+        if dro_reference_model_id.endswith("yaml"):
+            with open(dro_reference_model_id, "r") as f:
+                dro_config = yaml.safe_load(f)
 
-        if use_reference_model_predicted_scores:
-            # get reference model's mix and pass this through the regression model
-            reference_run_ratio = {
-                "run": reference_model_run_instance.id, 
-                "name": reference_model_run_instance.display_name, 
-                "index": 0, 
-                **mk_weights_from_config(reference_model_run_instance.config, priors)
-            }
-            reference_ratio_df = pd.DataFrame([reference_run_ratio])
-            reference_ratio = reference_ratio_df[reference_ratio_df.columns[3:]].values
+            assert all([entry['domain'] == ratios.columns[3:][i] for i, entry in enumerate(dro_config['sources'])])
+
+            reference_ratio = np.array([entry['weight'] for entry in dro_config['sources']])
+            reference_ratio /= np.sum(reference_ratio)  # normalize the weights
             reference_scores = [pred.predict(reference_ratio)[0] for pred in predictors]
             reference_scores = np.array(reference_scores)
+
         else:
-            # load in the reference model's true performance
-            reference_run_metric ={
-                "run": reference_model_run_instance.id,
-                "name": reference_model_run_instance.display_name, 
-                "index": 0,
-                **mk_run_metrics(
-                    history=reference_model_run_instance.samples,
-                    samples=num_samples,
-                    metrics=(eval_metric_group_name, eval_metric_group.value),
-                    display_name=reference_model_run_instance.display_name,
-                    average=group_average != None,
-                ),
-            }
-            reference_scores = []
-            for idx, metric in indexed_metrics:
-                reference_scores.append(reference_run_metric[metric])
-            reference_scores = np.array(reference_scores)
+            reference_model_run_instance = get_runs_from_api(
+                api, workspace, [dro_reference_model_id], cache_path, True, num_samples, eval_metric_group
+            )[0]
+
+            if use_reference_model_predicted_scores:
+                # get reference model's mix and pass this through the regression model
+                reference_run_ratio = {
+                    "run": reference_model_run_instance.id, 
+                    "name": reference_model_run_instance.display_name, 
+                    "index": 0, 
+                    **mk_weights_from_config(reference_model_run_instance.config, priors)
+                }
+                reference_ratio_df = pd.DataFrame([reference_run_ratio])
+                reference_ratio = reference_ratio_df[reference_ratio_df.columns[3:]].values
+                reference_scores = [pred.predict(reference_ratio)[0] for pred in predictors]
+                reference_scores = np.array(reference_scores)
+            else:
+                # load in the reference model's true performance
+                reference_run_metric ={
+                    "run": reference_model_run_instance.id,
+                    "name": reference_model_run_instance.display_name, 
+                    "index": 0,
+                    **mk_run_metrics(
+                        history=reference_model_run_instance.samples,
+                        samples=num_samples,
+                        metrics=(eval_metric_group_name, eval_metric_group.value),
+                        display_name=reference_model_run_instance.display_name,
+                        average=group_average != None,
+                    ),
+                }
+                reference_scores = []
+                for idx, metric in indexed_metrics:
+                    reference_scores.append(reference_run_metric[metric])
+                reference_scores = np.array(reference_scores)
 
     for idx, metric in indexed_metrics:
         plot_correlation(

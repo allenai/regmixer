@@ -1486,7 +1486,40 @@ class GroupedWandbMetrics(Enum):
         #"crux-eval",
     ]
 
-
+    a09b2bf1_finegrained_evals_v2 = [
+        'arc:mc::xlarge',
+        'basic_skills_arithmetic:rc::olmes',
+        'basic_skills_string_operations:rc::olmes',
+        'bigcodebench:3shot::olmo3:v2',
+        'codex_humaneval:3shot::olmo3:n32:v2',
+        'coqa:mc::gen2mc',
+        'csqa:mc::xlarge',
+        'drop::xlarge',
+        'gsm-symb:n8:v2',
+        'gsm8k::olmo3:n8:v2',
+        'hellaswag:rc::xlarge',
+        'jeopardy::xlarge',
+        'jeopardy:mc::gen2mc',
+        'lambada',
+        'mbpp:3shot::olmo3:n32:v2',
+        'medmcqa:mc::none',
+        'minerva:n4:v2',
+        'mmlu_humanities:mc',
+        'mmlu_other:mc',
+        'mmlu_social_sciences:mc',
+        'mmlu_stem:mc',
+        'multipl-e-humaneval:n32:v2:pass_at_16',
+        'multipl-e-mbpp:n32:v2:pass_at_16',
+        'naturalqs::xlarge',
+        'naturalqs:mc::gen2mc',
+        'piqa:mc::xlarge',
+        'sciq:mc::xlarge',
+        'socialiqa:mc::xlarge',
+        'squad::xlarge',
+        'squad:mc::gen2mc',
+        'winogrande:rc::xlarge'
+    ]
+    
 
 # arc_easy, arc_challenge, hellaswag, MMLU macro average,
 # GSM8K is a step function, is bad

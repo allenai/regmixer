@@ -858,7 +858,7 @@ def plot_correlation(
 
         plt.legend(
             handles=[test_dot, train_dot],
-            title=f"{metric_name.split("/")[-1]} correlations",
+            title=f"{metric_name.split('/')[-1]} correlations",
             fontsize=12,
             title_fontsize=12,
         )
