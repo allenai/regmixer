@@ -1,0 +1,37 @@
+sources:
+- domain: code_fim
+  paths:
+  - placeholder
+  weight: 0.1
+- domain: dolminomath
+  paths:
+  - placeholder
+  weight: 0.10687631
+- domain: megamatt
+  paths:
+  - placeholder
+  weight: 0.01698
+- domain: openmathreasoning-fullthoughts-rewrite
+  paths:
+  - placeholder
+  weight: 0.00850821
+- domain: swallowcode
+  paths:
+  - placeholder
+  weight: 0.1
+- domain: swallowmath
+  paths:
+  - placeholder
+  weight: 0.05624262
+- domain: tinymath-mind
+  paths:
+  - placeholder
+  weight: 0.00898704
+- domain: tinymath-pot
+  paths:
+  - placeholder
+  weight: 0.00240582
+- domain: gen-mcqa
+  paths:
+  - placeholder
+  weight: 0.525 #0.275+0.05+0.011+0.05+0.03+0.059+0.05

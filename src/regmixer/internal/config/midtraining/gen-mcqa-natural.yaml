@@ -1,0 +1,33 @@
+sources:
+- domain: flan
+  paths:
+  - placeholder
+  weight: 0.008150873300940345
+- domain: instruction-new-format
+  paths:
+  - placeholder
+  weight: 0.0007834644239876962
+- domain: nemotron-synth-qa
+  paths:
+  - placeholder
+  weight: 0.2325248263399173
+- domain: rcqa
+  paths:
+  - placeholder
+  weight: 0.0020144370032027727
+- domain: reddit-high
+  paths:
+  - placeholder
+  weight: 0.004712287691787381
+- domain: reddit-low
+  paths:
+  - placeholder
+  weight: 0.005633983515842724
+- domain: sponge
+  paths:
+  - placeholder
+  weight: 0.002490772860077091
+- domain: hqweb-pdf
+  paths:
+  - placeholder
+  weight: 0.7436893548642446

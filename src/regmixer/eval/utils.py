@@ -24,6 +24,8 @@ from copy import deepcopy
 from collections import defaultdict
 import pydantic_core
 import statsmodels.api as sm
+from matplotlib.colors import TwoSlopeNorm
+
 
 import subprocess
 from io import StringIO
@@ -301,6 +303,7 @@ class SimulationProposer(Proposer):
         index: int,
         predictor: list[Regressor],
         prior_distributions: dict,
+        original_prior: dict,
         ratios: pd.DataFrame,
         num_samples: int = 1_000_000,
         seed: int = 1337,
@@ -315,6 +318,9 @@ class SimulationProposer(Proposer):
         reference_scores: Optional[np.ndarray] = None,
         fixed_weight: Optional[dict[str, float]] = None,
         metric_type: Optional[str] = None,
+        tol: Optional[float] = None,
+        fixed_search_weight: Optional[str] = None,
+        reference_ratio: Optional[str] = None
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -325,11 +331,27 @@ class SimulationProposer(Proposer):
         max_dirichlet = 100
         search_dirichlet_factor = 2.0
 
-        search_prior = np.array(list(prior_distributions.values()))
+        
+        if reference_ratio is not None:
+            search_prior = np.array(reference_ratio)
+        else:
+            search_prior = np.array(list(prior_distributions.values()))
 
         if temperature is not None:
             search_prior = search_prior**temperature
             search_prior = search_prior / np.sum(search_prior)
+
+        if fixed_search_weight is not None:
+            fixed_dict = json.loads(fixed_search_weight)
+            fixed_indices = {list(prior_distributions.keys()).index(domain): weight for domain, weight in fixed_dict.items()}
+            free_indices = [i for i in range(len(search_prior)) if i not in fixed_indices]
+            free_prior = search_prior[free_indices]
+            free_prior /= np.sum(free_prior)
+            logger.info(f"Prior for sampling is {free_prior}")
+        else:
+            logger.info(f"Prior for sampling is {search_prior}")
+
+        breakpoint()
 
         best_weights = np.zeros(len(prior_distributions))
 
@@ -361,11 +383,18 @@ class SimulationProposer(Proposer):
                 desired_tokens = data["requested_tokens"]
 
                 leaf_level_constraints = data["leaf_level_constraints"]
-                if leaf_level_constraints:
+                granular_constraints = data.get("granular_constraints", False)
+                if leaf_level_constraints and not granular_constraints:
                     # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
                     available_tokens_per_source = {
                         source: data["available_tokens"][source]
                         for source, _ in prior_distributions.items()
+                    }
+                elif leaf_level_constraints and granular_constraints:
+                    # if the manual constraints are at a finer granularity, we need to aggregate them
+                    available_tokens_per_source = {
+                        source: data["available_tokens"][source]
+                        for source, _ in original_prior.items()
                     }
                 else:
                     # otherwise, our constraints are at the source level while prior_distribution is at the leaf level
@@ -385,14 +414,30 @@ class SimulationProposer(Proposer):
             )
 
             # generate simulations by sampling from dirichlet distribution with parameter prior * alpha
-            simulations = (
-                torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
-                .sample()
-                .numpy()
-            )
+            if fixed_search_weight is None:
+                simulations = (
+                    torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
+                    .sample()
+                    .numpy()
+                )
+            else:
+                free_indices_simulations = (
+                    torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * free_prior))
+                    .sample()
+                    .numpy()
+                )
+                simulations = np.zeros((num_samples, len(search_prior)))
+                simulations[:, free_indices] = free_indices_simulations * (1 - sum(list(fixed_indices.values())))
+                idx  = np.array(list(fixed_indices.keys()))
+                vals = np.array(list(fixed_indices.values()))
+                simulations[:, idx] = vals  # broadcasts across rows
+
+
+                
+
 
             # Filter out invalid simulations from the population
-            if temperature is None:
+            if False: #temperature is None:
                 # keep this for reproducibility...
                 simulations = simulations[
                     np.all(
@@ -412,10 +457,11 @@ class SimulationProposer(Proposer):
             if constrain_objective:
                 original_simulation_size = len(simulations)
 
-                if leaf_level_constraints:
+                if leaf_level_constraints and not granular_constraints:
                     # we can just directly do elementwise comparisons
                     # Check which simulations will be filtered out
                     token_usage = simulations * desired_tokens
+
                     token_limits = (
                         np.array(list(available_tokens_per_source.values())) * repetition_factor
                     )
@@ -426,21 +472,40 @@ class SimulationProposer(Proposer):
                         logger.info(
                             f"Filtering out {filtered_count} simulations that exceed token constraints"
                         )
-                        # Log details about why simulations were filtered
-                        invalid_simulations = simulations[~valid_mask]
-                        invalid_token_usage = token_usage[~valid_mask]
-                        for i, (sim, usage) in enumerate(
-                            zip(invalid_simulations[:5], invalid_token_usage[:5])
-                        ):  # Log first 5
-                            exceeding_sources = [
-                                f"{list(available_tokens_per_source.keys())[j]}: {usage[j]:.0f} > {token_limits[j]:.0f}"
-                                for j in range(len(usage))
-                                if usage[j] > token_limits[j]
-                            ]
-                            exceeding_details = "\n".join(
-                                [f"    {detail}" for detail in exceeding_sources]
-                            )
-                            logger.info(f"Filtered simulation {i+1}:\n{exceeding_details}")
+
+                    simulations = simulations[valid_mask]
+                elif leaf_level_constraints and granular_constraints:
+                    constrained_domains = list(original_prior.keys())
+                    original_prior_mix = np.array(list(original_prior.values()))
+
+                    source_to_indices = defaultdict(list)
+                    for i, domain in enumerate(constrained_domains):
+                        source = domain.split(":", 1)[0]
+                        source_to_indices[source].append(i)
+
+                    per_source_weights = {}
+                    for source, indices in source_to_indices.items():
+                        topic_mix = original_prior_mix[indices]
+                        total = topic_mix.sum()
+                        per_source_weights[source] = (np.array(indices), topic_mix/total)
+
+                    expanded_simulations = np.zeros((len(simulations), len(constrained_domains)))
+                    for j, source in enumerate(prior_distributions):
+                        indices, weights = per_source_weights[source]
+                        expanded_simulations[:, indices] = simulations[:, [j]] * weights
+
+                    token_usage = expanded_simulations * desired_tokens
+                    token_limits =  (
+                        np.array(list(available_tokens_per_source.values())) * repetition_factor
+                    )
+
+                    valid_mask = (token_usage <= token_limits).all(axis=1)
+
+                    filtered_count = np.sum(~valid_mask)
+                    if filtered_count > 0:
+                        logger.info(
+                            f"Filtering out {filtered_count} simulations that exceed token constraints"
+                        )
 
                     simulations = simulations[valid_mask]
                 else:
@@ -474,7 +539,10 @@ class SimulationProposer(Proposer):
             predictions = np.array([reg.predict(simulations) for reg in predictor])
             if reference_scores is not None:
                 # If reference scores are provided, filter simulations based on them
-                tol_range = [0, 0.05, 0.1, 0.15, 0.2]
+                if tol is not None:
+                    tol_range = [tol]
+                else:
+                    tol_range = [0, 0.05, 0.1, 0.15, 0.2]
                 for tol in tol_range:
                     # we allow for predicted scores to be within a tolerance of the reference scores
                     # if the current tol results in no remaining simulations, we increase tol
@@ -520,18 +588,24 @@ class SimulationProposer(Proposer):
 
             search_prior = (best_weights + search_prior) / 2
 
+            if fixed_search_weight is not None:
+                free_prior = search_prior[free_indices]
+                free_prior /= np.sum(free_prior)
+
             logger.info(
                 f"Current best weights is: {best_weights} and search prior is: {search_prior}"
             )
 
         if constrain_objective:
-            if leaf_level_constraints:
+            if leaf_level_constraints and not granular_constraints:
                 # we can just directly do elementwise comparisons
                 if not all(
                     best_weights * desired_tokens
                     <= np.array(list(available_tokens_per_source.values())) * repetition_factor
                 ):
                     raise ValueError(f"Best weights are out of bounds!")
+            elif leaf_level_constraints and granular_constraints:
+                pass
             else:
                 if not passes_constraints(best_weights):
                     raise ValueError(f"Best weights are out of bounds!")
@@ -906,7 +980,12 @@ def plot_interaction_matrix(
             #std = ratios[ratios.columns[3:]].std(ddof=0).values  # std for selected columns only
             interaction_matrix[i] = predictor.model.params #* std
 
-    plt.figure(figsize=(10, 8))
+
+    sorted_metric_indices = np.argsort(metric_names)
+    metric_names = [metric_names[i] for i in sorted_metric_indices]
+    interaction_matrix = interaction_matrix[sorted_metric_indices, :]
+
+    plt.figure(figsize=(20, 16))
     plt.imshow(interaction_matrix, cmap="rainbow", aspect="auto")
     cmap = plt.cm.coolwarm
     vlim = np.abs(interaction_matrix).max()
@@ -920,7 +999,6 @@ def plot_interaction_matrix(
         bar_label += " (lower is better)"
 
     plt.colorbar(label=bar_label)
-
     plt.xticks(ticks=np.arange(len(domain_names)), labels=domain_names, rotation=90)
     plt.yticks(ticks=np.arange(len(metric_names)), labels=metric_names)
     plt.title(f"Interaction matrix for {regression_type}")
@@ -938,7 +1016,7 @@ def plot_interaction_matrix(
                 j, i, text_str,
                 ha='center', va='center',
                 color='black' if abs(val) < 0.5 * np.max(np.abs(interaction_matrix)) else 'white',
-                fontsize=8
+                fontsize=10
             )
 
     plt.tight_layout()
@@ -949,6 +1027,106 @@ def plot_interaction_matrix(
     )
     plt.close()
     np.save(f"{output_dir}/interaction_matrix.npy", interaction_matrix)
+
+
+
+
+# Optional: BH FDR (Benjamini–Hochberg) to convert p->q
+def bh_adjust(pvals: np.ndarray) -> np.ndarray:
+    flat = pvals.ravel().astype(float)
+    n = flat.size
+    order = np.argsort(flat)
+    ranks = np.empty_like(order); ranks[order] = np.arange(1, n+1)
+    q = flat * n / ranks
+    # enforce monotonicity
+    q_sorted = np.minimum.accumulate(q[order][::-1])[::-1]
+    out = np.empty_like(q_sorted); out[order] = q_sorted
+    return out.reshape(pvals.shape)
+
+def plot_interaction_matrix_signed_evidence(
+    output_dir: str,
+    predictors: List,
+    regression_type: str,
+    domain_names: List[str],
+    metric_names: List[str],
+    ratios: pd.DataFrame,
+    metric_type: Optional[str] = None,
+    use_fdr: bool = True,
+    p_cap: float = 10.0,
+    sig_threshold: float = 0.05
+):
+    metric_names = [m.split("/")[-1].split(" ")[0] for m in metric_names]
+
+    B = np.zeros((len(metric_names), len(domain_names)))
+    P = np.full_like(B, np.nan, dtype=float)
+
+    for i, pred in enumerate(predictors):
+        if regression_type == "linear":
+            B[i] = pred.model.params
+            P[i] = pred.model.pvalues
+        elif regression_type == "lightgbm":
+            B[i] = getattr(pred.model, "feature_importances_", np.zeros(len(domain_names)))
+        elif regression_type == "log_linear":
+            B[i] = pred.model[1:]
+
+    order = np.argsort(metric_names)
+    metric_names = [metric_names[k] for k in order]
+    B = B[order]
+    P = P[order]
+
+    if regression_type == "linear" and np.isfinite(P).any():
+        Q = bh_adjust(P) if use_fdr else P
+        Z = -np.log10(np.clip(Q, 1e-300, 1.0))
+        Z = np.minimum(Z, p_cap)
+
+        signed_score = np.sign(B) * Z
+
+        plt.figure(figsize=(20, 16))
+        im = plt.imshow(
+            signed_score,
+            cmap="coolwarm",
+            norm=TwoSlopeNorm(vmin=-p_cap, vcenter=0.0, vmax=p_cap),
+            aspect="auto"
+        )
+
+        # Dim nonsignificant cells
+        mask = Q > sig_threshold
+        overlay = np.zeros((*signed_score.shape, 4))
+        overlay[mask] = [0.7, 0.7, 0.7, 0.6]
+        plt.imshow(overlay, aspect="auto")
+
+        # Annotate with β and p/q
+        for i in range(len(metric_names)):
+            for j in range(len(domain_names)):
+                if use_fdr:
+                    p_str = f"q={Q[i, j]:.2g}"
+                else:
+                    p_str = f"p={P[i, j]:.2g}"
+                text_str = f"β={B[i, j]:.2f}\n{p_str}"
+                text_color = "black" if abs(signed_score[i, j]) < 0.5 * p_cap else "white"
+                plt.text(j, i, text_str, ha="center", va="center",
+                         fontsize=8, color=text_color)
+
+        cbar = plt.colorbar(im)
+        cbar.set_label(f"sign(β) × min{{-log10({'q' if use_fdr else 'p'}), cap}}")
+        better = "higher is better" if metric_type == "primary_score" else "lower is better"
+        plt.title(f"Signed evidence heatmap (direction + significance)\n({better})")
+
+    else:
+        plt.figure(figsize=(20, 16))
+        im = plt.imshow(B, cmap="coolwarm", aspect="auto")
+        for i in range(len(metric_names)):
+            for j in range(len(domain_names)):
+                plt.text(j, i, f"{B[i, j]:.2f}", ha="center", va="center", fontsize=8)
+        cbar = plt.colorbar(im)
+        cbar.set_label("β value")
+        plt.title(f"β heatmap ({regression_type})")
+
+    plt.xticks(ticks=np.arange(len(domain_names)), labels=domain_names, rotation=90)
+    plt.yticks(ticks=np.arange(len(metric_names)), labels=metric_names)
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/interaction_matrix_signed_evidence.png", bbox_inches="tight")
+    plt.close()
 
 
 def mk_run_metrics(
@@ -1365,6 +1543,11 @@ def plot_and_log_weights(
             opt_weight_dict, original_prior, fixed_weight
         )
         out = [{"domain": domain, "weight": weight} for domain, weight in opt_weight_dict.items()]
+
+    if len(out) != len(df_config.columns[3:]):
+        logger.info("RAW WEIGHTS:")
+        raw_weights = [{"domain": columns[idx], "weight": weight} for idx, weight in enumerate(prediction)]
+        logger.info(raw_weights)
 
     with open(
         f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json",

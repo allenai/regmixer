@@ -1422,39 +1422,39 @@ class GroupedWandbMetrics(Enum):
         'hellaswag:rc::xlarge', 
         'winogrande:rc::xlarge', 
         'lambada',
+        'drop::xlarge', 
+        'jeopardy::xlarge', 
+        'naturalqs::xlarge', 
+        'squad::xlarge', 
+        'coqa::xlarge',
+        #
+        "gsm8k::olmo3:n8:v2",
+        "gsm-symb:n8:v2",
+        "minerva:n4:v2",
+        "minerva_math_500::olmo3:n32:v2",
+        "minerva_math_500::olmo3:n32:v2:pass_at_16",
+        'bigcodebench:3shot::olmo3:v2', 
+        'codex_humaneval:3shot::olmo3:n32:v2', 
+        'codex_humaneval:3shot::olmo3:n32:v2:pass_at_16',
+        'deepseek_leetcode::olmo3:n32:v2', 
+        'deepseek_leetcode::olmo3:n32:v2:pass_at_16', 
+        'ds1000:3shot::olmo3:v2', 
+        'mbpp:3shot::olmo3:n32:v2',
+        'mbpp:3shot::olmo3:n32:v2:pass_at_16',
+        "multipl-e-humaneval:n32:v2",
+        "multipl-e-humaneval:n32:v2:pass_at_16",
+        "multipl-e-mbpp:n32:v2",
+        "multipl-e-mbpp:n32:v2:pass_at_16",
+        #
+        "fim::olmo3",
+        #
+        "crux-eval",
         'basic_skills_arithmetic:rc::olmes', 
         'basic_skills_coding:rc::olmes', 
         'basic_skills_common_knowledge:rc::olmes', 
         'basic_skills_logical_reasoning:rc::olmes', 
         'basic_skills_string_operations:rc::olmes', 
         'basic_skills_pattern:rc::olmes', 
-        'drop::xlarge', 
-        'jeopardy::xlarge', 
-        'naturalqs::xlarge', 
-        'squad::xlarge', 
-        'coqa::xlarge',
-        "gsm8k::olmo3:n8:v2",
-        "gsm-symb:n8:v2",
-        "minerva:n4:v2",
-        'bigcodebench:3shot::olmo3:v2', 
-        'codex_humaneval:3shot::olmo3:n32:v2', 
-        'deepseek_leetcode::olmo3:n32:v2', 
-        'ds1000:3shot::olmo3:v2', 
-        'mbpp:3shot::olmo3:n32:v2',
-        "multipl-e-humaneval:n32:v2",
-        "multipl-e-mbpp:n32:v2",
-        #
-        'deepseek_leetcode::olmo3:n32:v2:pass_at_16', 
-        'codex_humaneval:3shot::olmo3:n32:v2:pass_at_16',
-        'mbpp:3shot::olmo3:n32:v2:pass_at_16',
-        "multipl-e-humaneval:n32:v2:pass_at_16",
-        "multipl-e-mbpp:n32:v2:pass_at_16",
-        #
-        "fim::olmo3",
-        #
-        "minerva_math_500::olmo3:n32:v2",
-        "minerva_math_500::olmo3:n32:v2:pass_at_16",
-        "crux-eval",
     ]
     
 
@@ -1518,6 +1518,91 @@ class GroupedWandbMetrics(Enum):
         'squad::xlarge',
         'squad:mc::gen2mc',
         'winogrande:rc::xlarge'
+    ]
+
+    a09b2bf1_coarse_evals_v2 = [
+       'olmo3:dev:7b:code_gen_mini:v2:n32:pass_at_16', 
+       'olmo3:dev:7b:gen',
+       'olmo3:dev:7b:math:v2', 
+       'olmo3:dev:7b:mcqa:non_stem',
+       'olmo3:dev:7b:mcqa:stem'
+    ]
+
+    a09b2bf1_non_code_math_finegrained_evals_v2 = [
+        'arc:mc::xlarge',
+        'basic_skills_string_operations:rc::olmes',
+        'coqa:mc::gen2mc',
+        'csqa:mc::xlarge',
+        'drop::xlarge',
+        'hellaswag:rc::xlarge',
+        'jeopardy::xlarge',
+        'jeopardy:mc::gen2mc',
+        'lambada',
+        'medmcqa:mc::none',
+        'mmlu_humanities:mc',
+        'mmlu_other:mc',
+        'mmlu_social_sciences:mc',
+        'mmlu_stem:mc',
+        'naturalqs::xlarge',
+        'naturalqs:mc::gen2mc',
+        'piqa:mc::xlarge',
+        'sciq:mc::xlarge',
+        'socialiqa:mc::xlarge',
+        'squad::xlarge',
+        'squad:mc::gen2mc',
+        'winogrande:rc::xlarge'
+    ]
+
+
+    a3e06472_515eaf2d_finegrained_evals_v2 = [
+        'arc:mc::xlarge',
+        'basic_skills_arithmetic:rc::olmes',
+        'basic_skills_coding:rc::olmes',
+        'basic_skills_common_knowledge:rc::olmes',
+        'basic_skills_string_operations:rc::olmes',
+        'bigcodebench:3shot::olmo3:v2',
+        'codex_humaneval:3shot::olmo3:n32:v2:pass_at_16',
+        'coqa::xlarge',
+        'csqa:mc::xlarge',
+        'drop::xlarge',
+        'drop:mc::gen2mc',
+        'ds1000:3shot::olmo3:v2',
+        'fim::olmo3',
+        'gsm-symb:n8:v2',
+        'gsm8k::olmo3:n8:v2',
+        'hellaswag:rc::xlarge',
+        'jeopardy::xlarge',
+        'jeopardy:mc::gen2mc',
+        'mbpp:3shot::olmo3:n32:v2:pass_at_16',
+        'medqa_en:mc::none',
+        'minerva:n4:v2',
+        'mmlu_humanities:mc',
+        'mmlu_other:mc',
+        'mmlu_social_sciences:mc',
+        'mmlu_stem:mc',
+        'multipl-e-humaneval:n32:v2:pass_at_16',
+        'multipl-e-mbpp:n32:v2:pass_at_16',
+        'naturalqs::xlarge',
+        'naturalqs:mc::gen2mc',
+        'piqa:mc::xlarge',
+        'sciq:mc::xlarge',
+        'socialiqa:mc::xlarge',
+        'squad::xlarge',
+        'winogrande:rc::xlarge']
+
+    a3e06472_515eaf2d_code_math_finegrained_evals_v2 = [
+        'basic_skills_arithmetic:rc::olmes',
+        'basic_skills_coding:rc::olmes',
+        'bigcodebench:3shot::olmo3:v2',
+        'codex_humaneval:3shot::olmo3:n32:v2:pass_at_16',
+        'ds1000:3shot::olmo3:v2',
+        'fim::olmo3',
+        'gsm-symb:n8:v2',
+        'gsm8k::olmo3:n8:v2',
+        'mbpp:3shot::olmo3:n32:v2:pass_at_16',
+        'minerva:n4:v2',
+        'multipl-e-humaneval:n32:v2:pass_at_16',
+        'multipl-e-mbpp:n32:v2:pass_at_16',
     ]
     
 
@@ -2101,4 +2186,15 @@ class ObjectiveWeights(Enum):
         "lambada": 0.04824823120734346,
         "winogrande:rc::olmes:full": 0.05836308529444827,
         "coqa:rc:bpb::gen2mc": 0.07963746129893136,
+    }
+
+
+    midtraining_aggregate_evals_v2_weights_7_3 = {
+       'olmo3:dev:7b:code_fim': 0.7/4,
+       'olmo3:dev:7b:code_gen:v2': 0.7/4,
+       'olmo3:dev:7b:code_gen_mini:v2:n32:pass_at_16': 0.7/4, 
+       'olmo3:dev:7b:math:v2': 0.7/4, 
+       'olmo3:dev:7b:gen': 0.3/3,
+       'olmo3:dev:7b:mcqa:non_stem': 0.3/3,
+       'olmo3:dev:7b:mcqa:stem': 0.3/3
     }
