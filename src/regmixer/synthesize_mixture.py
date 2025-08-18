@@ -207,6 +207,7 @@ def generate_weights_dirichlet(
         weight_bounds = [
             (0.0, min(prior_dist[idx] * token_scale, 1.0)) for idx in range(len(prior_dist))
         ]
+        raise ValueError("WARNING: need to make sure keys are aligned here and with other places. In cookbook implementation, just removed sorted() everywhere, and seems to be fine?")
         grouped_bounds = {domain: weight_bounds[idx] for idx, domain in enumerate(domains)}
         logger.info("Weight bounds:")
         logger.info(grouped_bounds)

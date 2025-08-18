@@ -351,8 +351,6 @@ class SimulationProposer(Proposer):
         else:
             logger.info(f"Prior for sampling is {search_prior}")
 
-        breakpoint()
-
         best_weights = np.zeros(len(prior_distributions))
 
         if constrain_objective:
@@ -543,15 +541,15 @@ class SimulationProposer(Proposer):
                     tol_range = [tol]
                 else:
                     tol_range = [0, 0.05, 0.1, 0.15, 0.2]
-                for tol in tol_range:
+                for t in tol_range:
                     # we allow for predicted scores to be within a tolerance of the reference scores
                     # if the current tol results in no remaining simulations, we increase tol
                     if metric_type == "primary_score":
-                        pareto_idxs = np.where(np.all(predictions.T > reference_scores - tol, axis=1))[0]
+                        pareto_idxs = np.where(np.all(predictions.T > reference_scores - t, axis=1))[0]
                     else:
-                        pareto_idxs = np.where(np.all(predictions.T < reference_scores + tol, axis=1))[0]
+                        pareto_idxs = np.where(np.all(predictions.T < reference_scores + t, axis=1))[0]
                     if len(pareto_idxs) != 0:
-                        logger.info(f"Using eps={tol} for enforcing pareto improvements")
+                        logger.info(f"Using eps={t} for enforcing pareto improvements")
                         break
 
                 if len(pareto_idxs) == 0:
@@ -592,8 +590,9 @@ class SimulationProposer(Proposer):
                 free_prior = search_prior[free_indices]
                 free_prior /= np.sum(free_prior)
 
+            predicted_best_performance = sum([pred.predict(best_weights)[0] for pred in predictor])
             logger.info(
-                f"Current best weights is: {best_weights} and search prior is: {search_prior}"
+                f"Current best weights is: {best_weights} with predicted performance {predicted_best_performance}, and search prior is: {search_prior}"
             )
 
         if constrain_objective:

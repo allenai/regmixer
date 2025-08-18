@@ -356,7 +356,7 @@ done'
 
 
 
-
+# coarse, math/code only 
 : 'for R in 1 2 3 4 
 do 
     rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code-and-math.yaml \
@@ -453,7 +453,7 @@ rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/
         --use-reference-model-predicted-scores
 '
 
-
+# weighted objective 
 : 'for R in 1 2 3 4 
 do 
     rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code-and-math.yaml \
@@ -555,8 +555,8 @@ rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/
 '
 
 
-
-: 'for  T in 30 35 65 #40 45 50 55 60 65 70
+# sweep over token budgets 
+for  T in 30 35 40 45 50 55 60
 do 
      rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code-and-math.yaml \
         -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code.yaml \
@@ -581,7 +581,6 @@ do
         --dro-reference-model-id src/regmixer/internal/config/midtraining/code-math-round-5.yaml \
         --use-reference-model-predicted-scores \
         --fixed-search-weight '{"gen-mcqa": 0}' \
-        --temperature 0.2
-        #--use-reference-model-as-search-prior \
-        #--temperature 0.2
-done '
+        --temperature 0.2 \
+        #--use-reference-model-as-search-prior
+done
