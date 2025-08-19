@@ -84,7 +84,7 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
             predefined_mixes = json.load(f)
 
         logger.info(predefined_mixes)
-        if click.confirm("Launch experiment with this set of mixtures?", default=False):
+        if click.confirm(f"Launch experiment {group_uuid} with this set of mixtures?", default=False):
             with yaspin(text="Building experiment group...", color="yellow") as spinner:
                 launch_group = LaunchGroup(
                     instances=mk_launch_configs(
@@ -98,8 +98,8 @@ def launch(config: Path, mixture_file: Optional[Path], dry_run: bool, no_cache: 
                 )
                 spinner.ok("✔")
     else:
-        mixes = mk_mixes(config, use_cache=(no_cache == False))
-        if click.confirm("Launch experiment with this set of mixtures?", default=False):
+        mixes = mk_mixes(config, group_uuid, use_cache=(no_cache == False))
+        if click.confirm(f"Launch experiment {group_uuid} with this set of mixtures?", default=False):
             with yaspin(text="Building experiment group...", color="yellow") as spinner:
                 launch_group = LaunchGroup(
                     instances=mk_launch_configs(

@@ -233,17 +233,17 @@ def prettify_mixes(mixes: list[dict[str, Tuple[float, float]]]):
 
 
 def mk_mixes(
-    config_file: Path, output: Optional[Path] = None, use_cache: bool = True
+    config_file: Path, group_uuid: str, output: Optional[Path] = None, use_cache: bool = True
 ) -> list[dict[str, Tuple[float, float]]]:
     with open(config_file, "r") as f:
         data = yaml.safe_load(f)
 
     config = ExperimentConfig(**data)
-    mixes = mk_mixtures(config, use_cache=use_cache)
+    mixes = mk_mixtures(config, group_uuid, use_cache=use_cache)
     mix_string = prettify_mixes(mixes)
 
     if not output:
-        output = Path(f"/tmp/regmixer/{config.name}_{generate_uuid()[:6]}.json")
+        output = Path(f"/tmp/regmixer/{config.name}_{group_uuid}.json")
 
     if output:
         os.makedirs(os.path.dirname(output), exist_ok=True)

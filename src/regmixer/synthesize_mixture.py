@@ -6,6 +6,9 @@ import random
 from collections import defaultdict
 from typing import Tuple, Optional, Union, List, Any
 from copy import deepcopy
+from pathlib import Path
+import re
+import matplotlib.pyplot as plt 
 
 import numpy as np
 import gcsfs
@@ -187,6 +190,7 @@ def generate_weights_dirichlet(
 ):
     """
     Generate weights for each domain group using a dirichlet distribution.
+    The list of domains is always sorted to be in alphabetical order (i.e. alphabetical on sources, then on topics).
     """
 
     token_scale = available_tokens / max_tokens
@@ -207,7 +211,7 @@ def generate_weights_dirichlet(
         weight_bounds = [
             (0.0, min(prior_dist[idx] * token_scale, 1.0)) for idx in range(len(prior_dist))
         ]
-        raise ValueError("WARNING: need to make sure keys are aligned here and with other places. In cookbook implementation, just removed sorted() everywhere, and seems to be fine?")
+        #raise ValueError("WARNING: need to make sure keys are aligned here and with other places. In cookbook implementation, just removed sorted() everywhere, and seems to be fine?")
         grouped_bounds = {domain: weight_bounds[idx] for idx, domain in enumerate(domains)}
         logger.info("Weight bounds:")
         logger.info(grouped_bounds)
@@ -219,7 +223,7 @@ def generate_weights_dirichlet(
     for source_config in sorted(sources, key=lambda x: x.name):
         if source_config.topics:
             # this source has topics 
-            weights = np.array([leaf_dist[f"{source_config.name}:{topic.name}"] for topic in source_config.topics])
+            weights = np.array([leaf_dist[f"{source_config.name}:{topic.name}"] for topic in sorted(source_config.topics, key=lambda x: x.name)])
             normalized_weights = weights / weights.sum()
             topic_distributions[source_config.name] = normalized_weights 
 
@@ -265,7 +269,7 @@ def generate_weights_dirichlet(
         if source.topics:
             if source.topics[0].weight is not None:
                 # this source has topics with a fixed weight, so we use that weight as the prior
-                conditional_weight = np.array([[topic.weight for topic in source.topics]])
+                conditional_weight = np.array([[topic.weight for topic in sorted(source.topics, key=lambda x: x.name)]])
                 logger.info(f"Using fixed topic weights for source '{source.name}': {conditional_weight[0]}")
                 fixed_topic_weights[source.name] = conditional_weight
 
@@ -436,7 +440,7 @@ def generate_weights_dirichlet(
 
 
 def mk_mixtures(
-    config: ExperimentConfig, use_cache: bool = True
+    config: ExperimentConfig, group_uuid: str, use_cache: bool = True
 ) -> list[dict[str, Tuple[float, float]]]:
     random.seed(config.seed)
     np.random.seed(config.seed)
@@ -512,6 +516,26 @@ def mk_mixtures(
             logger.info(f"Topic {domains[i]}, min: {weights.min()}, max: {weights.max()}")
 
 
+            out_dir = Path("cache") / "swarms" / str(group_uuid)
+            out_dir.mkdir(parents=True, exist_ok=True)
+
+            # Sanitize source to be filesystem-friendly
+            safe_topic = re.sub(r'[^A-Za-z0-9_.-]+', '_', str(domains[i]))
+            out_path = out_dir / f"{safe_topic}_weights_hist.png"
+
+            # Plot histogram
+            plt.figure(figsize=(8, 5))
+            plt.hist(weights[~np.isnan(weights)], bins=10)
+            plt.title(f"{safe_topic}")
+            plt.xlabel("Weight")
+            plt.ylabel("Frequency")
+            plt.tight_layout()
+
+            # Save & close
+            plt.savefig(out_path, dpi=200)
+            plt.close()
+
+
     source_to_indices = defaultdict(list)
     for i, domain in enumerate(domains):
         source = domain.split(':', 1)[0] 
@@ -525,6 +549,24 @@ def mk_mixtures(
         source_weights = np.array(source_weights)
         logger.info(f"Source {source}, min: {source_weights.min()}, max: {source_weights.max()}")
 
+        out_dir = Path("cache") / "swarms" / str(group_uuid)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # Sanitize source to be filesystem-friendly
+        safe_source = re.sub(r'[^A-Za-z0-9_.-]+', '_', str(source))
+        out_path = out_dir / f"{safe_source}_source_weights_hist.png"
+
+        # Plot histogram
+        plt.figure(figsize=(8, 5))
+        plt.hist(source_weights[~np.isnan(source_weights)], bins=10)
+        plt.title(f"{source}")
+        plt.xlabel("Weight")
+        plt.ylabel("Frequency")
+        plt.tight_layout()
+
+        # Save & close
+        plt.savefig(out_path, dpi=200)
+        plt.close()
 
     return weight_maps
 
