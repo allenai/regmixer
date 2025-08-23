@@ -18,6 +18,7 @@ from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.io import get_file_size, is_url, normalize_path
 from olmo_core.utils import OLMoEnvironmentError
 from tqdm import tqdm
+import pandas as pd
 
 from urllib.parse import urlparse
 
@@ -186,7 +187,8 @@ def generate_weights_dirichlet(
     sample_multiplier: Optional[int],
     enable_bound: bool = True,
     nonzero_weight: Optional[list[str]] = None,
-    fixed_source_weights: Optional[dict[str, float]] = None
+    fixed_source_weights: Optional[dict[str, float]] = None,
+    existing_mix_file: Optional[str] = None
 ):
     """
     Generate weights for each domain group using a dirichlet distribution.
@@ -278,6 +280,10 @@ def generate_weights_dirichlet(
     if fixed_source_weights is not None:
         fixed_source_weights = [fixed_source_weights[source_config.name] for source_config in sorted(sources, key=lambda x: x.name)]
 
+
+    if existing_mix_file is not None:
+        ratios = pd.read_pickle(existing_mix_file)
+        valid_existing_mixes = ratios[ratios[domains].sum(axis=1) == 1][domains].values # keep the rows that have probabilities that add up to 1 on the domains we're mixing on
     for _ in tqdm(range(num_samples_out * sample_multiplier)):
         candidates = []
 
@@ -383,6 +389,13 @@ def generate_weights_dirichlet(
             candidates[0],
             np.ones(candidates.shape[1]),
         )
+
+        # if selected is too close to an existing mix from existing_mix_file, discard it 
+        if existing_mix_file is not None:
+            dists = np.linalg.norm(valid_existing_mixes - candidates[0], axis=1)
+            if np.any(dists < 0.01):
+                logger.info(f"Candidate swarm run is too close to the mixes at {existing_mix_file}, rejecting.")
+                continue 
 
         reject = False
         if allow_repetition:
@@ -499,7 +512,8 @@ def mk_mixtures(
         nonzero_weight=config.nonzero_weight,
         fixed_source_weights=config.fixed_source_weights,
         manual_prior=config.manual_prior,
-        sample_multiplier=config.sample_multiplier
+        sample_multiplier=config.sample_multiplier,
+        existing_mix_file=config.existing_mix_file
     )
 
     weight_maps = []

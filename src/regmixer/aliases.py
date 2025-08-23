@@ -84,6 +84,7 @@ class ExperimentConfig(BaseModel):
     manual_prior: Optional[dict[str, float]] = None
     sample_multiplier: Optional[int] = None
     wandb_debug: bool = False
+    existing_mix_file: Optional[str] = None 
     # TODO(undfined): Add field validation for weka/cluster/train_type here
 
 
