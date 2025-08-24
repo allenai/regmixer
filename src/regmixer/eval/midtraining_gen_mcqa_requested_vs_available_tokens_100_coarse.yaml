@@ -1,11 +1,11 @@
 requested_tokens: 100_000_000_000 # 10B
 leaf_level_constraints: true
 available_tokens:  
-  flan: 17055708123
-  instruction-new-format: 1639399859
-  nemotron-synth-qa: 486558362887
+  flan: 17_055_708_123
+  instruction-new-format: 1_639_399_859
+  nemotron-synth-qa: 486_558_362_887
   rcqa: 4_215_210_848
-  reddit-high: 9860465314
-  reddit-low: 11789114475
+  reddit-high: 9_860_465_314
+  reddit-low: 11_789_114_475
   sponge: 5_211_943_964
-  hqweb-pdf: 1556170498845
+  hqweb-pdf: 1_556_170_498_845

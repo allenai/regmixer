@@ -160,5 +160,73 @@ done '
 # rmc-eval fit -c src/regmixer/config/olmo2-5xC-30m-dense.yaml -g 6cf425be -G all_bpb -a 1 -S 100_000 -s 1 --opt-avg-metric --seed 0 --regression-type log_linear --obj-weights aggregated_minerva_codex --temperature 0.1
 
 
-rmc-eval fit -c src/regmixer/config/olmo2-5xC-30m-dense.yaml -g 6cf425be -G all_bpb_with_offline -a 1 -S 100_000 -s 1 --opt-avg-metric --seed 0 --regression-type log_linear --obj-weights correlation_weighting_dense
-rmc-eval fit -c src/regmixer/config/olmo2-5xC-30m-dense.yaml -g 6cf425be -G all_bpb_with_offline -a 1 -S 100_000 -s 1 --opt-avg-metric --seed 0 --regression-type log_linear --obj-weights correlation_weighting
+#rmc-eval fit -c src/regmixer/config/olmo2-5xC-30m-dense.yaml -g 6cf425be -G all_bpb_with_offline -a 1 -S 100_000 -s 1 --opt-avg-metric --seed 0 --regression-type log_linear --obj-weights correlation_weighting_dense
+#rmc-eval fit -c src/regmixer/config/olmo2-5xC-30m-dense.yaml -g 6cf425be -G all_bpb_with_offline -a 1 -S 100_000 -s 1 --opt-avg-metric --seed 0 --regression-type log_linear --obj-weights correlation_weighting
+
+
+: 'rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+    -g 62e7dc06 \
+    -G all_bpb \
+    -a 1 \
+    -S 100_000 \
+    -s 1 \
+    --opt-avg-metric \
+    --seed 0 \
+    --regression-type log_linear \
+    --fit-only'
+
+
+
+
+
+: 'rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+    -c src/regmixer/config/for_paper/backfill-5xC-30m-dclm-top-18-domains.yaml \
+    -g 62e7dc06 \
+    -g ee3bf7f7 \
+    -G all_bpb \
+    -a 1 \
+    -S 100_000 \
+    -s 1 \
+    --opt-avg-metric \
+    --seed 0 \
+    --regression-type log_linear \
+    --fit-only'
+
+
+
+: 'rmc-eval fit -c src/regmixer/config/for_paper/backfill-5xC-30m-dclm-top-18-domains.yaml \
+    -g ee3bf7f7 \
+    -G all_bpb \
+    -a 1 \
+    -S 100_000 \
+    -s 1 \
+    --opt-avg-metric \
+    --seed 0 \
+    --regression-type log_linear \
+    --fit-only'
+
+
+: 'rmc-eval fit -c src/regmixer/config/for_paper/backfill-5xC-30m-dclm-top-12-domains.yaml \
+    -g 50f03954 \
+    -G all_bpb \
+    -a 1 \
+    -S 100_000 \
+    -s 1 \
+    --opt-avg-metric \
+    --seed 0 \
+    --regression-type log_linear \
+    --fit-only'
+
+
+rmc-eval fit -c src/regmixer/config/for_paper/backfill-5xC-30m-dclm-top-6-domains.yaml \
+    -g 028dcd8d \
+    -G all_bpb \
+    -a 1 \
+    -S 100_000 \
+    -s 1 \
+    --opt-avg-metric \
+    --seed 0 \
+    --regression-type log_linear \
+    --fit-only
+
+    

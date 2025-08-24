@@ -1396,6 +1396,12 @@ class GroupedWandbMetrics(Enum):
        'olmo3:dev:7b:math:v2', 
     ]
 
+    midtraining_code_math_aggregate_evals_v2_for_reasoning_v2 = [
+       'olmo3:dev:7b:code_gen:v2',
+       #'olmo3:dev:7b:code_gen_mini:v2:n32:pass_at_16',
+       'olmo3:dev:7b:math:v2', 
+    ]
+
     midtraining_math_aggregate_evals_v2 = [
        'olmo3:dev:7b:math:v2', 
     ]
@@ -1604,6 +1610,13 @@ class GroupedWandbMetrics(Enum):
         'multipl-e-humaneval:n32:v2:pass_at_16',
         'multipl-e-mbpp:n32:v2:pass_at_16',
     ]
+
+    a3d4f82c_code_math_aggregate_evals_v2 = [
+       'olmo3:dev:7b:code_fim',
+       'olmo3:dev:7b:code_gen_mini:v2:n32:pass_at_16',
+       'olmo3:dev:7b:math:v2', 
+    ]
+
     
 
 # arc_easy, arc_challenge, hellaswag, MMLU macro average,

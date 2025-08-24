@@ -262,3 +262,48 @@ done
         --use-reference-model-predicted-scores \
         --temperature 0.2 \
         --custom-name 50B-finegrained-repetition-constraints-gen-mc-tasks'
+
+
+
+rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/gen-mcqa.yaml \
+        -g a09b2bf1 \
+        -G midtraining_aggregate_evals_v2 \
+        -a 1 \
+        -S 100_000 \
+        -s 1 \
+        --opt-avg-metric \
+        --seed 0 \
+        --regression-type linear \
+        --workspace ai2-llm/olmo-cookbook \
+        --pull-from-dashboard \
+        --dashboard olmo3-midtraining-mixing \
+        --metric-type primary_score \
+        --use-cookbook \
+        --temperature 0.2 \
+        --custom-name fit_all \
+        --fit-only
+
+
+: 'for R in 1 2 3 4 
+do
+rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/gen-mcqa.yaml \
+        -g a09b2bf1 \
+        -G a09b2bf1_non_code_math_finegrained_evals_v2 \
+        -a 1 \
+        -S 100_000 \
+        -s 1 \
+        --opt-avg-metric \
+        --seed 0 \
+        --regression-type linear \
+        --workspace ai2-llm/olmo-cookbook \
+        --pull-from-dashboard \
+        --dashboard olmo3-midtraining-mixing \
+        --metric-type primary_score \
+        --use-cookbook \
+        --constrain-objective \
+        --manual-token-constraint-path src/regmixer/eval/midtraining_gen_mcqa_requested_vs_available_tokens_50.yaml \
+        --repetition-factor $R \
+        --dro-reference-model-id src/regmixer/internal/config/midtraining/gen-mcqa-round-5-dummy.yaml \
+        --use-reference-model-predicted-scores \
+        --temperature 0.2
+done '

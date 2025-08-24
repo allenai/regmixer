@@ -26,6 +26,9 @@ import pydantic_core
 import statsmodels.api as sm
 from matplotlib.colors import TwoSlopeNorm
 
+from scipy.stats import norm  # for probit transform
+from matplotlib.cm import ScalarMappable
+
 
 import subprocess
 from io import StringIO
@@ -379,6 +382,10 @@ class SimulationProposer(Proposer):
                 with open(manual_token_constraint_path, "r") as f:
                     data = yaml.safe_load(f)
                 desired_tokens = data["requested_tokens"]
+                group_ids = data.get("group_ids", None)
+
+
+                
 
                 leaf_level_constraints = data["leaf_level_constraints"]
                 granular_constraints = data.get("granular_constraints", False)
@@ -388,12 +395,23 @@ class SimulationProposer(Proposer):
                         source: data["available_tokens"][source]
                         for source, _ in prior_distributions.items()
                     }
+
+                    if group_ids is not None:
+                        group_ids = {source: group_ids[source] for source in prior_distributions} # order the group ids dict
+                        groups = np.array(list(group_ids.values()))
+                        desired_tokens = np.array([desired_tokens[idx] for idx in groups])
+
                 elif leaf_level_constraints and granular_constraints:
                     # if the manual constraints are at a finer granularity, we need to aggregate them
                     available_tokens_per_source = {
                         source: data["available_tokens"][source]
                         for source, _ in original_prior.items()
                     }
+
+                    if group_ids is not None:
+                        group_ids = {source: group_ids[source] for source in original_prior} # order the group ids dict
+                        groups = np.array(list(group_ids.values()))
+                        desired_tokens_per_source = np.array([desired_tokens[idx] for idx in groups])
                 else:
                     # otherwise, our constraints are at the source level while prior_distribution is at the leaf level
                     available_tokens_per_source = data["available_tokens"]
@@ -412,13 +430,7 @@ class SimulationProposer(Proposer):
             )
 
             # generate simulations by sampling from dirichlet distribution with parameter prior * alpha
-            if fixed_search_weight is None:
-                simulations = (
-                    torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
-                    .sample()
-                    .numpy()
-                )
-            else:
+            if fixed_search_weight is not None:
                 free_indices_simulations = (
                     torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * free_prior))
                     .sample()
@@ -429,10 +441,33 @@ class SimulationProposer(Proposer):
                 idx  = np.array(list(fixed_indices.keys()))
                 vals = np.array(list(fixed_indices.values()))
                 simulations[:, idx] = vals  # broadcasts across rows
+            elif constrain_objective and isinstance(desired_tokens, list):
+                total = sum(desired_tokens)
+                simulations = np.zeros((num_samples, len(search_prior)))
 
+                if granular_constraints:
+                    coarse_groups = np.array([group_ids[k] if k in group_ids else np.unique([stuff for g, stuff in group_ids.items() if g.startswith(k)])[0]  for k, v in prior_distributions.items()])
+                else:
+                    coarse_groups = groups
+                for g in np.unique(coarse_groups):
+                    cols = np.where(coarse_groups==g)[0]
 
-                
+                    # deterministic mass for the whole group
+                    w_g = desired_tokens[g] / total                    # scalar
 
+                    # fold desired & prior to shape within-group
+                    base_norm = search_prior[cols] / search_prior[cols].sum()                        # simplex over group
+                    conc = alphas[:, None] * base_norm[None, :]          # (n_samples, |cols|)
+
+                    # sample a simplex for the group, then scale the whole group by w_g
+                    samp = torch.distributions.Dirichlet(torch.from_numpy(conc)).sample().numpy()  # (n_samples, |cols|)
+                    simulations[:, cols] = samp * w_g
+            else:
+                simulations = (
+                    torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
+                    .sample()
+                    .numpy()
+                )
 
             # Filter out invalid simulations from the population
             if False: #temperature is None:
@@ -458,7 +493,24 @@ class SimulationProposer(Proposer):
                 if leaf_level_constraints and not granular_constraints:
                     # we can just directly do elementwise comparisons
                     # Check which simulations will be filtered out
-                    token_usage = simulations * desired_tokens
+
+                    if isinstance(desired_tokens, list):
+                        #group_ids = {source: group_ids[source] for source in prior_distributions} # order the group ids dict
+                        #groups = np.array(list(group_ids.values()))
+                        #desired_tokens = np.array([desired_tokens[idx] for idx in groups])
+
+                        group_normalized_simulations = np.zeros_like(simulations)
+                        for g in np.unique(groups):
+                            cols = np.where(groups == g)[0]
+                            block = simulations[:, cols]                               # (n_samples, n_cols_in_group)
+                            denom = block.sum(axis=1, keepdims=True)         # row sums within group
+                            # Safe division: leave rows with denom==0 as zeros
+                            np.divide(block, denom, out=block, where=(denom != 0))
+                            group_normalized_simulations[:, cols] = block
+
+                        token_usage = group_normalized_simulations * desired_tokens_per_source 
+                    else:
+                        token_usage = simulations * desired_tokens
 
                     token_limits = (
                         np.array(list(available_tokens_per_source.values())) * repetition_factor
@@ -492,7 +544,24 @@ class SimulationProposer(Proposer):
                         indices, weights = per_source_weights[source]
                         expanded_simulations[:, indices] = simulations[:, [j]] * weights
 
-                    token_usage = expanded_simulations * desired_tokens
+                    if isinstance(desired_tokens, list):
+                        #group_ids = {source: group_ids[source] for source in original_prior} # order the group ids dict
+                        #groups = np.array(list(group_ids.values()))
+                        #desired_tokens = np.array([desired_tokens[idx] for idx in groups])
+
+                        group_normalized_simulations = np.zeros_like(expanded_simulations)
+                        for g in np.unique(groups):
+                            cols = np.where(groups == g)[0]
+                            block = expanded_simulations[:, cols]                               # (n_samples, n_cols_in_group)
+                            denom = block.sum(axis=1, keepdims=True)         # row sums within group
+                            # Safe division: leave rows with denom==0 as zeros
+                            np.divide(block, denom, out=block, where=(denom != 0))
+                            group_normalized_simulations[:, cols] = block
+
+                        token_usage = group_normalized_simulations * desired_tokens_per_source 
+                    else:
+                        token_usage = expanded_simulations * desired_tokens
+
                     token_limits =  (
                         np.array(list(available_tokens_per_source.values())) * repetition_factor
                     )
@@ -507,6 +576,7 @@ class SimulationProposer(Proposer):
 
                     simulations = simulations[valid_mask]
                 else:
+                    raise NotImplementedError("Code is out of date.")
                     # the constraints are at the source level, so we need to aggregate the simulation vectors by source
                     # we map from source to their indices in the probability vector
                     source_to_indices = defaultdict(list)
@@ -604,11 +674,32 @@ class SimulationProposer(Proposer):
                 ):
                     raise ValueError(f"Best weights are out of bounds!")
             elif leaf_level_constraints and granular_constraints:
-                pass
+                expanded_best_weights = np.zeros(len(constrained_domains))
+                for j, source in enumerate(prior_distributions):
+                    indices, weights = per_source_weights[source]
+                    expanded_best_weights[indices] = best_weights[j] * weights
+
+                if False:#isinstance(desired_tokens, list):
+                    #group_ids = {source: group_ids[source] for source in original_prior} # order the group ids dict
+                    #groups = np.array(list(group_ids.values()))
+                    #desired_tokens = np.array([desired_tokens[idx] for idx in groups])
+
+                    group_normalized_best_weights = np.zeros_like(expanded_best_weights)
+                    for g in np.unique(groups):
+                        cols = np.where(groups == g)[0]
+                        block = expanded_best_weights[:, cols]                               # (n_samples, n_cols_in_group)
+                        denom = block.sum(axis=1, keepdims=True)         # row sums within group
+                        # Safe division: leave rows with denom==0 as zeros
+                        np.divide(block, denom, out=block, where=(denom != 0))
+                        group_normalized_best_weights[:, cols] = block
+
+                    token_usage = group_normalized_best_weights * desired_tokens_per_source
+                    assert all(token_usage <= np.array(list(available_tokens_per_source.values())) * repetition_factor)
+
             else:
                 if not passes_constraints(best_weights):
                     raise ValueError(f"Best weights are out of bounds!")
-
+                
         # if best_weights was collapsed (because of conditioning on a topic-level p* mix), we need to expand it to the full prior distribution
 
         return best_weights
@@ -979,10 +1070,29 @@ def plot_interaction_matrix(
             #std = ratios[ratios.columns[3:]].std(ddof=0).values  # std for selected columns only
             interaction_matrix[i] = predictor.model.params #* std
 
+    domain_reordering = None 
+    if "a3d4f82c" in output_dir:
+        # hardcode the nice block structure for the superswarm
+        new_order = ['code_fim', 'dolminomath', 'megamatt', 'openmathreasoning-fullthoughts-rewrite', 'swallowcode', 'swallowmath', 'tinymath-mind', 'tinymath-pot',  'flan', 'instruction-new-format',  'nemotron-synth-qa', 'rcqa', 'reddit-high', 'sponge', 'hqweb-pdf']
+        domain_reordering = [domain_names.index(d) for d in new_order]
+        domain_names = new_order
+        interaction_matrix = interaction_matrix[:, domain_reordering]
+
+
+
 
     sorted_metric_indices = np.argsort(metric_names)
     metric_names = [metric_names[i] for i in sorted_metric_indices]
     interaction_matrix = interaction_matrix[sorted_metric_indices, :]
+
+    if "olmo3:dev:7b:gen" in metric_names and "olmo3:dev:7b:math:v2" in metric_names:
+        if metric_names.index("olmo3:dev:7b:gen") < metric_names.index("olmo3:dev:7b:math:v2"):
+            # Swap the two if they are in the wrong order
+            idx_gen = metric_names.index("olmo3:dev:7b:gen")
+            idx_math = metric_names.index("olmo3:dev:7b:math:v2")
+            metric_names[idx_gen], metric_names[idx_math] = metric_names[idx_math], metric_names[idx_gen]
+            interaction_matrix[[idx_gen, idx_math]] = interaction_matrix[[idx_math, idx_gen]]
+
 
     plt.figure(figsize=(20, 16))
     plt.imshow(interaction_matrix, cmap="rainbow", aspect="auto")
@@ -1015,7 +1125,7 @@ def plot_interaction_matrix(
                 j, i, text_str,
                 ha='center', va='center',
                 color='black' if abs(val) < 0.5 * np.max(np.abs(interaction_matrix)) else 'white',
-                fontsize=10
+                fontsize=8
             )
 
     plt.tight_layout()
@@ -1050,68 +1160,106 @@ def plot_interaction_matrix_signed_evidence(
     metric_names: List[str],
     ratios: pd.DataFrame,
     metric_type: Optional[str] = None,
-    use_fdr: bool = True,
-    p_cap: float = 10.0,
-    sig_threshold: float = 0.05
+    use_fdr: bool = False,
+    p_cap: float = 10.0,          # kept for API compatibility; unused in p-coloring
+    sig_threshold: float = 0.05,
+    gamma: float = 1.5            # >1 makes the color mapping less drastic
 ):
+    # Normalize metric labels
     metric_names = [m.split("/")[-1].split(" ")[0] for m in metric_names]
 
+    # Optional hardcoded domain block structure + build a column permutation
+    domain_reordering = None
+    if "a3d4f82c" in output_dir:
+        new_order = [
+            'code_fim', 'dolminomath', 'megamatt',
+            'openmathreasoning-fullthoughts-rewrite',
+            'swallowcode', 'swallowmath',
+            'tinymath-mind', 'tinymath-pot',
+            'flan', 'instruction-new-format',
+            'nemotron-synth-qa', 'rcqa',
+            'reddit-high', 'sponge', 'hqweb-pdf'
+        ]
+        domain_reordering = [domain_names.index(d) for d in new_order]
+        domain_names = new_order
+
+    # Collect coefficients (B) and p-values (P)
     B = np.zeros((len(metric_names), len(domain_names)))
     P = np.full_like(B, np.nan, dtype=float)
 
     for i, pred in enumerate(predictors):
         if regression_type == "linear":
+            # Assumes pred.model.params and pred.model.pvalues are aligned to current domain_names order
             B[i] = pred.model.params
             P[i] = pred.model.pvalues
         elif regression_type == "lightgbm":
+            # Feature importances only; no p-values
             B[i] = getattr(pred.model, "feature_importances_", np.zeros(len(domain_names)))
         elif regression_type == "log_linear":
+            # e.g., first element intercept, then one per domain
             B[i] = pred.model[1:]
 
+    # Row (metric) sorting
     order = np.argsort(metric_names)
     metric_names = [metric_names[k] for k in order]
     B = B[order]
     P = P[order]
 
-    if regression_type == "linear" and np.isfinite(P).any():
-        Q = bh_adjust(P) if use_fdr else P
-        Z = -np.log10(np.clip(Q, 1e-300, 1.0))
-        Z = np.minimum(Z, p_cap)
+    if "olmo3:dev:7b:gen" in metric_names and "olmo3:dev:7b:math:v2" in metric_names:
+        if metric_names.index("olmo3:dev:7b:gen") < metric_names.index("olmo3:dev:7b:math:v2"):
+            # Swap the two if they are in the wrong order
+            idx_gen = metric_names.index("olmo3:dev:7b:gen")
+            idx_math = metric_names.index("olmo3:dev:7b:math:v2")
+            metric_names[idx_gen], metric_names[idx_math] = metric_names[idx_math], metric_names[idx_gen]
+            B[[idx_gen, idx_math]] = B[[idx_math, idx_gen]]
+            P[[idx_gen, idx_math]] = P[[idx_math, idx_gen]]
 
-        signed_score = np.sign(B) * Z
+    # Column (domain) reordering to match hardcoded order, if requested
+    if domain_reordering is not None:
+        B = B[:, domain_reordering]
+        P = P[:, domain_reordering]
+
+    # Plotting
+    if regression_type == "linear" and np.isfinite(P).any():
+        # Optionally compute FDR q-values for dimming only
+        Q = bh_adjust(P) if use_fdr else P
+
+        # ---- COLOR BY p, gently (bounded), while TEXT shows raw p ----
+        # Map p in [0,1] to a gentle strength via (1 - p)^(1/gamma), then apply sign(β)
+        P_safe = np.clip(P, 0.0, 1.0)
+        p_strength = (1.0 - P_safe) ** (1.0 / max(gamma, 1e-6))
+        signed_score = np.sign(B) * p_strength  # in [-1, 1]
+        v = 1.0
 
         plt.figure(figsize=(20, 16))
         im = plt.imshow(
             signed_score,
             cmap="coolwarm",
-            norm=TwoSlopeNorm(vmin=-p_cap, vcenter=0.0, vmax=p_cap),
-            aspect="auto"
+            norm=TwoSlopeNorm(vmin=-v, vcenter=0.0, vmax=v),
+            aspect="auto",
         )
 
-        # Dim nonsignificant cells
-        mask = Q > sig_threshold
+        # Dim non-significant cells (gray overlay)
+        mask = (Q if use_fdr else P_safe) > sig_threshold
         overlay = np.zeros((*signed_score.shape, 4))
         overlay[mask] = [0.7, 0.7, 0.7, 0.6]
         plt.imshow(overlay, aspect="auto")
 
-        # Annotate with β and p/q
+        # Annotate with β and RAW p (as requested)
         for i in range(len(metric_names)):
             for j in range(len(domain_names)):
-                if use_fdr:
-                    p_str = f"q={Q[i, j]:.2g}"
-                else:
-                    p_str = f"p={P[i, j]:.2g}"
-                text_str = f"β={B[i, j]:.2f}\n{p_str}"
-                text_color = "black" if abs(signed_score[i, j]) < 0.5 * p_cap else "white"
+                text_str = f"β={B[i, j]:.2f}\np={P[i, j]:.2g}"
+                text_color = "black" if abs(signed_score[i, j]) < 0.5 * v else "white"
                 plt.text(j, i, text_str, ha="center", va="center",
                          fontsize=8, color=text_color)
 
         cbar = plt.colorbar(im)
-        cbar.set_label(f"sign(β) × min{{-log10({'q' if use_fdr else 'p'}), cap}}")
+        cbar.set_label(r"sign(β) × (1 − p)$^{1/\gamma}$")
         better = "higher is better" if metric_type == "primary_score" else "lower is better"
-        plt.title(f"Signed evidence heatmap (direction + significance)\n({better})")
+        plt.title(f"Signed evidence heatmap (color ∝ p, gentler gradient; text shows raw p)\n({better})")
 
     else:
+        # No p-values available: show β heatmap only
         plt.figure(figsize=(20, 16))
         im = plt.imshow(B, cmap="coolwarm", aspect="auto")
         for i in range(len(metric_names)):
@@ -1126,6 +1274,7 @@ def plot_interaction_matrix_signed_evidence(
     plt.tight_layout()
     plt.savefig(f"{output_dir}/interaction_matrix_signed_evidence.png", bbox_inches="tight")
     plt.close()
+
 
 
 def mk_run_metrics(
@@ -1346,7 +1495,7 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
             elif ":" not in domain:
                 # 2) prior requests a source (i.e. when we condition on a topic-level p* mix) but wandb mixes are specified at the leaf level
                 cfg = {
-                    k: v.get("target_ratio", 0.0) for k, v in source_configs.items() if domain in k
+                    k: v.get("target_ratio", 0.0) for k, v in source_configs.items() if f"{domain}:" in k
                 }
                 weights[domain] = sum(cfg.values()) if cfg else 0.0
             else:

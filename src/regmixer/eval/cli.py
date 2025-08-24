@@ -670,6 +670,7 @@ def fit(
         numerical_cols = metrics.columns[3:]
         metrics[numerical_cols] = metrics[numerical_cols].apply(pd.to_numeric, errors='coerce')
         ratios = ratios[ratios['run'].isin(metrics.run)]
+        assert np.isclose(ratios[ratios.columns[3:]].sum(axis=1).sum(), len(ratios)), "Ratios do not add up to 1!"
 
         if fixed_weight is not None:
             # normalize the non-fixed-weight domains to add to 1 
@@ -1015,7 +1016,10 @@ def fit(
             json.dump(float(predicted_performance), f)
 
         if dro_reference_model_id is not None and use_reference_model_predicted_scores:
-            diff = reference_scores - predictions 
+            if metric_type == "primary_score":
+                diff = predictions - reference_scores 
+            else:
+                diff = reference_scores - predictions 
             colors = ['green' if val > 0 else 'red' for val in diff]
             x = np.arange(len(diff))
 

@@ -556,7 +556,7 @@ rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/
 
 
 # sweep over token budgets 
-for  T in 30 35 40 45 50 55 60
+: 'for  T in 30 35 40 45 50 55 60
 do 
      rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code-and-math.yaml \
         -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code.yaml \
@@ -583,4 +583,56 @@ do
         --fixed-search-weight '{"gen-mcqa": 0}' \
         --temperature 0.2 \
         #--use-reference-model-as-search-prior
-done
+done'
+
+
+rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code-and-math.yaml \
+        -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code.yaml \
+        -g a3e06472 \
+        -g 515eaf2d \
+        -G midtraining_aggregate_evals_v2 \
+        -a 1 \
+        -S 100_000 \
+        -s 1 \
+        --opt-avg-metric \
+        --seed 0 \
+        --regression-type linear \
+        --workspace ai2-llm/olmo-cookbook \
+        --pull-from-dashboard \
+        --dashboard olmo3-midtraining-mixing \
+        --metric-type primary_score \
+        --use-cookbook \
+        --custom-name drop_outliers \
+        --temperature 0.2 \
+        --fit-only
+
+
+: 'for R in 1 2 3 4 
+do 
+    rmc-eval fit -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code-and-math.yaml \
+        -c /weka/oe-data-default/mayeec/olmo-cookbook/src/cookbook/recipes/olmo3-midtraining/mayeec_swarms/round_2/code.yaml \
+        -g a3e06472 \
+        -g 515eaf2d \
+        -G a3e06472_515eaf2d_code_math_finegrained_evals_v2 \
+        -a 1 \
+        -S 100_000 \
+        -s 1 \
+        --opt-avg-metric \
+        --seed 0 \
+        --regression-type linear \
+        --workspace ai2-llm/olmo-cookbook \
+        --temperature 0.2 \
+        --pull-from-dashboard \
+        --dashboard olmo3-midtraining-mixing \
+        --metric-type primary_score \
+        --use-cookbook \
+        --custom-name drop_outliers \
+        --constrain-objective \
+        --manual-token-constraint-path src/regmixer/eval/midtraining_code_math_requested_vs_available_tokens_50.yaml \
+        --repetition-factor $R \
+        --dro-reference-model-id src/regmixer/internal/config/midtraining/code-math-round-5.yaml \
+        --use-reference-model-predicted-scores \
+        --use-reference-model-as-search-prior \
+        --fixed-search-weight '{"gen-mcqa": 0}' \
+
+done'

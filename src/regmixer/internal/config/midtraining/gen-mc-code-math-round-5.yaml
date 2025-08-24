@@ -1,0 +1,61 @@
+sources:
+- domain: code_fim
+  paths:
+  - placeholder
+  weight: 0.1
+- domain: dolminomath
+  paths:
+  - placeholder
+  weight: 0.10687631
+- domain: flan
+  paths:
+  - placeholder
+  weight: 0.05
+- domain: instruction-new-format
+  paths:
+  - placeholder
+  weight: 0.011
+- domain: megamatt
+  paths:
+  - placeholder
+  weight: 0.01698
+- domain: nemotron-synth-qa
+  paths:
+  - placeholder
+  weight: 0.05
+- domain: openmathreasoning-fullthoughts-rewrite
+  paths:
+  - placeholder
+  weight: 0.00850821
+- domain: rcqa
+  paths:
+  - placeholder
+  weight: 0.03
+- domain: reddit-high
+  paths:
+  - placeholder
+  weight: 0.0186161147356339187
+- domain: sponge
+  paths:
+  - placeholder
+  weight: 0.05
+- domain: swallowcode
+  paths:
+  - placeholder
+  weight: 0.1
+- domain: swallowmath
+  paths:
+  - placeholder
+  weight: 0.05624262
+- domain: tinymath-mind
+  paths:
+  - placeholder
+  weight: 0.00898704
+- domain: tinymath-pot
+  paths:
+  - placeholder
+  weight: 0.00240582
+- domain: hqweb-pdf
+  paths:
+  - placeholder
+  weight: 0.275

@@ -1,0 +1,37 @@
+sources:
+- domain: code-meta-reasoning
+  paths:
+  - placeholder
+  weight: 0.0033333333333333335
+- domain: gemini_reasoning
+  paths:
+  - placeholder
+  weight: 0.0025
+- domain: llamanemotron_reasoning
+  paths:
+  - placeholder
+  weight: 0.0125
+- domain: math-meta-reasoning
+  paths:
+  - placeholder
+  weight: 0.0033333333333333335
+- domain: openthoughts2
+  paths:
+  - placeholder
+  weight: 0.0125
+- domain: qwq_reasoning
+  paths:
+  - placeholder
+  weight: 0.01875
+- domain: r1_reasoning
+  paths:
+  - placeholder
+  weight: 0.01875
+- domain: verifiable
+  paths:
+  - placeholder
+  weight: 0.0033333333333333335
+- domain: gen_mc_code_math
+  paths:
+  - placeholder
+  weight: 0.925
