@@ -339,6 +339,13 @@ def cli():
     type=str,
     default=None
 )
+@click.option(
+    '--pareto-eps',
+    type=float,
+    help="epsilon tolerance for pareto constraint",
+    required=False,
+    default=None
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -376,7 +383,8 @@ def fit(
     use_cookbook: bool = False,
     fit_only: bool = False,
     custom_name: Optional[str] = None,
-    interactions: Optional[list[str]] = None
+    interactions: Optional[list[str]] = None,
+    pareto_eps: Optional[float] = None
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -391,7 +399,6 @@ def fit(
     if use_cookbook:
         workspace = "ai2-llm/olmo-cookbook"
         assert pull_from_dashboard, "If using olmo-cookbook, pull_from_dashboard must be set to True"
-        assert metric_type=="primary_score", "If using olmo-cookbook, metric_type must be set to primary_score"
 
     eval_config = {
         "config": config[0] if len(config) == 1 else config,
@@ -444,7 +451,10 @@ def fit(
         eval_config["dashboard"] = dashboard
     if metric_type is not None:
         eval_config["metric_type"] = metric_type
-
+    if interactions is not None:
+        eval_config["interactions"] = interactions
+    if pareto_eps is not None:
+        eval_config["pareto_eps"] = pareto_eps
 
     # used for caching regression model
     regression_config = {
@@ -462,12 +472,12 @@ def fit(
     if select_top_k_runs < 1.0:
         eval_config["select_top_k_runs"] = select_top_k_runs
         regression_config["select_top_k_runs"] = select_top_k_runs
-
     if fixed_weight is not None:
         regression_config["fixed_weight"] = fixed_weight
-
     if metric_type is not None:
         regression_config["metric_type"] = metric_type
+    if interactions is not None:
+        regression_config["interactions"] = interactions
 
 
     output_dir = save_eval_config(eval_config, output_dir, custom_name)
@@ -677,6 +687,10 @@ def fit(
         ratios = ratios.drop(index=27)
         metrics = metrics.drop(index=27)
 
+    if experiment_groups[0] == "a09b2bf1":
+        # hardcoded logic: drop outlier for reasoning swarm 
+        ratios = ratios.drop(index=[30, 49, 47])
+        metrics = metrics.drop(index=[30, 49, 47])
 
     if select_top_k_runs < 1.0:
         metrics['all_bpb'] = metrics[metrics.columns[3:]].mean(axis=1)
@@ -696,6 +710,7 @@ def fit(
     cols_with_nans = metrics[cols_to_check].columns[metrics[cols_to_check].isna().any()].tolist()
     if len(cols_with_nans) > 0:
         logger.warning(f"Found NaNs in the following columns, dropping them! {cols_with_nans}")
+        breakpoint()
         metrics = metrics.drop(columns=cols_with_nans)
         metrics_to_index = [m for m in metrics_to_index if m not in cols_with_nans]
 
@@ -765,7 +780,7 @@ def fit(
     else:
         logger.info(f"Will save regression model to {regression_model_cache_path}")
         for idx, metric in indexed_metrics:
-            predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping, B_mask if regression_type == "log_nonlinear" else None))
+            predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping, interactions))
             # save intermediate progress after each regression model
             if regression_type == "log_linear":
                 parameters = {indexed_metrics[i][-1]: predictors[i].model for i in range(len(predictors))}
@@ -783,45 +798,74 @@ def fit(
             with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
                 f.write(str(regression_model_cache_path))
 
-    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type)
+    if experiment_groups[0] == "95d5a161":
+        # hardcoded logic: drop "drop", "socialiqa", "csqa" eval for all-dressed swarm
+        drop_idx = np.where(metrics.columns[3:].str.contains("drop"))[0][0]
+        metrics = metrics.drop(columns=["drop:rc::gen2mc"])
+        del predictors[drop_idx]
+        indexed_metrics = [(i, item[1]) for i, item in enumerate([m for j, m in enumerate(indexed_metrics) if j != 11])]
+
+        drop_idx = np.where(metrics.columns[3:].str.contains("socialiqa"))[0][0]
+        metrics = metrics.drop(columns=["socialiqa:rc::olmes"])
+        del predictors[drop_idx]
+        indexed_metrics = [(i, item[1]) for i, item in enumerate([m for j, m in enumerate(indexed_metrics) if j != 11])]
+
+        drop_idx = np.where(metrics.columns[3:].str.contains("csqa"))[0][0]
+        metrics = metrics.drop(columns=["csqa:rc::olmes"])
+        del predictors[drop_idx]
+        indexed_metrics = [(i, item[1]) for i, item in enumerate([m for j, m in enumerate(indexed_metrics) if j != 11])]
+        
+
+    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type, interactions)
     results = []
-
     if dro_reference_model_id is not None: 
-        # load in metrics of the reference model 
-        reference_model_run_instance = get_runs_from_api(
-            api, workspace, [dro_reference_model_id], cache_path, True, num_samples, eval_metric_group
-        )[0]
+        if dro_reference_model_id.endswith(".yaml"):
+            assert use_reference_model_predicted_scores, "If you provide a reference model as a yaml config, you need to use the predicted scores."
+            with open(dro_reference_model_id, "r") as f:
+                data = yaml.safe_load(f)
 
-        if use_reference_model_predicted_scores:
-            # get reference model's mix and pass this through the regression model
-            reference_run_ratio = {
-                "run": reference_model_run_instance.id, 
-                "name": reference_model_run_instance.display_name, 
-                "index": 0, 
-                **mk_weights_from_config(reference_model_run_instance.config, priors)
-            }
-            reference_ratio_df = pd.DataFrame([reference_run_ratio])
-            reference_ratio = reference_ratio_df[reference_ratio_df.columns[3:]].values
+            assert all([entry['domain'] == ratios.columns[3:][i] for i, entry in enumerate(data['sources'])])
+
+            reference_ratio = np.array([[entry['weight'] for entry in data['sources']]])
+            reference_ratio /= np.sum(reference_ratio)  # normalize the weights to add to 1
             reference_scores = [pred.predict(reference_ratio)[0] for pred in predictors]
             reference_scores = np.array(reference_scores)
         else:
-            # load in the reference model's true performance
-            reference_run_metric ={
-                "run": reference_model_run_instance.id,
-                "name": reference_model_run_instance.display_name, 
-                "index": 0,
-                **mk_run_metrics(
-                    history=reference_model_run_instance.samples,
-                    samples=num_samples,
-                    metrics=(eval_metric_group_name, eval_metric_group.value),
-                    display_name=reference_model_run_instance.display_name,
-                    average=group_average != None,
-                ),
-            }
-            reference_scores = []
-            for idx, metric in indexed_metrics:
-                reference_scores.append(reference_run_metric[metric])
-            reference_scores = np.array(reference_scores)
+            # load in metrics of the reference model 
+            reference_model_run_instance = get_runs_from_api(
+                api, workspace, [dro_reference_model_id], cache_path, True, num_samples, eval_metric_group
+            )[0]
+
+            if use_reference_model_predicted_scores:
+                # get reference model's mix and pass this through the regression model
+                reference_run_ratio = {
+                    "run": reference_model_run_instance.id, 
+                    "name": reference_model_run_instance.display_name, 
+                    "index": 0, 
+                    **mk_weights_from_config(reference_model_run_instance.config, priors)
+                }
+                reference_ratio_df = pd.DataFrame([reference_run_ratio])
+                reference_ratio = reference_ratio_df[reference_ratio_df.columns[3:]].values
+                reference_scores = [pred.predict(reference_ratio)[0] for pred in predictors]
+                reference_scores = np.array(reference_scores)
+            else:
+                # load in the reference model's true performance
+                reference_run_metric ={
+                    "run": reference_model_run_instance.id,
+                    "name": reference_model_run_instance.display_name, 
+                    "index": 0,
+                    **mk_run_metrics(
+                        history=reference_model_run_instance.samples,
+                        samples=num_samples,
+                        metrics=(eval_metric_group_name, eval_metric_group.value),
+                        display_name=reference_model_run_instance.display_name,
+                        average=group_average != None,
+                    ),
+                }
+                reference_scores = []
+                for idx, metric in indexed_metrics:
+                    reference_scores.append(reference_run_metric[metric])
+                reference_scores = np.array(reference_scores)
 
     for idx, metric in indexed_metrics:
         plot_correlation(
@@ -858,7 +902,8 @@ def fit(
                 reference_scores=reference_scores if dro_reference_model_id is not None else None,
                 fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
                 metric_type=metric_type,
-                ratios=ratios
+                ratios=ratios,
+                pareto_eps=pareto_eps
             )
 
             plot_and_log_weights(
@@ -900,7 +945,8 @@ def fit(
             reference_scores=reference_scores if dro_reference_model_id is not None else None,
             fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
             metric_type=metric_type,
-            ratios=ratios
+            ratios=ratios,
+            pareto_eps=pareto_eps
         )
         plot_and_log_weights(
             prior=priors[0],
@@ -955,14 +1001,19 @@ def fit(
             json.dump(float(predicted_performance), f)
 
         if dro_reference_model_id is not None and use_reference_model_predicted_scores:
-            diff = reference_scores - predictions 
+
+            if metric_type == "primary_score":
+                diff = predictions - reference_scores #(higher is better)
+            else:
+                diff = reference_scores - predictions 
             colors = ['green' if val > 0 else 'red' for val in diff]
             x = np.arange(len(diff))
-
+ 
             plt.figure(figsize=(10, 6))
             plt.bar(x, diff, color=colors)
             plt.title(f'Pareto Improvement')
-            plt.ylabel('PREDICTED Difference (BPB v2, 30M)')
+
+            plt.ylabel('PREDICTED Improvements over reference model')
             plt.axhline(0, color='black', linewidth=0.8)
             plt.xticks(ticks=x, labels=metrics.columns[3:].tolist(), rotation=90)
             plt.tight_layout()
