@@ -49,7 +49,8 @@ from regmixer.eval.utils import (
     aggregate_mmlu,
     PROPOSER_TYPES, 
     LogLinearRegressor,
-    swarm_config_from_cookbook_or_regmixer_path
+    swarm_config_from_cookbook_or_regmixer_path, 
+    plot_interaction_matrix_signed_evidence
 )
 
 from tqdm import tqdm
@@ -276,6 +277,13 @@ def cli():
     default=False
 )
 @click.option(
+    "--use-reference-model-as-search-prior",
+    is_flag=True,
+    help="If true, we center our proposal/simulation around the reference model weights",
+    required=False,
+    default=False
+)
+@click.option(
     "--select-top-k-runs",
     type=float,
     help="If set, only use the metrics and ratios of the top k runs, where performance is the average BPB across all tasks",
@@ -340,9 +348,16 @@ def cli():
     default=None
 )
 @click.option(
-    '--pareto-eps',
-    type=float,
-    help="epsilon tolerance for pareto constraint",
+    '--tol', 
+    type=float, 
+    help="Pareto constraint tolerance",
+    default=None,
+    required=False
+)
+@click.option(
+    '--fixed-search-weight', 
+    type=str,
+    help="If set, this states that certain elements of our proposed mix must have a specific weight",
     required=False,
     default=None
 )
@@ -376,6 +391,7 @@ def fit(
     early_stopping: float = 0.0,
     dro_reference_model_id: Optional[str] = None,
     use_reference_model_predicted_scores: bool = False,
+    use_reference_model_as_search_prior: bool = False,
     select_top_k_runs: float = 1.0,
     fixed_weight: Optional[str] = None,
     pull_from_dashboard: bool = False,
@@ -384,7 +400,8 @@ def fit(
     fit_only: bool = False,
     custom_name: Optional[str] = None,
     interactions: Optional[list[str]] = None,
-    pareto_eps: Optional[float] = None
+    tol: Optional[float] = None,
+    fixed_search_weight: Optional[str] = None
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -442,6 +459,8 @@ def fit(
         eval_config["dro_reference_model_id"] = dro_reference_model_id
     if use_reference_model_predicted_scores:
         eval_config["use_reference_model_predicted_scores"] = use_reference_model_predicted_scores
+    if use_reference_model_as_search_prior:
+        eval_config["use_reference_model_as_search_prior"] = use_reference_model_as_search_prior
     if fixed_weight is not None:
         eval_config["fixed_weight"] = fixed_weight
         fixed_weight_dict = json.loads(fixed_weight)
@@ -451,10 +470,11 @@ def fit(
         eval_config["dashboard"] = dashboard
     if metric_type is not None:
         eval_config["metric_type"] = metric_type
-    if interactions is not None:
-        eval_config["interactions"] = interactions
-    if pareto_eps is not None:
-        eval_config["pareto_eps"] = pareto_eps
+    if tol is not None:
+        eval_config["tol"] = tol
+    if fixed_search_weight is not None:
+        eval_config['fixed_search_weight'] = fixed_search_weight
+
 
     # used for caching regression model
     regression_config = {
@@ -649,6 +669,7 @@ def fit(
         numerical_cols = metrics.columns[3:]
         metrics[numerical_cols] = metrics[numerical_cols].apply(pd.to_numeric, errors='coerce')
         ratios = ratios[ratios['run'].isin(metrics.run)]
+        assert np.isclose(ratios[ratios.columns[3:]].sum(axis=1).sum(), len(ratios)), "Ratios do not add up to 1!"
 
         if fixed_weight is not None:
             # normalize the non-fixed-weight domains to add to 1 
@@ -688,9 +709,12 @@ def fit(
         metrics = metrics.drop(index=27)
 
     if experiment_groups[0] == "a09b2bf1":
-        # hardcoded logic: drop outlier for reasoning swarm 
-        ratios = ratios.drop(index=[30, 49, 47])
-        metrics = metrics.drop(index=[30, 49, 47])
+        ratios = ratios.drop(index=[30, 47, 49])
+        metrics = metrics.drop(index=[30, 47, 49])
+
+    if experiment_groups == ["a3e06472", "515eaf2d"]:
+        ratios = ratios.drop(index=[11, 12, 25, 27, 30, 35, 55])
+        metrics = metrics.drop(index=[11, 12, 25, 27, 30, 35, 55])
 
     if select_top_k_runs < 1.0:
         metrics['all_bpb'] = metrics[metrics.columns[3:]].mean(axis=1)
@@ -798,40 +822,25 @@ def fit(
             with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
                 f.write(str(regression_model_cache_path))
 
-    if experiment_groups[0] == "95d5a161":
-        # hardcoded logic: drop "drop", "socialiqa", "csqa" eval for all-dressed swarm
-        drop_idx = np.where(metrics.columns[3:].str.contains("drop"))[0][0]
-        metrics = metrics.drop(columns=["drop:rc::gen2mc"])
-        del predictors[drop_idx]
-        indexed_metrics = [(i, item[1]) for i, item in enumerate([m for j, m in enumerate(indexed_metrics) if j != 11])]
-
-        drop_idx = np.where(metrics.columns[3:].str.contains("socialiqa"))[0][0]
-        metrics = metrics.drop(columns=["socialiqa:rc::olmes"])
-        del predictors[drop_idx]
-        indexed_metrics = [(i, item[1]) for i, item in enumerate([m for j, m in enumerate(indexed_metrics) if j != 11])]
-
-        drop_idx = np.where(metrics.columns[3:].str.contains("csqa"))[0][0]
-        metrics = metrics.drop(columns=["csqa:rc::olmes"])
-        del predictors[drop_idx]
-        indexed_metrics = [(i, item[1]) for i, item in enumerate([m for j, m in enumerate(indexed_metrics) if j != 11])]
-        
-
-    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type, interactions)
+    plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type)
+    plot_interaction_matrix_signed_evidence(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type)
     results = []
+
+    reference_ratio = None
     if dro_reference_model_id is not None: 
-        if dro_reference_model_id.endswith(".yaml"):
-            assert use_reference_model_predicted_scores, "If you provide a reference model as a yaml config, you need to use the predicted scores."
+        # load in metrics of the reference model 
+        if dro_reference_model_id.endswith("yaml"):
             with open(dro_reference_model_id, "r") as f:
-                data = yaml.safe_load(f)
+                dro_config = yaml.safe_load(f)
 
-            assert all([entry['domain'] == ratios.columns[3:][i] for i, entry in enumerate(data['sources'])])
+            assert all([entry['domain'] == ratios.columns[3:][i] for i, entry in enumerate(dro_config['sources'])])
 
-            reference_ratio = np.array([[entry['weight'] for entry in data['sources']]])
-            reference_ratio /= np.sum(reference_ratio)  # normalize the weights to add to 1
+            reference_ratio = np.array([entry['weight'] for entry in dro_config['sources']])
+            reference_ratio /= np.sum(reference_ratio)  # normalize the weights
             reference_scores = [pred.predict(reference_ratio)[0] for pred in predictors]
             reference_scores = np.array(reference_scores)
+
         else:
-            # load in metrics of the reference model 
             reference_model_run_instance = get_runs_from_api(
                 api, workspace, [dro_reference_model_id], cache_path, True, num_samples, eval_metric_group
             )[0]
@@ -891,6 +900,7 @@ def fit(
                 index=idx,
                 predictor=predictors,
                 prior_distributions=priors[0],
+                original_prior=original_priors[0],
                 num_samples=simulation_samples,
                 opt_avg_metric=opt_avg_metric,
                 constrain_objective=constrain_objective,
@@ -903,7 +913,9 @@ def fit(
                 fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
                 metric_type=metric_type,
                 ratios=ratios,
-                pareto_eps=pareto_eps
+                tol=tol,
+                fixed_search_weight=fixed_search_weight,
+                reference_ratio=reference_ratio if use_reference_model_as_search_prior else None
             )
 
             plot_and_log_weights(
@@ -934,6 +946,7 @@ def fit(
             index=-1,
             predictor=predictors,
             prior_distributions=priors[0],
+            original_prior=original_priors[0],
             num_samples=simulation_samples,
             opt_avg_metric=opt_avg_metric,
             constrain_objective=constrain_objective,
@@ -946,7 +959,9 @@ def fit(
             fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
             metric_type=metric_type,
             ratios=ratios,
-            pareto_eps=pareto_eps
+            tol=tol,
+            fixed_search_weight=fixed_search_weight,
+            reference_ratio=reference_ratio if use_reference_model_as_search_prior else None
         )
         plot_and_log_weights(
             prior=priors[0],
@@ -1001,9 +1016,8 @@ def fit(
             json.dump(float(predicted_performance), f)
 
         if dro_reference_model_id is not None and use_reference_model_predicted_scores:
-
             if metric_type == "primary_score":
-                diff = predictions - reference_scores #(higher is better)
+                diff = predictions - reference_scores 
             else:
                 diff = reference_scores - predictions 
             colors = ['green' if val > 0 else 'red' for val in diff]

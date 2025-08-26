@@ -1,0 +1,12 @@
+requested_tokens: 60_000_000_000 # 10B
+leaf_level_constraints: true
+available_tokens:  
+  code_fim: 21_390_279_634
+  dolminomath: 10_687_987_907
+  gen-mcqa: 100_000_000
+  megamatt: 3_883_674_937
+  openmathreasoning-fullthoughts-rewrite: 850_848_999
+  swallowcode: 18_833_636_683
+  swallowmath: 5_624_449_531
+  tinymath-mind: 898_733_958
+  tinymath-pot: 240_590_380

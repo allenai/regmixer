@@ -24,6 +24,11 @@ from copy import deepcopy
 from collections import defaultdict
 import pydantic_core
 import statsmodels.api as sm
+from matplotlib.colors import TwoSlopeNorm
+
+from scipy.stats import norm  # for probit transform
+from matplotlib.cm import ScalarMappable
+
 
 import subprocess
 from io import StringIO
@@ -312,6 +317,7 @@ class SimulationProposer(Proposer):
         index: int,
         predictor: list[Regressor],
         prior_distributions: dict,
+        original_prior: dict,
         ratios: pd.DataFrame,
         num_samples: int = 1_000_000,
         seed: int = 1337,
@@ -326,7 +332,9 @@ class SimulationProposer(Proposer):
         reference_scores: Optional[np.ndarray] = None,
         fixed_weight: Optional[dict[str, float]] = None,
         metric_type: Optional[str] = None,
-        pareto_eps: Optional[float] = None,
+        tol: Optional[float] = None,
+        fixed_search_weight: Optional[str] = None,
+        reference_ratio: Optional[str] = None
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -337,12 +345,25 @@ class SimulationProposer(Proposer):
         max_dirichlet = 100
         search_dirichlet_factor = 2.0
 
-        search_prior = np.array(list(prior_distributions.values()))
+        
+        if reference_ratio is not None:
+            search_prior = np.array(reference_ratio)
+        else:
+            search_prior = np.array(list(prior_distributions.values()))
+
         if temperature is not None:
             search_prior = search_prior**temperature
             search_prior = search_prior / np.sum(search_prior)
 
-        logger.info(f"Initial search prior: {search_prior}")
+        if fixed_search_weight is not None:
+            fixed_dict = json.loads(fixed_search_weight)
+            fixed_indices = {list(prior_distributions.keys()).index(domain): weight for domain, weight in fixed_dict.items()}
+            free_indices = [i for i in range(len(search_prior)) if i not in fixed_indices]
+            free_prior = search_prior[free_indices]
+            free_prior /= np.sum(free_prior)
+            logger.info(f"Prior for sampling is {free_prior}")
+        else:
+            logger.info(f"Prior for sampling is {search_prior}")
 
         best_weights = np.zeros(len(prior_distributions))
 
@@ -372,14 +393,36 @@ class SimulationProposer(Proposer):
                 with open(manual_token_constraint_path, "r") as f:
                     data = yaml.safe_load(f)
                 desired_tokens = data["requested_tokens"]
+                group_ids = data.get("group_ids", None)
+
+
+                
 
                 leaf_level_constraints = data["leaf_level_constraints"]
-                if leaf_level_constraints:
+                granular_constraints = data.get("granular_constraints", False)
+                if leaf_level_constraints and not granular_constraints:
                     # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
                     available_tokens_per_source = {
                         source: data["available_tokens"][source]
                         for source, _ in prior_distributions.items()
                     }
+
+                    if group_ids is not None:
+                        group_ids = {source: group_ids[source] for source in prior_distributions} # order the group ids dict
+                        groups = np.array(list(group_ids.values()))
+                        desired_tokens = np.array([desired_tokens[idx] for idx in groups])
+
+                elif leaf_level_constraints and granular_constraints:
+                    # if the manual constraints are at a finer granularity, we need to aggregate them
+                    available_tokens_per_source = {
+                        source: data["available_tokens"][source]
+                        for source, _ in original_prior.items()
+                    }
+
+                    if group_ids is not None:
+                        group_ids = {source: group_ids[source] for source in original_prior} # order the group ids dict
+                        groups = np.array(list(group_ids.values()))
+                        desired_tokens_per_source = np.array([desired_tokens[idx] for idx in groups])
                 else:
                     # otherwise, our constraints are at the source level while prior_distribution is at the leaf level
                     available_tokens_per_source = data["available_tokens"]
@@ -398,14 +441,47 @@ class SimulationProposer(Proposer):
             )
 
             # generate simulations by sampling from dirichlet distribution with parameter prior * alpha
-            simulations = (
-                torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
-                .sample()
-                .numpy()
-            )
+            if fixed_search_weight is not None:
+                free_indices_simulations = (
+                    torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * free_prior))
+                    .sample()
+                    .numpy()
+                )
+                simulations = np.zeros((num_samples, len(search_prior)))
+                simulations[:, free_indices] = free_indices_simulations * (1 - sum(list(fixed_indices.values())))
+                idx  = np.array(list(fixed_indices.keys()))
+                vals = np.array(list(fixed_indices.values()))
+                simulations[:, idx] = vals  # broadcasts across rows
+            elif constrain_objective and isinstance(desired_tokens, list):
+                total = sum(desired_tokens)
+                simulations = np.zeros((num_samples, len(search_prior)))
+
+                if granular_constraints:
+                    coarse_groups = np.array([group_ids[k] if k in group_ids else np.unique([stuff for g, stuff in group_ids.items() if g.startswith(k)])[0]  for k, v in prior_distributions.items()])
+                else:
+                    coarse_groups = groups
+                for g in np.unique(coarse_groups):
+                    cols = np.where(coarse_groups==g)[0]
+
+                    # deterministic mass for the whole group
+                    w_g = desired_tokens[g] / total                    # scalar
+
+                    # fold desired & prior to shape within-group
+                    base_norm = search_prior[cols] / search_prior[cols].sum()                        # simplex over group
+                    conc = alphas[:, None] * base_norm[None, :]          # (n_samples, |cols|)
+
+                    # sample a simplex for the group, then scale the whole group by w_g
+                    samp = torch.distributions.Dirichlet(torch.from_numpy(conc)).sample().numpy()  # (n_samples, |cols|)
+                    simulations[:, cols] = samp * w_g
+            else:
+                simulations = (
+                    torch.distributions.Dirichlet(torch.from_numpy(alphas[:, None] * search_prior))
+                    .sample()
+                    .numpy()
+                )
 
             # Filter out invalid simulations from the population
-            if temperature is None:
+            if False: #temperature is None:
                 # keep this for reproducibility...
                 simulations = simulations[
                     np.all(
@@ -425,10 +501,28 @@ class SimulationProposer(Proposer):
             if constrain_objective:
                 original_simulation_size = len(simulations)
 
-                if leaf_level_constraints:
+                if leaf_level_constraints and not granular_constraints:
                     # we can just directly do elementwise comparisons
                     # Check which simulations will be filtered out
-                    token_usage = simulations * desired_tokens
+
+                    if isinstance(desired_tokens, list):
+                        #group_ids = {source: group_ids[source] for source in prior_distributions} # order the group ids dict
+                        #groups = np.array(list(group_ids.values()))
+                        #desired_tokens = np.array([desired_tokens[idx] for idx in groups])
+
+                        group_normalized_simulations = np.zeros_like(simulations)
+                        for g in np.unique(groups):
+                            cols = np.where(groups == g)[0]
+                            block = simulations[:, cols]                               # (n_samples, n_cols_in_group)
+                            denom = block.sum(axis=1, keepdims=True)         # row sums within group
+                            # Safe division: leave rows with denom==0 as zeros
+                            np.divide(block, denom, out=block, where=(denom != 0))
+                            group_normalized_simulations[:, cols] = block
+
+                        token_usage = group_normalized_simulations * desired_tokens_per_source 
+                    else:
+                        token_usage = simulations * desired_tokens
+
                     token_limits = (
                         np.array(list(available_tokens_per_source.values())) * repetition_factor
                     )
@@ -439,24 +533,61 @@ class SimulationProposer(Proposer):
                         logger.info(
                             f"Filtering out {filtered_count} simulations that exceed token constraints"
                         )
-                        # Log details about why simulations were filtered
-                        invalid_simulations = simulations[~valid_mask]
-                        invalid_token_usage = token_usage[~valid_mask]
-                        for i, (sim, usage) in enumerate(
-                            zip(invalid_simulations[:5], invalid_token_usage[:5])
-                        ):  # Log first 5
-                            exceeding_sources = [
-                                f"{list(available_tokens_per_source.keys())[j]}: {usage[j]:.0f} > {token_limits[j]:.0f}"
-                                for j in range(len(usage))
-                                if usage[j] > token_limits[j]
-                            ]
-                            exceeding_details = "\n".join(
-                                [f"    {detail}" for detail in exceeding_sources]
-                            )
-                            #logger.info(f"Filtered simulation {i+1}:\n{exceeding_details}")
+
+                    simulations = simulations[valid_mask]
+                elif leaf_level_constraints and granular_constraints:
+                    constrained_domains = list(original_prior.keys())
+                    original_prior_mix = np.array(list(original_prior.values()))
+
+                    source_to_indices = defaultdict(list)
+                    for i, domain in enumerate(constrained_domains):
+                        source = domain.split(":", 1)[0]
+                        source_to_indices[source].append(i)
+
+                    per_source_weights = {}
+                    for source, indices in source_to_indices.items():
+                        topic_mix = original_prior_mix[indices]
+                        total = topic_mix.sum()
+                        per_source_weights[source] = (np.array(indices), topic_mix/total)
+
+                    expanded_simulations = np.zeros((len(simulations), len(constrained_domains)))
+                    for j, source in enumerate(prior_distributions):
+                        indices, weights = per_source_weights[source]
+                        expanded_simulations[:, indices] = simulations[:, [j]] * weights
+
+                    if isinstance(desired_tokens, list):
+                        #group_ids = {source: group_ids[source] for source in original_prior} # order the group ids dict
+                        #groups = np.array(list(group_ids.values()))
+                        #desired_tokens = np.array([desired_tokens[idx] for idx in groups])
+
+                        group_normalized_simulations = np.zeros_like(expanded_simulations)
+                        for g in np.unique(groups):
+                            cols = np.where(groups == g)[0]
+                            block = expanded_simulations[:, cols]                               # (n_samples, n_cols_in_group)
+                            denom = block.sum(axis=1, keepdims=True)         # row sums within group
+                            # Safe division: leave rows with denom==0 as zeros
+                            np.divide(block, denom, out=block, where=(denom != 0))
+                            group_normalized_simulations[:, cols] = block
+
+                        token_usage = group_normalized_simulations * desired_tokens_per_source 
+                    else:
+                        token_usage = expanded_simulations * desired_tokens
+
+                    token_limits =  (
+                        np.array(list(available_tokens_per_source.values())) * repetition_factor
+                    )
+
+                    valid_mask = (token_usage <= token_limits).all(axis=1)
+
+                    filtered_count = np.sum(~valid_mask)
+                    if filtered_count > 0:
+                        logger.info(
+                            f"Filtering out {filtered_count} simulations that exceed token constraints"
+                        )
 
                     simulations = simulations[valid_mask]
                 else:
+                    raise NotImplementedError("Code is out of date.")
                     # the constraints are at the source level, so we need to aggregate the simulation vectors by source
                     # we map from source to their indices in the probability vector
                     source_to_indices = defaultdict(list)
@@ -487,19 +618,19 @@ class SimulationProposer(Proposer):
             predictions = np.array([reg.predict(simulations) for reg in predictor])
             if reference_scores is not None:
                 # If reference scores are provided, filter simulations based on them
-                if pareto_eps is not None:
-                    tol_range = [pareto_eps]
+                if tol is not None:
+                    tol_range = [tol]
                 else:
                     tol_range = [0, 0.05, 0.1, 0.15, 0.2]
-                for tol in tol_range:
+                for t in tol_range:
                     # we allow for predicted scores to be within a tolerance of the reference scores
                     # if the current tol results in no remaining simulations, we increase tol
                     if metric_type == "primary_score":
-                        pareto_idxs = np.where(np.all(predictions.T > reference_scores - tol, axis=1))[0]
+                        pareto_idxs = np.where(np.all(predictions.T > reference_scores - t, axis=1))[0]
                     else:
-                        pareto_idxs = np.where(np.all(predictions.T < reference_scores + tol, axis=1))[0]
+                        pareto_idxs = np.where(np.all(predictions.T < reference_scores + t, axis=1))[0]
                     if len(pareto_idxs) != 0:
-                        logger.info(f"Using eps={tol} for enforcing pareto improvements")
+                        logger.info(f"Using eps={t} for enforcing pareto improvements")
                         break
 
                 if len(pareto_idxs) == 0:
@@ -536,22 +667,50 @@ class SimulationProposer(Proposer):
 
             search_prior = (best_weights + search_prior) / 2
 
+            if fixed_search_weight is not None:
+                free_prior = search_prior[free_indices]
+                free_prior /= np.sum(free_prior)
+
+            predicted_best_performance = sum([pred.predict(best_weights)[0] for pred in predictor])
             logger.info(
-                f"Current best weights is: {best_weights} and search prior is: {search_prior}"
+                f"Current best weights is: {best_weights} with predicted performance {predicted_best_performance}, and search prior is: {search_prior}"
             )
 
         if constrain_objective:
-            if leaf_level_constraints:
+            if leaf_level_constraints and not granular_constraints:
                 # we can just directly do elementwise comparisons
                 if not all(
                     best_weights * desired_tokens
                     <= np.array(list(available_tokens_per_source.values())) * repetition_factor
                 ):
                     raise ValueError(f"Best weights are out of bounds!")
+            elif leaf_level_constraints and granular_constraints:
+                expanded_best_weights = np.zeros(len(constrained_domains))
+                for j, source in enumerate(prior_distributions):
+                    indices, weights = per_source_weights[source]
+                    expanded_best_weights[indices] = best_weights[j] * weights
+
+                if False:#isinstance(desired_tokens, list):
+                    #group_ids = {source: group_ids[source] for source in original_prior} # order the group ids dict
+                    #groups = np.array(list(group_ids.values()))
+                    #desired_tokens = np.array([desired_tokens[idx] for idx in groups])
+
+                    group_normalized_best_weights = np.zeros_like(expanded_best_weights)
+                    for g in np.unique(groups):
+                        cols = np.where(groups == g)[0]
+                        block = expanded_best_weights[:, cols]                               # (n_samples, n_cols_in_group)
+                        denom = block.sum(axis=1, keepdims=True)         # row sums within group
+                        # Safe division: leave rows with denom==0 as zeros
+                        np.divide(block, denom, out=block, where=(denom != 0))
+                        group_normalized_best_weights[:, cols] = block
+
+                    token_usage = group_normalized_best_weights * desired_tokens_per_source
+                    assert all(token_usage <= np.array(list(available_tokens_per_source.values())) * repetition_factor)
+
             else:
                 if not passes_constraints(best_weights):
                     raise ValueError(f"Best weights are out of bounds!")
-
+                
         # if best_weights was collapsed (because of conditioning on a topic-level p* mix), we need to expand it to the full prior distribution
 
         return best_weights
@@ -874,7 +1033,7 @@ def plot_correlation(
 
         plt.legend(
             handles=[test_dot, train_dot],
-            title=f"{metric_name.split("/")[-1]} correlations",
+            title=f"{metric_name.split('/')[-1]} correlations",
             fontsize=12,
             title_fontsize=12,
         )
@@ -932,9 +1091,28 @@ def plot_interaction_matrix(
         elif regression_type == "quadratic":
             interaction_matrix[i] = predictor.model.params
 
+    domain_reordering = None 
+    if "a3d4f82c" in output_dir:
+        # hardcode the nice block structure for the superswarm
+        new_order = ['code_fim', 'dolminomath', 'megamatt', 'openmathreasoning-fullthoughts-rewrite', 'swallowcode', 'swallowmath', 'tinymath-mind', 'tinymath-pot',  'flan', 'instruction-new-format',  'nemotron-synth-qa', 'rcqa', 'reddit-high', 'sponge', 'hqweb-pdf']
+        domain_reordering = [domain_names.index(d) for d in new_order]
+        domain_names = new_order
+        interaction_matrix = interaction_matrix[:, domain_reordering]
+
+
+
+
     sorted_metric_indices = np.argsort(metric_names)
     metric_names = [metric_names[i] for i in sorted_metric_indices]
     interaction_matrix = interaction_matrix[sorted_metric_indices, :]
+
+    if "olmo3:dev:7b:gen" in metric_names and "olmo3:dev:7b:math:v2" in metric_names:
+        if metric_names.index("olmo3:dev:7b:gen") < metric_names.index("olmo3:dev:7b:math:v2"):
+            # Swap the two if they are in the wrong order
+            idx_gen = metric_names.index("olmo3:dev:7b:gen")
+            idx_math = metric_names.index("olmo3:dev:7b:math:v2")
+            metric_names[idx_gen], metric_names[idx_math] = metric_names[idx_math], metric_names[idx_gen]
+            interaction_matrix[[idx_gen, idx_math]] = interaction_matrix[[idx_math, idx_gen]]
 
 
     plt.figure(figsize=(20, 16))
@@ -951,13 +1129,6 @@ def plot_interaction_matrix(
         bar_label += " (lower is better)"
 
     plt.colorbar(label=bar_label)
-
-    if interactions is not None:
-        new_names = [f"{domain_names[i]}_{domain_names[j]}" for (i, j) in interaction_pairs]
-        domain_names.extend(new_names)
-
-
-
     plt.xticks(ticks=np.arange(len(domain_names)), labels=domain_names, rotation=90)
     plt.yticks(ticks=np.arange(len(metric_names)), labels=metric_names)
     plt.title(f"Interaction matrix for {regression_type}")
@@ -986,6 +1157,145 @@ def plot_interaction_matrix(
     )
     plt.close()
     np.save(f"{output_dir}/interaction_matrix.npy", interaction_matrix)
+
+
+
+
+# Optional: BH FDR (Benjamini–Hochberg) to convert p->q
+def bh_adjust(pvals: np.ndarray) -> np.ndarray:
+    flat = pvals.ravel().astype(float)
+    n = flat.size
+    order = np.argsort(flat)
+    ranks = np.empty_like(order); ranks[order] = np.arange(1, n+1)
+    q = flat * n / ranks
+    # enforce monotonicity
+    q_sorted = np.minimum.accumulate(q[order][::-1])[::-1]
+    out = np.empty_like(q_sorted); out[order] = q_sorted
+    return out.reshape(pvals.shape)
+
+def plot_interaction_matrix_signed_evidence(
+    output_dir: str,
+    predictors: List,
+    regression_type: str,
+    domain_names: List[str],
+    metric_names: List[str],
+    ratios: pd.DataFrame,
+    metric_type: Optional[str] = None,
+    use_fdr: bool = False,
+    p_cap: float = 10.0,          # kept for API compatibility; unused in p-coloring
+    sig_threshold: float = 0.05,
+    gamma: float = 1.5            # >1 makes the color mapping less drastic
+):
+    # Normalize metric labels
+    metric_names = [m.split("/")[-1].split(" ")[0] for m in metric_names]
+
+    # Optional hardcoded domain block structure + build a column permutation
+    domain_reordering = None
+    if "a3d4f82c" in output_dir:
+        new_order = [
+            'code_fim', 'dolminomath', 'megamatt',
+            'openmathreasoning-fullthoughts-rewrite',
+            'swallowcode', 'swallowmath',
+            'tinymath-mind', 'tinymath-pot',
+            'flan', 'instruction-new-format',
+            'nemotron-synth-qa', 'rcqa',
+            'reddit-high', 'sponge', 'hqweb-pdf'
+        ]
+        domain_reordering = [domain_names.index(d) for d in new_order]
+        domain_names = new_order
+
+    # Collect coefficients (B) and p-values (P)
+    B = np.zeros((len(metric_names), len(domain_names)))
+    P = np.full_like(B, np.nan, dtype=float)
+
+    for i, pred in enumerate(predictors):
+        if regression_type == "linear":
+            # Assumes pred.model.params and pred.model.pvalues are aligned to current domain_names order
+            B[i] = pred.model.params
+            P[i] = pred.model.pvalues
+        elif regression_type == "lightgbm":
+            # Feature importances only; no p-values
+            B[i] = getattr(pred.model, "feature_importances_", np.zeros(len(domain_names)))
+        elif regression_type == "log_linear":
+            # e.g., first element intercept, then one per domain
+            B[i] = pred.model[1:]
+
+    # Row (metric) sorting
+    order = np.argsort(metric_names)
+    metric_names = [metric_names[k] for k in order]
+    B = B[order]
+    P = P[order]
+
+    if "olmo3:dev:7b:gen" in metric_names and "olmo3:dev:7b:math:v2" in metric_names:
+        if metric_names.index("olmo3:dev:7b:gen") < metric_names.index("olmo3:dev:7b:math:v2"):
+            # Swap the two if they are in the wrong order
+            idx_gen = metric_names.index("olmo3:dev:7b:gen")
+            idx_math = metric_names.index("olmo3:dev:7b:math:v2")
+            metric_names[idx_gen], metric_names[idx_math] = metric_names[idx_math], metric_names[idx_gen]
+            B[[idx_gen, idx_math]] = B[[idx_math, idx_gen]]
+            P[[idx_gen, idx_math]] = P[[idx_math, idx_gen]]
+
+    # Column (domain) reordering to match hardcoded order, if requested
+    if domain_reordering is not None:
+        B = B[:, domain_reordering]
+        P = P[:, domain_reordering]
+
+    # Plotting
+    if regression_type == "linear" and np.isfinite(P).any():
+        # Optionally compute FDR q-values for dimming only
+        Q = bh_adjust(P) if use_fdr else P
+
+        # ---- COLOR BY p, gently (bounded), while TEXT shows raw p ----
+        # Map p in [0,1] to a gentle strength via (1 - p)^(1/gamma), then apply sign(β)
+        P_safe = np.clip(P, 0.0, 1.0)
+        p_strength = (1.0 - P_safe) ** (1.0 / max(gamma, 1e-6))
+        signed_score = np.sign(B) * p_strength  # in [-1, 1]
+        v = 1.0
+
+        plt.figure(figsize=(20, 16))
+        im = plt.imshow(
+            signed_score,
+            cmap="coolwarm",
+            norm=TwoSlopeNorm(vmin=-v, vcenter=0.0, vmax=v),
+            aspect="auto",
+        )
+
+        # Dim non-significant cells (gray overlay)
+        mask = (Q if use_fdr else P_safe) > sig_threshold
+        overlay = np.zeros((*signed_score.shape, 4))
+        overlay[mask] = [0.7, 0.7, 0.7, 0.6]
+        plt.imshow(overlay, aspect="auto")
+
+        # Annotate with β and RAW p (as requested)
+        for i in range(len(metric_names)):
+            for j in range(len(domain_names)):
+                text_str = f"β={B[i, j]:.2f}\np={P[i, j]:.2g}"
+                text_color = "black" if abs(signed_score[i, j]) < 0.5 * v else "white"
+                plt.text(j, i, text_str, ha="center", va="center",
+                         fontsize=8, color=text_color)
+
+        cbar = plt.colorbar(im)
+        cbar.set_label(r"sign(β) × (1 − p)$^{1/\gamma}$")
+        better = "higher is better" if metric_type == "primary_score" else "lower is better"
+        plt.title(f"Signed evidence heatmap (color ∝ p, gentler gradient; text shows raw p)\n({better})")
+
+    else:
+        # No p-values available: show β heatmap only
+        plt.figure(figsize=(20, 16))
+        im = plt.imshow(B, cmap="coolwarm", aspect="auto")
+        for i in range(len(metric_names)):
+            for j in range(len(domain_names)):
+                plt.text(j, i, f"{B[i, j]:.2f}", ha="center", va="center", fontsize=8)
+        cbar = plt.colorbar(im)
+        cbar.set_label("β value")
+        plt.title(f"β heatmap ({regression_type})")
+
+    plt.xticks(ticks=np.arange(len(domain_names)), labels=domain_names, rotation=90)
+    plt.yticks(ticks=np.arange(len(metric_names)), labels=metric_names)
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/interaction_matrix_signed_evidence.png", bbox_inches="tight")
+    plt.close()
+
 
 
 def mk_run_metrics(
@@ -1206,7 +1516,7 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
             elif ":" not in domain:
                 # 2) prior requests a source (i.e. when we condition on a topic-level p* mix) but wandb mixes are specified at the leaf level
                 cfg = {
-                    k: v.get("target_ratio", 0.0) for k, v in source_configs.items() if domain in k
+                    k: v.get("target_ratio", 0.0) for k, v in source_configs.items() if f"{domain}:" in k
                 }
                 weights[domain] = sum(cfg.values()) if cfg else 0.0
             else:
@@ -1403,12 +1713,10 @@ def plot_and_log_weights(
         )
         out = [{"domain": domain, "weight": weight} for domain, weight in opt_weight_dict.items()]
 
-    raw_out = [{"domain": columns[idx], "weight": weight} for idx, weight in enumerate(prediction)]
-    if raw_out != out :
+    if len(out) != len(df_config.columns[3:]):
         logger.info("RAW WEIGHTS:")
-        logger.info(raw_out)
-        logger.info("Full weights:")
-
+        raw_weights = [{"domain": columns[idx], "weight": weight} for idx, weight in enumerate(prediction)]
+        logger.info(raw_weights)
 
     with open(
         f"{mk_output_prefix(output_dir, metric_name, regression_type, train_split, n_test, split_seed, n_samples, alpha=alpha)}_optimal.json",

@@ -1,0 +1,12 @@
+requested_tokens: 10_000_000_000 # 10B
+leaf_level_constraints: true
+available_tokens:  
+  gen_mc_code_math: 2154910906344  
+  code-meta-reasoning: 1266875431 
+  gemini_reasoning: 254415258 
+  llamanemotron_reasoning: 20889249456 
+  math-meta-reasoning: 1053413970 
+  openthoughts2: 5601836260 
+  qwq_reasoning: 4774150082 
+  r1_reasoning: 2483453165 
+  verifiable: 522435993

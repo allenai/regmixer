@@ -1,0 +1,188 @@
+name: "backfill-5xC-30m-stackedu-with-dclm-not-fixed"
+description: "30M @ 5xC stackedu swarm across programming languages, dense, with DCLM vs Stack source ratio centered around 75/25"
+budget: "ai2/oe-base"
+workspace: "ai2/dolma2"
+nodes: 1
+gpus: 1
+variants: 128
+preemptible: true
+max_tokens: 2_910_233_600
+allow_repetition: false 
+sequence_length: 2048 # we changed this from 4096 to 2048 to maintain batch size (?)
+seed: 42
+#mix_temperature: 0.7
+minimum_weight: 0.00001
+min_strength: 1
+max_strength: 20
+proxy_model_id: "olmo_30m"
+tokenizer: "dolma2"
+weka: false
+dtype: "uint32"
+priority: low
+cluster: ai2/augusta-google-1 #ai2/saturn-cirrascale, ai2/neptune-cirrascale
+device_batch_size: 32
+sources:
+  - name: dclm
+    topics:
+      - name: adult_content
+        weight: 0.001144117810399051
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/adult_content/**/*.npy
+      - name: art_and_design
+        weight: 0.01249707367344882
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/art_and_design/**/*.npy
+      - name: crime_and_law
+        weight: 0.02923482987563418
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
+      - name: education_and_jobs
+        weight: 0.042876790729263314
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+      - name: electronics_and_hardware
+        weight: 0.03452411494012139
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+      - name: entertainment
+        weight: 0.09598475243055875
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/entertainment/**/*.npy
+      - name: fashion_and_beauty
+        weight: 0.00012733666316416182
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/fashion_and_beauty/**/*.npy
+      - name: finance_and_business
+        weight: 0.04067027113145341
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
+      - name: food_and_dining
+        weight: 0.014086159108083668
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/food_and_dining/**/*.npy
+      - name: games
+        weight: 0.06891284699600658
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/games/**/*.npy
+      - name: health
+        weight: 0.09942183338931967
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/health/**/*.npy
+      - name: history_and_geography
+        weight: 0.027098556464741227
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
+      - name: home_and_hobbies
+        weight: 0.009226467887549798
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/home_and_hobbies/**/*.npy
+      - name: industrial
+        weight: 0.015745768366251897
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/industrial/**/*.npy
+      - name: literature
+        weight: 0.0682512927464629
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/literature/**/*.npy
+      - name: politics
+        weight: 0.02170366281584968
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/politics/**/*.npy
+      - name: religion
+        weight: 0.019765203386769094
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/religion/**/*.npy
+      - name: science_math_and_technology
+        weight: 0.2102541083699082
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
+      - name: social_life
+        weight: 0.00464628155954837
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/social_life/**/*.npy
+      - name: software
+        weight: 0.04733898713026143
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/software/**/*.npy
+      - name: software_development
+        weight: 0.11142142430705981
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/software_development/**/*.npy
+      - name: sports_and_fitness
+        weight: 0.013072140601763493
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
+      - name: transportation
+        weight: 0.009798609444870071
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/transportation/**/*.npy
+      - name: travel_and_tourism
+        weight: 0.002197370171511048
+        paths:
+          - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
+  - name: stack-edu
+    topics:
+      - name: C
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/C/**/*.npy
+      - name: CSharp
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/CSharp/**/*.npy
+      - name: Cpp
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Cpp/**/*.npy
+      - name: Go
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Go/**/*.npy
+      - name: Java
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Java/**/*.npy
+      - name: JavaScript
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/JavaScript/**/*.npy
+      - name: Markdown
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Markdown/**/*.npy
+      - name: PHP
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/PHP/**/*.npy
+      - name: Python
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Python/**/*.npy
+      - name: Ruby
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Ruby/**/*.npy
+      - name: Rust
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Rust/**/*.npy
+      - name: Shell 
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Shell/**/*.npy
+      - name: SQL
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/SQL/**/*.npy
+      - name: Swift
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Swift/**/*.npy
+      - name: TypeScript
+        paths:
+          - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/TypeScript/**/*.npy
+nonzero_weight:
+- stack-edu:C
+- stack-edu:Cpp
+- stack-edu:CSharp
+- stack-edu:Go
+- stack-edu:Java      
+- stack-edu:JavaScript
+- stack-edu:Markdown
+- stack-edu:PHP
+- stack-edu:Python
+- stack-edu:Ruby
+- stack-edu:Rust
+- stack-edu:Shell
+- stack-edu:SQL
+- stack-edu:Swift
+- stack-edu:TypeScript
+manual_prior:
+  dclm: 0.75
+  stack-edu: 0.25

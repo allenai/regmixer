@@ -1,0 +1,76 @@
+name: "backfill-5xC-30m-dclm-top-18-domains"
+description: "30M @ 5xC swarm over DCLM top 18 topics (cost function ablation)"
+budget: "ai2/oe-base"
+workspace: "ai2/dolma2"
+nodes: 1
+gpus: 1
+variants: 33
+preemptible: true
+max_tokens: 2_910_233_600
+allow_repetition: false 
+sequence_length: 2048
+seed: 42
+minimum_weight: 0.05
+existing_mix_file: cache/62e7dc06_all_bpb_ratios.pkl
+proxy_model_id: "olmo_30m"
+tokenizer: "dolma2"
+weka: false
+dtype: "uint32"
+priority: low 
+cluster: ai2/augusta-google-1 
+device_batch_size: 32
+sources:
+  - name: art_and_design
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/art_and_design/**/*.npy
+  - name: education_and_jobs
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+  - name: electronics_and_hardware
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+  - name: entertainment
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/entertainment/**/*.npy
+  - name: crime_and_law
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
+  - name: social_life
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/social_life/**/*.npy
+  - name: finance_and_business
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
+  - name: games
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/games/**/*.npy
+  - name: health
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/health/**/*.npy
+  - name: history_and_geography
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
+  - name: literature
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/literature/**/*.npy
+  - name: politics
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/politics/**/*.npy
+  - name: religion
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/religion/**/*.npy
+  - name: science_math_and_technology
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
+  - name: software
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software/**/*.npy
+  - name: sports_and_fitness
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
+  - name: transportation
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/transportation/**/*.npy
+  - name: travel_and_tourism
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
