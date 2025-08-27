@@ -196,6 +196,29 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
         ]"""
 
         setup_steps += [
+            # Single-process values
+            "export WORLD_SIZE=1 RANK=0 LOCAL_RANK=0",
+            "export MASTER_ADDR=127.0.0.1",
+
+            # Pick a free port for the training PG (env:// consumers)
+            "export MASTER_PORT=$(python - <<'PY'\n"
+            "import socket, contextlib\n"
+            "with contextlib.closing(socket.socket()) as s:\n"
+            "    s.bind(('', 0)); print(s.getsockname()[1])\n"
+            "PY)",
+
+            # Also set the *distributed default* port that some launchers default to (incl. torchrun RDZV when not specified)
+            "export TORCH_DISTRIBUTED_DEFAULT_PORT=$(python - <<'PY'\n"
+            "import socket, contextlib\n"
+            "with contextlib.closing(socket.socket()) as s:\n"
+            "    s.bind(('', 0)); print(s.getsockname()[1])\n"
+            "PY)",
+
+            # Keep the job on GPU 0 even if the box has more (unrelated to ports, but fine)
+            "export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}",
+        ]
+
+        """setup_steps += [
             # Standard single-process values
             "export WORLD_SIZE=1 RANK=0 LOCAL_RANK=0",
             "export MASTER_ADDR=127.0.0.1",
@@ -217,7 +240,7 @@ def mk_launch_configs(group: ExperimentGroup, beaker_user: str) -> list[BeakerLa
             "export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}",
             # Provide args to append to torchrun
             'export TORCHRUN_ARGS="--standalone --rdzv_backend=c10d --rdzv_endpoint=${MASTER_ADDR}:${RDZV_PORT}"',
-        ]
+        ]"""
 
     return [
         BeakerLaunchConfig(
