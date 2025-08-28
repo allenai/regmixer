@@ -31,6 +31,10 @@ dev = [
     "isort>=5.12,<5.13",
     "pytest",
 ]
+interactive = [
+    "ipykernel",
+    "jupyter"
+]
 beaker = [
     "beaker-py>=1,<2",
     "GitPython>=3.0,<4.0",
@@ -46,7 +50,7 @@ eval = [
     "statsmodels"
 ]
 all = [
-    "regmixer[dev,beaker,wandb,eval]",
+    "regmixer[dev,beaker,wandb,eval,interactive]",
 ]
 
 [project.scripts]
