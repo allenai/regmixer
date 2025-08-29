@@ -19,7 +19,7 @@ proxy_model_id: "olmo_30m"
 tokenizer: "dolma2"
 weka: false
 dtype: "uint32"
-priority: normal
+priority: high
 cluster: ai2/augusta-google-1 #ai2/saturn-cirrascale, ai2/neptune-cirrascale
 device_batch_size: 32
 sources:
