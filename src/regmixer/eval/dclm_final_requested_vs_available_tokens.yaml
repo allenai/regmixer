@@ -1,6 +1,6 @@
 requested_tokens: 6_000_000_000_000 # 6 trillion
 leaf_level_constraints: true
-available_tokens: # 5 trillion x prior from dclm sample 
+available_tokens: # a guess: 5 trillion x prior from dclm sample 
   adult_content: 67760078203
   art_and_design: 70659711995
   crime_and_law: 170130914779

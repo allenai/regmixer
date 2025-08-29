@@ -1,0 +1,42 @@
+requested_tokens: 6_000_000_000_000 # 6 trillion
+leaf_level_constraints: true
+available_tokens: # a guess: 5 trillion x prior from dclm sample 
+  dclm:adult_content: 76060833803
+  dclm:art_and_design: 160348086949
+  dclm:crime_and_law: 222396097976
+  dclm:education_and_jobs: 374344033306
+  dclm:electronics_and_hardware: 194635013351
+  dclm:entertainment: 577063548483
+  dclm:fashion_and_beauty: 220059343754
+  dclm:finance_and_business: 802642906695
+  dclm:food_and_dining: 254698952283
+  dclm:games: 310668788169
+  dclm:health: 620956649928
+  dclm:history_and_geography: 172454367123
+  dclm:home_and_hobbies: 590670946430
+  dclm:industrial: 124777555466
+  dclm:literature: 327492875796
+  dclm:politics: 648092807597
+  dclm:religion: 290959977215
+  dclm:science_math_and_technology: 435189405388
+  dclm:social_life: 330364961114
+  dclm:software: 204400914204
+  dclm:software_development: 175919010405
+  dclm:sports_and_fitness: 516710923091
+  dclm:transportation: 199951010397
+  dclm:travel_and_tourism: 307695033705
+  stack-edu:C: 4735074247
+  stack-edu:CSharp: 7204525343
+  stack-edu:Cpp: 12530445761
+  stack-edu:Go: 1398595118
+  stack-edu:Java: 31347725888
+  stack-edu:JavaScript: 8886972357
+  stack-edu:Markdown: 28916320218
+  stack-edu:PHP: 7395033318
+  stack-edu:Python: 18017832560
+  stack-edu:Ruby: 1386775805
+  stack-edu:Rust: 1418447132
+  stack-edu:SQL: 7063472860
+  stack-edu:Shell: 2542637875
+  stack-edu:Swift: 1510019025
+  stack-edu:TypeScript: 2495753789

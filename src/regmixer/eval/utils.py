@@ -660,7 +660,7 @@ class SimulationProposer(Proposer):
                 free_prior = search_prior[free_indices]
                 free_prior /= np.sum(free_prior)
 
-            predicted_best_performance = sum([pred.predict(best_weights)[0] for pred in predictor])
+            predicted_best_performance = sum([pred.predict([best_weights]) for pred in predictor])
             logger.info(
                 f"Current best weights is: {best_weights} with predicted performance {predicted_best_performance}, and search prior is: {search_prior}"
             )
@@ -1297,7 +1297,6 @@ def mk_run_metrics(
         result = np.mean(
             [df.loc[:, metric_name].tail(samples).mean() for metric_name in group_metrics]
         )
-
         results[group_name] = result
     else:
         if pull_from_dashboard:
@@ -1306,7 +1305,6 @@ def mk_run_metrics(
                 offline_results = get_offline_evals_from_dashboard(display_name, offline_tasks, dashboard=d)
                 results.update(offline_results)
         else:
-
             for metric_name in in_loop_tasks:
                 results[metric_name] = df.loc[:, metric_name].tail(samples).mean()
 
@@ -1385,7 +1383,7 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
 
     #all_available_tasks = [data['task_config'].get('metadata', {}).get('alias')  for data in all_jsonl_data]
     #logger.info(f"Available tasks in JSONL data for {display_name}:")
-    #for task in all_available_tasks:
+    #for task in sorted(all_available_tasks):
     #    print(f'"{task}",')
     #raise ValueError()
 
@@ -1473,11 +1471,13 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
         .get("source_mixture_config", {})
         .get("source_configs", [])
     }
-
+    prefixes = ['dclm', 's2pdf', 'pes2o', 'stack-edu', 'finemath-3plus', 'arxiv', 'wikipedia']
     source_configs = {
-        (name.replace("_", ":", 1) if any(substr in name for substr in [
-            'dclm', 's2pdf', 'pes2o', 'stack-edu', 'finemath-3plus', 'arxiv', 'wikipedia'
-        ]) and "_" in name else name): value
+        (
+            name.replace("_", ":", 1)
+            if any(name.startswith(prefix + "_") for prefix in prefixes)
+            else name
+        ): value
         for name, value in source_configs.items()
     }
 

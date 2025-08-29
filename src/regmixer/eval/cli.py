@@ -359,6 +359,19 @@ def cli():
     type=str,
     help="If set, this states that certain elements of our proposed mix must have a specific weight",
     required=False,
+)
+@click.option(
+    '--support-domains', 
+    multiple=True, 
+    help="if set, we only select runs where the ratios on the support domains add to 1 ",
+    type=str,
+    default=None
+)
+@click.option(
+    '--drop-metrics', 
+    multiple=True, 
+    help="if set, we do not fit regression models on certain metrics",
+    type=str,
     default=None
 )
 def fit(
@@ -388,6 +401,8 @@ def fit(
     temperature: Optional[float],
     keep_sources: Optional[list[str]],
     dashboard: list[str],
+    support_domains: tuple[str],
+    drop_metrics: tuple[str],
     early_stopping: float = 0.0,
     dro_reference_model_id: Optional[str] = None,
     use_reference_model_predicted_scores: bool = False,
@@ -401,7 +416,7 @@ def fit(
     custom_name: Optional[str] = None,
     interactions: Optional[list[str]] = None,
     tol: Optional[float] = None,
-    fixed_search_weight: Optional[str] = None
+    fixed_search_weight: Optional[str] = None,
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -475,6 +490,10 @@ def fit(
         eval_config["tol"] = tol
     if fixed_search_weight is not None:
         eval_config['fixed_search_weight'] = fixed_search_weight
+    if len(support_domains) != 0:
+        eval_config['support_domains'] = support_domains
+    if len(drop_metrics) != 0:
+        eval_config['drop_metrics'] = drop_metrics
 
 
     # used for caching regression model
@@ -500,6 +519,8 @@ def fit(
     if metric_type is not None:
         regression_config["metric_type"] = metric_type
 
+    if len(support_domains) != 0:
+        regression_config["support_domains"] = support_domains
 
     output_dir = save_eval_config(eval_config, output_dir, custom_name)
 
@@ -656,8 +677,9 @@ def fit(
                 "code_tasks_offline", 
                 "code_tasks_offline_fixed", 
                 "olmo3_offline_tasks_0630",
-                "midtraining_aggregate_evals"
-                "midtraining_finegrained_evals"
+                "midtraining_aggregate_evals",
+                "midtraining_finegrained_evals",
+                "pretraining_tasks_for_paper"
                 ] or len(run.samples) > 0
             ]
 
@@ -670,8 +692,9 @@ def fit(
         numerical_cols = metrics.columns[3:]
         metrics[numerical_cols] = metrics[numerical_cols].apply(pd.to_numeric, errors='coerce')
         ratios = ratios[ratios['run'].isin(metrics.run)]
-        assert np.isclose(ratios[ratios.columns[3:]].sum(axis=1).sum(), len(ratios)), "Ratios do not add up to 1!"
 
+        if len(support_domains) == 0:
+            assert np.isclose(ratios[ratios.columns[3:]].sum(axis=1).sum(), len(ratios)), "Ratios do not add up to 1!"
         if fixed_weight is not None:
             # normalize the non-fixed-weight domains to add to 1 
             domains = ratios.columns[3:]
@@ -682,6 +705,21 @@ def fit(
         logger.info(f"Saved ratios to {ratios_cache_path} and metrics to {metrics_cache_path}")
 
     metrics_to_index = eval_metric_group.value
+    if len(support_domains) != 0:
+        # only keep ratios/
+        keep_idxs = np.where(np.isclose(ratios[list(support_domains)].sum(axis=1), 1))[0]
+        ratios = ratios.iloc[keep_idxs]
+        drop_col = list(set(ratios.columns[3:]).difference(set(support_domains)))
+        ratios = ratios.drop(columns=drop_col)
+        metrics = metrics.iloc[keep_idxs]
+
+        new_priors = {k: v for k, v in priors[0].items() if k in list(support_domains)}
+        total = sum(list(new_priors.values()))
+        new_priors = {k: v/total for k, v in new_priors.items()}
+        # hack to update prior tuple 
+        priors_list = list(priors)
+        priors_list[0] = new_priors
+        priors = tuple(priors_list)
 
     if group_average:
         metrics_to_index = [eval_metric_group_name]
@@ -732,11 +770,18 @@ def fit(
         )
 
     cols_to_check = metrics.columns[3:]
-    cols_with_nans = metrics[cols_to_check].columns[metrics[cols_to_check].isna().any()].tolist()
+    bad_rows = metrics[metrics[cols_to_check].isna().any(axis=1)]
+
+    if not bad_rows.empty:
+        logger.warning(f"Found NaNs in the following rows, dropping them! {bad_rows.index.tolist()}")
+        metrics = metrics.drop(index=bad_rows.index)
+        ratios = ratios.drop(index=bad_rows.index)
+
+    """ cols_with_nans = metrics[cols_to_check].columns[metrics[cols_to_check].isna().any()].tolist()
     if len(cols_with_nans) > 0:
         logger.warning(f"Found NaNs in the following columns, dropping them! {cols_with_nans}")
         metrics = metrics.drop(columns=cols_with_nans)
-        metrics_to_index = [m for m in metrics_to_index if m not in cols_with_nans]
+        metrics_to_index = [m for m in metrics_to_index if m not in cols_with_nans] """
 
     if regression_type == "log_linear":
         if (metrics[metrics.columns[3:]] < 0).any().any():
@@ -756,6 +801,8 @@ def fit(
     if train_split != 1.0:
         # If we also want to subsample the training_data to study the effect of number of proxy runs
         logger.info(f"Subsampling training data to {train_split} of original size")
+        if train_split > 1:
+            train_split = int(train_split)
 
         if neighborhood is None:
             # we IID subselect training data
@@ -784,7 +831,7 @@ def fit(
     # which is why we need to cache based on a separate subconfig, regression_config 
     regression_config_str = json.dumps(regression_config, sort_keys=True)
     hash_str = hashlib.sha256(regression_config_str.encode("utf-8")).hexdigest()[:16]
-    regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / " ".join(experiment_groups) / hash_str 
+    regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / "_".join(experiment_groups) / hash_str 
     regression_model_cache_folder.mkdir(parents=True, exist_ok=True)
     regression_model_cache_path = regression_model_cache_folder / f"regression_params.pkl"
 
@@ -821,6 +868,21 @@ def fit(
             logger.info(f"Log linear regression model saved to {regression_model_cache_path}")
             with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
                 f.write(str(regression_model_cache_path))
+
+
+    if len(drop_metrics) != 0:
+        drop_indices = [metrics.columns.get_loc(m) - 3   # shift because metrics start at col 3
+                        for m in drop_metrics 
+                        if m in metrics.columns[3:]]
+        logger.info(f"Dropping metrics {drop_metrics} at indices {drop_indices}")
+        # Remove those predictors by index
+        predictors = [p for i, p in enumerate(predictors) if i not in drop_indices]
+        metrics = metrics.drop(columns=list(drop_metrics), errors='ignore')
+        Y_train = np.delete(Y_train, drop_indices, axis=1)
+        Y_test = np.delete(Y_test, drop_indices, axis=1)
+
+        metrics_to_index = [m for i, m in indexed_metrics if i not in drop_indices]
+        indexed_metrics = list(enumerate(metrics_to_index))
 
     plot_interaction_matrix(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type)
     plot_interaction_matrix_signed_evidence(output_dir, predictors, regression_type, ratios.columns[3:].tolist(), metrics.columns[3:].tolist(), ratios, metric_type)

@@ -1,0 +1,27 @@
+requested_tokens: 127939584000 # 5xC 1B
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet 
+  adult_content: 9986282062 
+  art_and_design: 10413621606
+  crime_and_law: 25073396423
+  education_and_jobs: 27219188653
+  electronics_and_hardware: 11815005112
+  entertainment: 65106484344
+  fashion_and_beauty: 5490759782
+  finance_and_business: 45733158679
+  food_and_dining: 15612729259
+  games: 33895620477
+  health: 57992322702
+  history_and_geography: 23735036428
+  home_and_hobbies: 18703739024
+  industrial: 6421534569
+  literature: 53768218251
+  politics: 90076592083
+  religion: 40937951061
+  science_math_and_technology: 62949325018
+  social_life: 32236058743
+  software: 15922527708
+  software_development: 32921823893
+  sports_and_fitness: 28997912992
+  transportation: 13380851810
+  travel_and_tourism: 8495229492
