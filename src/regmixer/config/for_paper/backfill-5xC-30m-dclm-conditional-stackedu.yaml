@@ -1,11 +1,10 @@
 name: backfill-5xC-30m-dclm-conditional-stackedu
-description: 30M @ 5xC conditional swarm on DCLM p* and StackEdu, where DCLM p* is
-  rep=4 @6T (e3dad906846f76a6)
+description: 30M @ 5xC conditional swarm on DCLM p* and StackEdu, where DCLM p* is rep=4 @6T (e3dad906846f76a6)
 budget: ai2/oe-base
 workspace: ai2/dolma2
 nodes: 1
 gpus: 1
-variants: 256
+variants: 128
 preemptible: true
 max_tokens: 2910233600
 allow_repetition: false
