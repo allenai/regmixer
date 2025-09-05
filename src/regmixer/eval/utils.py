@@ -1495,25 +1495,15 @@ def mk_weights_from_config(config: dict, priors: tuple, display_name: str) -> di
                 weights[domain] = (
                     source_configs[source_name].get("target_ratio", 0.0) * priors[0][domain]
                 )
-                if weights[domain] != 0:
-                    print(f"here 1: {domain}: {weights[domain]}")
-
             elif ":" in domain and domain.split(":")[-1] in source_configs:
                 domain_name = domain.split(":")[-1]
                 weights[domain] = source_configs[domain_name].get("target_ratio", 0.0)
-
-                if weights[domain] != 0:
-                    print(f"here 2: {domain}: {weights[domain]}")
-
             elif ":" not in domain:
                 # 2) prior requests a source (i.e. when we condition on a topic-level p* mix) but wandb mixes are specified at the leaf level
                 cfg = {
                     k: v.get("target_ratio", 0.0) for k, v in source_configs.items() if f"{domain}:" in k
                 }
                 weights[domain] = sum(cfg.values()) if cfg else 0.0
-
-                if weights[domain] != 0:
-                    print(f"here 3: {domain}: {weights[domain]}")
             else:
                 # 3) prior's domain has 0 weight in the wandb config
                 weights[domain] = 0.0
