@@ -323,7 +323,8 @@ class SimulationProposer(Proposer):
         metric_type: Optional[str] = None,
         tol: Optional[float] = None,
         fixed_search_weight: Optional[str] = None,
-        reference_ratio: Optional[str] = None
+        reference_ratio: Optional[str] = None,
+        make_worst_mix: bool = False
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -614,9 +615,9 @@ class SimulationProposer(Proposer):
                 for t in tol_range:
                     # we allow for predicted scores to be within a tolerance of the reference scores
                     # if the current tol results in no remaining simulations, we increase tol
-                    if metric_type == "primary_score":
+                    if (metric_type == "primary_score" and not make_worst_mix) or (metric_type != "primary_score" and make_worst_mix):
                         pareto_idxs = np.where(np.all(predictions.T > reference_scores - t, axis=1))[0]
-                    else:
+                    elif (metric_type == "primary_score" and make_worst_mix) or (metric_type != "primary_score" and not make_worst_mix):
                         pareto_idxs = np.where(np.all(predictions.T < reference_scores + t, axis=1))[0]
                     if len(pareto_idxs) != 0:
                         logger.info(f"Using eps={t} for enforcing pareto improvements")
@@ -642,10 +643,10 @@ class SimulationProposer(Proposer):
             else:
                 objs = predictor[index].predict(simulations)
 
-            if metric_type == "primary_score":
+            if (metric_type == "primary_score" and not make_worst_mix) or (metric_type != "primary_score" and make_worst_mix):
                 best_mask = (objs.max() - objs) < 1e-3
                 print(objs.max())
-            else:
+            elif (metric_type == "primary_score" and make_worst_mix) or (metric_type != "primary_score" and not make_worst_mix):
                 best_mask = (objs - objs.min()) < 1e-3
                 print(objs.min())
             best_weights = simulations[best_mask].mean(0)
@@ -1464,7 +1465,7 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
     return offline_results
 
 
-def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
+def mk_weights_from_config(config: dict, priors: tuple, display_name: str) -> dict[str, float]:
     source_configs = {
         source["source_name"]: source
         for source in config.get("dataset", {})
@@ -1481,6 +1482,9 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
         for name, value in source_configs.items()
     }
 
+    if "62e7dc06" in display_name:
+        source_configs = {f"dclm:{k}" : v for k, v in source_configs.items()}
+
     weights = {}
     for domain in priors[0].keys():
         if domain not in source_configs:
@@ -1491,6 +1495,15 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
                 weights[domain] = (
                     source_configs[source_name].get("target_ratio", 0.0) * priors[0][domain]
                 )
+                if weights[domain] != 0:
+                    print(f"here 1: {domain}: {weights[domain]}")
+
+            elif ":" in domain and domain.split(":")[-1] in source_configs:
+                domain_name = domain.split(":")[-1]
+                weights[domain] = source_configs[domain_name].get("target_ratio", 0.0)
+
+                if weights[domain] != 0:
+                    print(f"here 2: {domain}: {weights[domain]}")
 
             elif ":" not in domain:
                 # 2) prior requests a source (i.e. when we condition on a topic-level p* mix) but wandb mixes are specified at the leaf level
@@ -1498,6 +1511,9 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
                     k: v.get("target_ratio", 0.0) for k, v in source_configs.items() if f"{domain}:" in k
                 }
                 weights[domain] = sum(cfg.values()) if cfg else 0.0
+
+                if weights[domain] != 0:
+                    print(f"here 3: {domain}: {weights[domain]}")
             else:
                 # 3) prior's domain has 0 weight in the wandb config
                 weights[domain] = 0.0
@@ -1778,7 +1794,7 @@ def mk_output_prefix(
     output_dir: str,
     metric: str,
     regression_type: str,
-    train_split: float,
+    train_split: tuple[float],
     n_test: int,
     split_seed: int,
     n_samples: int,
@@ -1787,11 +1803,12 @@ def mk_output_prefix(
     def sanitize(s: str) -> str:
         return re.sub(r"[^a-zA-Z0-9_\-]", "_", s)
 
+    train_split_str = [str(t) for t in train_split]
     return (
         os.path.join(output_dir, sanitize(metric))
         + (f"_alpha_{str(alpha).replace('.', '_')}" if alpha and alpha != 1.0 else "")
         + (f"_{regression_type}_reg" if regression_type != "lightgbm" else "")
-        + (f"_trainsplit_{train_split}" if train_split != 1.0 else "")
+        + (f"_trainsplit_{'_'.join(train_split_str)}" if train_split[0] != 1.0 else "")
         + (f"_ntest_{n_test}" if n_test != 0 else "")
         + (f"_seed_{split_seed}" if split_seed != 0 else "")
         + (f"_{n_samples}_samples" if n_samples != 10 else "")

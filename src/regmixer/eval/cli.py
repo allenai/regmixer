@@ -158,9 +158,10 @@ def cli():
 @click.option(
     "-t",
     "--train-split",
+    multiple=True,
     type=float,
-    default=1.0,
-    help="Fraction of dataset used for training. Default = 1.0 means that train equals test.",
+    default=[1.0],
+    help="Fraction of dataset/number of samples used for training. Default = 1.0 means that train equals test.",
     required=False,
 )
 @click.option(
@@ -374,6 +375,13 @@ def cli():
     type=str,
     default=None
 )
+@click.option(
+    '--make-worst-mix', 
+    is_flag=True,
+    help="if set, we invert the objective function and produce a bad mix (for counterfactual)",
+    required=False,
+    default=False
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -386,7 +394,7 @@ def fit(
     no_cache: bool,
     use_entropy: bool,
     regression_type: str,
-    train_split: float,
+    train_split: tuple[float],
     n_test: int,
     seed: int,
     opt_avg_metric: bool,
@@ -417,6 +425,7 @@ def fit(
     interactions: Optional[list[str]] = None,
     tol: Optional[float] = None,
     fixed_search_weight: Optional[str] = None,
+    make_worst_mix: bool = False
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -442,7 +451,7 @@ def fit(
         "group_metrics": group_metrics,
         "workspace": workspace,
         "regression_type": regression_type,
-        "train_split": train_split,
+        "train_split": train_split[0] if len(train_split) == 1 else train_split,
         "n_test": n_test,
         "seed": seed,
         "opt_avg_metric": opt_avg_metric,
@@ -494,6 +503,8 @@ def fit(
         eval_config['support_domains'] = support_domains
     if len(drop_metrics) != 0:
         eval_config['drop_metrics'] = drop_metrics
+    if make_worst_mix:
+        eval_config['make_worst_mix'] = True
 
 
     # used for caching regression model
@@ -501,7 +512,7 @@ def fit(
         "group_average": group_average,
         "group_metrics": group_metrics,
         "regression_type": regression_type,
-        "train_split": train_split,
+        "train_split": train_split[0] if len(train_split) == 1 else train_split,
         "n_test": n_test,
         "seed": seed,
         "neighborhood": neighborhood,
@@ -602,7 +613,7 @@ def fit(
         ratios = ratios[ratios['run'].isin(metrics.run)]
     else:
         run_ratios = [
-            {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors)}
+            {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors, run.display_name)}
             for idx, run in enumerate(run_instances)
         ]
         if pull_from_dashboard:
@@ -693,7 +704,8 @@ def fit(
         metrics[numerical_cols] = metrics[numerical_cols].apply(pd.to_numeric, errors='coerce')
         ratios = ratios[ratios['run'].isin(metrics.run)]
 
-        if len(support_domains) == 0:
+        breakpoint()
+        if len(support_domains) == 0 and len(train_split) == 1:
             assert np.isclose(ratios[ratios.columns[3:]].sum(axis=1).sum(), len(ratios)), "Ratios do not add up to 1!"
         if fixed_weight is not None:
             # normalize the non-fixed-weight domains to add to 1 
@@ -774,6 +786,7 @@ def fit(
 
     if not bad_rows.empty:
         logger.warning(f"Found NaNs in the following rows, dropping them! {bad_rows.index.tolist()}")
+        breakpoint()
         metrics = metrics.drop(index=bad_rows.index)
         ratios = ratios.drop(index=bad_rows.index)
 
@@ -798,17 +811,36 @@ def fit(
         X_train, X_test, Y_train, Y_test = train_test_split(X_train, Y_train, test_size=n_test / len(Y_train), random_state=seed)
 
 
-    if train_split != 1.0:
+    if train_split[0] != 1.0:
         # If we also want to subsample the training_data to study the effect of number of proxy runs
         logger.info(f"Subsampling training data to {train_split} of original size")
-        if train_split > 1:
-            train_split = int(train_split)
+
+        train_split = [int(t) if t > 1 else t for t in train_split]                
 
         if neighborhood is None:
             # we IID subselect training data
-            X_train, _, Y_train, _ = train_test_split(X_train, Y_train, train_size=train_split, random_state=seed)
+    
+            if len(train_split) > 1:
+                all_x = []
+                all_y = []
+                for i, t in enumerate(train_split):
+                    ratios_subset = ratios[ratios['name'].str.contains(full_group_names[i])]
+                    metrics_subset = metrics[metrics['name'].str.contains(full_group_names[i])]
+
+                    X_train_subset = ratios_subset[ratios_subset.columns[3:]].values
+                    Y_train_subset = metrics_subset[metrics_subset.columns[3:]].values
+
+                    X_train_subset, _, Y_train_subset, _ = train_test_split(X_train_subset, Y_train_subset, train_size=t, random_state=seed)
+
+                    all_x.append(X_train_subset)
+                    all_y.append(Y_train_subset)
+                X_train = np.concatenate(all_x)
+                Y_train = np.concatenate(all_y)
+            else:
+                X_train, _, Y_train, _ = train_test_split(X_train, Y_train, train_size=train_split[0], random_state=seed)
         else:
-            X_train, Y_train = compute_mixture_neighborhood(X_train, Y_train, ratios, neighborhood, train_split)
+            assert len(train_split) == 1, "If neighborhood is not set, train_split must be a single float"
+            X_train, Y_train = compute_mixture_neighborhood(X_train, Y_train, ratios, neighborhood, train_split[0])
 
     if n_test == 0:
         X_test = deepcopy(X_train)
@@ -977,7 +1009,8 @@ def fit(
                 ratios=ratios,
                 tol=tol,
                 fixed_search_weight=fixed_search_weight,
-                reference_ratio=reference_ratio if use_reference_model_as_search_prior else None
+                reference_ratio=reference_ratio if use_reference_model_as_search_prior else None,
+                make_worst_mix=make_worst_mix
             )
 
             plot_and_log_weights(
@@ -1023,7 +1056,8 @@ def fit(
             ratios=ratios,
             tol=tol,
             fixed_search_weight=fixed_search_weight,
-            reference_ratio=reference_ratio if use_reference_model_as_search_prior else None
+            reference_ratio=reference_ratio if use_reference_model_as_search_prior else None,
+            make_worst_mix=make_worst_mix
         )
         plot_and_log_weights(
             prior=priors[0],
