@@ -107,25 +107,35 @@ class LinearRegressor(Regressor):
         self.model = sm.OLS(target, x).fit()
 
 class QuadraticRegressor(Regressor):
-    #def __init__(self, **kwargs):
-    #    self.model = LinearRegression(fit_intercept=False)
+    def __init__(self, interactions, **kwargs):
+        self.model = None
+        assert interactions is not None, "Interactions must be provided for quadratic regression."
+        self.interactions = []
+        for interaction in interactions:
+            self.interactions.append(tuple([int(var) for var in interaction.split(",")]))
 
-    def __init__(self, B_mask=None, **kwargs):
-        self.model = None 
-
-    #def fit(self, x, y, idx, **kwargs):
-    #    target = y[:, idx]
-    #    self.model = self.model.fit(x, target)
+    def _transform(self, x):
+        """Add interaction terms to x based on self.interactions"""
+        x = np.asarray(x)
+        interaction_terms = []
+        for i, j in self.interactions:
+            interaction = (x[:, i] * x[:, j]).reshape(-1, 1)
+            interaction_terms.append(interaction)
+        if interaction_terms:
+            interaction_matrix = np.hstack(interaction_terms)
+            x_augmented = np.hstack([x, interaction_matrix])
+        else:
+            x_augmented = x
+        return x_augmented
 
     def fit(self, x, y, idx, **kwargs):
+        x_augmented = self._transform(x)
         target = y[:, idx]
-        # TODO: transform x according to interactions
-        # we do not add intercept because this would make X linearly dependent.
-        self.model = sm.OLS(target, x).fit()
+        self.model = sm.OLS(target, x_augmented).fit()
 
     def predict(self, x):
-        # TODO: transform x according to interactions 
-        pass 
+        x_augmented = self._transform(x)
+        return self.model.predict(x_augmented)
 
 
 class LogLinearRegressor(Regressor):
@@ -289,6 +299,7 @@ REGRESSION_TYPES = {
     "log_linear": LogLinearRegressor,
     "log_nonlinear": LogNonLinearRegressor,
     "search": SearchRegressor,
+    "quadratic": QuadraticRegressor,
 }
 
 
@@ -759,10 +770,10 @@ def build_regression(
     X_train: np.ndarray,
     regression_type: str,
     early_stopping: float,
-    B_mask: Optional[List[Tuple[int, int]]] = None,
+    interactions: Optional[List[str]] = None,
 ) -> Regressor:
     logger.info(f"Building regression model, index: {idx}")
-    reg = REGRESSION_TYPES[regression_type](B_mask=B_mask)
+    reg = REGRESSION_TYPES[regression_type](interactions=interactions)
     reg.fit(X_train, Y_train, idx, early_stopping=early_stopping)
     return reg
 
@@ -1058,9 +1069,17 @@ def plot_interaction_matrix(
     metric_names: list[str],
     ratios: pd.DataFrame,
     metric_type: Optional[str] = None,
+    interactions: Optional[List[str]] = None,
 ):
     metric_names = [metric.split("/")[-1].split(" ")[0] for metric in metric_names]
-    interaction_matrix = np.zeros((len(metric_names), len(domain_names)))
+
+    interaction_pairs = []
+    if interactions is not None:
+        for interaction in interactions:
+            interaction_pairs.append(tuple([int(var) for var in interaction.split(",")]))
+
+    interaction_matrix = np.zeros((len(metric_names), len(domain_names) + len(interaction_pairs)))
+
     for i, predictor in enumerate(predictors):
         if regression_type == "lightgbm":
             interaction_matrix[i] = predictor.model.feature_importances_
@@ -1070,6 +1089,8 @@ def plot_interaction_matrix(
             # normalize coefficients by the standard deviation of the corresponding domain
             #std = ratios[ratios.columns[3:]].std(ddof=0).values  # std for selected columns only
             interaction_matrix[i] = predictor.model.params #* std
+        elif regression_type == "quadratic":
+            interaction_matrix[i] = predictor.model.params
 
     domain_reordering = None 
     if "a3d4f82c" in output_dir:
@@ -1115,18 +1136,18 @@ def plot_interaction_matrix(
 
     # Annotate each cell with its value
     for i in range(len(metric_names)):
-        if regression_type == "linear":
+        if regression_type in ["linear", "quadratic"]:
                 p_values = predictors[i].model.pvalues
         for j in range(len(domain_names)):
             val = interaction_matrix[i, j]
             text_str = f"β={val:.2f}"
-            if regression_type == "linear":
+            if regression_type in ["linear", "quadratic"]:
                 text_str += f"\np={p_values[j]:.2g}"
             plt.text(
                 j, i, text_str,
                 ha='center', va='center',
                 color='black' if abs(val) < 0.5 * np.max(np.abs(interaction_matrix)) else 'white',
-                fontsize=8
+                fontsize=10
             )
 
     plt.tight_layout()
@@ -1389,7 +1410,7 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
     #raise ValueError()
 
     offline_results = {}
-    for task in tasks:
+    for i, task in enumerate(tasks):
         task_data = [
             data
             for data in all_jsonl_data
@@ -1421,7 +1442,7 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
                 if len(task_data) == 0:
                     all_available_tasks = [data['task_config'].get('metadata', {}).get('alias')  for data in all_jsonl_data]
                     logger.warning(f"Task {task} not found in JSONL data for {display_name}. Available tasks: {all_available_tasks}")
-                    break
+                    continue
                 else:
                     logger.info(
                         f"Task {task} found in JSONL data for {display_name} with alias {task_data[0]['task_config'].get('metadata', {}).get('alias')}"
@@ -1433,7 +1454,7 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
                 logger.warning(
                     f"Metric type {metric_type} not found in task {data['task_name']} metrics. Available metrics: {data['metrics'].keys()}"
                 )
-                break
+                continue
             else:
                 name = data["task_config"]["metadata"]["alias"].replace("bpb:", "").replace(":full", "")
                 metric_value = data["metrics"][metric_type]
@@ -1442,21 +1463,21 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
             if "bits_per_byte_corr" in data["metrics"]:
                 name = data["task_config"]["metadata"]["alias"].replace("bpb:", "").replace(":full", "")
                 offline_results[name] = data["metrics"]["bits_per_byte_corr"]
-                #logger.info(
-                #    f"Task {name} found in JSONL data for {display_name} with bits_per_byte_corr {data['metrics']['bits_per_byte_corr']}"
-                #)
+                logger.info(
+                    f"Task {name} found in JSONL data for {display_name} with bits_per_byte_corr {data['metrics']['bits_per_byte_corr']}"
+                )
             elif "bits_per_byte_corr_macro" in data["metrics"]:
                 name = data["task_config"]["metadata"]["alias"].replace("bpb:", "").replace(":full", "")
                 offline_results[name] = data["metrics"]["bits_per_byte_corr_macro"]
-                #logger.info(
-                #    f"Task {name} found in JSONL data for {display_name} with bits_per_byte_corr_macro {data['metrics']['bits_per_byte_corr_macro']}"
-                #)
+                logger.info(
+                    f"Task {name} found in JSONL data for {display_name} with bits_per_byte_corr_macro {data['metrics']['bits_per_byte_corr_macro']}"
+                )
             elif "bits_per_byte" in data["metrics"]:
                 name = data["task_name"].replace("bpb:", "").replace(":full", "")
                 offline_results[name] = data["metrics"]["bits_per_byte"]
-                #logger.info(
-                #    f"Task {name} found in JSONL data for {display_name} with bits_per_byte {data['metrics']['bits_per_byte']}"
-                #)
+                logger.info(
+                    f"Task {name} found in JSONL data for {display_name} with bits_per_byte {data['metrics']['bits_per_byte']}"
+                )
             else:
                 logger.warning(
                     f"{data['task_name']} does not have bits_per_byte_corr or bits_per_byte_corr_macro in metrics {data['metrics'].keys()}"

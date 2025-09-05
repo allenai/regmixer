@@ -440,7 +440,6 @@ def fit(
     if use_cookbook:
         workspace = "ai2-llm/olmo-cookbook"
         assert pull_from_dashboard, "If using olmo-cookbook, pull_from_dashboard must be set to True"
-        assert metric_type=="primary_score", "If using olmo-cookbook, metric_type must be set to primary_score"
 
     eval_config = {
         "config": config[0] if len(config) == 1 else config,
@@ -523,12 +522,12 @@ def fit(
     if select_top_k_runs < 1.0:
         eval_config["select_top_k_runs"] = select_top_k_runs
         regression_config["select_top_k_runs"] = select_top_k_runs
-
     if fixed_weight is not None:
         regression_config["fixed_weight"] = fixed_weight
-
     if metric_type is not None:
         regression_config["metric_type"] = metric_type
+    if interactions is not None:
+        regression_config["interactions"] = interactions
 
     if len(support_domains) != 0:
         regression_config["support_domains"] = support_domains
@@ -793,6 +792,7 @@ def fit(
     """ cols_with_nans = metrics[cols_to_check].columns[metrics[cols_to_check].isna().any()].tolist()
     if len(cols_with_nans) > 0:
         logger.warning(f"Found NaNs in the following columns, dropping them! {cols_with_nans}")
+        breakpoint()
         metrics = metrics.drop(columns=cols_with_nans)
         metrics_to_index = [m for m in metrics_to_index if m not in cols_with_nans] """
 
@@ -883,7 +883,7 @@ def fit(
     else:
         logger.info(f"Will save regression model to {regression_model_cache_path}")
         for idx, metric in indexed_metrics:
-            predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping, B_mask if regression_type == "log_nonlinear" else None))
+            predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping, interactions))
             # save intermediate progress after each regression model
             if regression_type == "log_linear":
                 parameters = {indexed_metrics[i][-1]: predictors[i].model for i in range(len(predictors))}
@@ -1118,11 +1118,12 @@ def fit(
                 diff = reference_scores - predictions 
             colors = ['green' if val > 0 else 'red' for val in diff]
             x = np.arange(len(diff))
-
+ 
             plt.figure(figsize=(10, 6))
             plt.bar(x, diff, color=colors)
             plt.title(f'Pareto Improvement')
-            plt.ylabel('PREDICTED Difference (BPB v2, 30M)')
+
+            plt.ylabel('PREDICTED Improvements over reference model')
             plt.axhline(0, color='black', linewidth=0.8)
             plt.xticks(ticks=x, labels=metrics.columns[3:].tolist(), rotation=90)
             plt.tight_layout()
