@@ -1,0 +1,61 @@
+sources:
+- domain: code_fim
+  paths:
+  - s3://ai2-llm/preprocessed/stack-edu/sample-fim-weighted-pl-edu-score-decon/**/**/*.npy
+  weight: 0.018221511638381694
+- domain: dolminomath
+  paths:
+  - s3://ai2-llm/preprocessed/midtraining-reasoning/flat_dolmino_math-decon-2/allenai/dolma2-tokenizer/*.npy
+  weight: 0.009104663397140668
+- domain: flan
+  paths:
+  - s3://ai2-llm/preprocessed/tulu_flan/v1-FULLDECON-HARD-TRAIN-60M-shots_all-upweight_1-dialog_false-sep_rulebased-decon/allenai/dolma2-tokenizer/*.npy
+  weight: 0.014529065976776546
+- domain: instruction-new-format
+  paths:
+  - s3://ai2-llm/preprocessed/tulu-3-sft-for-olmo-3-midtraining/raw/tulu-3-midtrain-v0-data-simple-concat-with-therefore-template-decon/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0013965382464307529
+- domain: megamatt
+  paths:
+  - s3://ai2-llm/preprocessed/megamath_web_pro_max/beaker_rewrites-decon-2/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0033083451584126583
+- domain: nemotron-synth-qa
+  paths:
+  - s3://ai2-llm/preprocessed/Nemotron-CC/v0/quality=high/kind=synthetic/kind2=diverse_qa_pairs-decon/allenai/dolma2-tokenizer/*.npy
+  weight: 0.41447933471636883
+- domain: openmathreasoning-fullthoughts-rewrite
+  paths:
+  - s3://ai2-llm/preprocessed/midtraining-reasoning/OpenMathReasoning/OpenMathReasoning-rewrite-full-thoughts/jsonls-decon-2/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0007248037521276994
+- domain: rcqa
+  paths:
+  - s3://ai2-llm/preprocessed/wiki_psgqa_rewrites/psgqa_rewrites_v1-decon-2/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0035907671540197487
+- domain: reddit-high
+  paths:
+  - s3://ai2-llm/preprocessed/reddit-rewrites/densesub_highthresh_microanneal_4omini_rewrite/documents-decon-2/allenai/dolma2-tokenizer/*.npy
+  weight: 0.008399730464173976
+- domain: sponge
+  paths:
+  - s3://ai2-llm/preprocessed/sponge_63_mixes/eli5_60pct_filter-decon-2/*/allenai/dolma2-tokenizer/*.npy
+  weight: 0.004439843668413971
+- domain: swallowcode
+  paths:
+  - s3://ai2-llm/preprocessed/tokyotech-llm/swallowcode/scor_final_data-decon/allenai/dolma2-tokenizer/*.npy
+  weight: 0.01604361120491637
+- domain: swallowmath
+  paths:
+  - s3://ai2-llm/preprocessed/tokyotech-llm/swallowmath/beaker_outputs-decon-2/allenai/dolma2-tokenizer/*.npy
+  weight: 0.00479124042986819
+- domain: tinymath-mind
+  paths:
+  - s3://ai2-llm/preprocessed/midtraining-reasoning/tinyMATH/MIND/data/processed-decon-2/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0007655950065035902
+- domain: tinymath-pot
+  paths:
+  - s3://ai2-llm/preprocessed/midtraining-reasoning/tinyMATH/PoT/processed_data/processed-decon-2/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0002049491864652579
+- domain: hqweb-pdf
+  paths:
+  - placeholder
+  weight: 0.5
