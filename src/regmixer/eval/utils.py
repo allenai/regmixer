@@ -945,7 +945,7 @@ def plot_correlation(
     X_train: np.ndarray,
     index: int,
     predictors: list[Regressor],
-    train_split: float,
+    train_split: tuple[float],
     n_test: int,
     split_seed: int,
     n_samples: int,
@@ -971,7 +971,7 @@ def plot_correlation(
 
     corr_results = {}
 
-    if train_split == 1 and n_test == 0:
+    if train_split[0] == 1 and n_test == 0:
         # Only plot train if train and test are the same
         sns.regplot(
             x=y_pred_train,
