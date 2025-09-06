@@ -1,0 +1,47 @@
+requested_tokens: 6_000_000_000_000 # 6 trillion
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet 
+  arxiv: 20_000_000_000 # 20 billion
+  dclm: 5_000_000_000_000 # 5 trillion
+  finemath-3plus: 34_000_000_000 # 34 billion
+  pes2o: 60_000_000_000 # 60 billion
+  s2pdf:adult: 303073226
+  s2pdf:art_design: 6833185034
+  s2pdf:crime_law: 42538674743
+  s2pdf:education_jobs: 138127926093
+  s2pdf:entertainment: 6069602783
+  s2pdf:fashion_beauty: 557917820
+  s2pdf:finance_business: 61150044703
+  s2pdf:food_dining: 2322982204
+  s2pdf:games: 2486095532
+  s2pdf:hardware: 7334608118
+  s2pdf:health: 108215933374
+  s2pdf:history: 26016611836
+  s2pdf:home_hobbies: 3924579643
+  s2pdf:industrial: 29389278657
+  s2pdf:literature: 31886391090
+  s2pdf:politics: 39234116889
+  s2pdf:religion: 24729732953
+  s2pdf:science_tech: 424245385160
+  s2pdf:social_life: 3181652910
+  s2pdf:software: 9146853216
+  s2pdf:software_dev: 41841278724
+  s2pdf:sports_fitness: 5450913796
+  s2pdf:transportation: 17149342957
+  s2pdf:travel: 2102425717
+  stack-edu:C: 4735074247
+  stack-edu:CSharp: 7204525343
+  stack-edu:Cpp: 12530445761
+  stack-edu:Go: 1398595118
+  stack-edu:Java: 31347725888
+  stack-edu:JavaScript: 8886972357
+  stack-edu:Markdown: 28916320218
+  stack-edu:PHP: 7395033318
+  stack-edu:Python: 18017832560
+  stack-edu:Ruby: 1386775805
+  stack-edu:Rust: 1418447132
+  stack-edu:SQL: 7063472860
+  stack-edu:Shell: 2542637875
+  stack-edu:Swift: 1510019025
+  stack-edu:TypeScript: 2495753789
+  wikipedia: 10_000_000_000 # 10 billion

@@ -1239,6 +1239,69 @@ echo "All evaluation tasks completed!"
 
 
 
+: 'FULL_RANGE=($(seq -f "%04g" 0 127))
+EXCLUDED=()
+INCLUDED=()
+
+for num in "${FULL_RANGE[@]}"; do
+    skip=false
+    for exclude in "${EXCLUDED[@]}"; do
+        if [[ "$num" == "$exclude" ]]; then
+            skip=true
+            break
+        fi
+    done
+    if [[ "$skip" == false ]]; then
+        INCLUDED+=("$num")
+    fi
+done
+
+# Process all checkpoints with max 12 concurrent jobs
+for i in "${INCLUDED[@]}"; do
+    # Wait until we have fewer than 12 jobs running
+    while [ $(count_jobs) -ge 12 ]; do
+        sleep 5
+    done
+
+    echo "Starting evaluation for checkpoint $i..."
+    {
+
+      olmo-cookbook-eval evaluate \
+      "/oe-data-default/ai2-llm/checkpoints/mayeec/5xC-30m-all-dressed-topics-95d5a161-$i/step22200-hf" \
+      --tasks "olmo3:dev:1b:main" \
+      --priority high \
+      --cluster ai2/jupiter-cirrascale-2 \
+      --num-gpus 1 \
+      --model-backend vllm \
+      --model-args dtype=bfloat16 \
+      --dashboard regmixer \
+      --workspace ai2/dolma2 \
+      --partition-size 8 
+
+      olmo-cookbook-eval evaluate \
+      "/oe-data-default/ai2-llm/checkpoints/mayeec/5xC-30m-all-dressed-topics-95d5a161-$i/step22200-hf" \
+      --tasks "olmo3:dev:1b:main:hf" \
+      --priority high \
+      --cluster ai2/jupiter-cirrascale-2 \
+      --num-gpus 1 \
+      --model-backend hf \
+      --model-args dtype=bfloat16 \
+      --dashboard regmixer \
+      --workspace ai2/dolma2
+
+      echo "Completed checkpoint $i"
+    } &
+done
+
+# Wait for all remaining jobs to complete
+wait
+echo "All evaluation tasks completed!"
+'
+
+
+
+
+
 FULL_RANGE=($(seq -f "%04g" 0 127))
 EXCLUDED=()
 INCLUDED=()

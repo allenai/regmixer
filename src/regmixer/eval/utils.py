@@ -334,7 +334,8 @@ class SimulationProposer(Proposer):
         metric_type: Optional[str] = None,
         tol: Optional[float] = None,
         fixed_search_weight: Optional[str] = None,
-        reference_ratio: Optional[str] = None
+        reference_ratio: Optional[str] = None,
+        make_worst_mix: bool = False
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -625,9 +626,9 @@ class SimulationProposer(Proposer):
                 for t in tol_range:
                     # we allow for predicted scores to be within a tolerance of the reference scores
                     # if the current tol results in no remaining simulations, we increase tol
-                    if metric_type == "primary_score":
+                    if (metric_type == "primary_score" and not make_worst_mix) or (metric_type != "primary_score" and make_worst_mix):
                         pareto_idxs = np.where(np.all(predictions.T > reference_scores - t, axis=1))[0]
-                    else:
+                    elif (metric_type == "primary_score" and make_worst_mix) or (metric_type != "primary_score" and not make_worst_mix):
                         pareto_idxs = np.where(np.all(predictions.T < reference_scores + t, axis=1))[0]
                     if len(pareto_idxs) != 0:
                         logger.info(f"Using eps={t} for enforcing pareto improvements")
@@ -653,10 +654,10 @@ class SimulationProposer(Proposer):
             else:
                 objs = predictor[index].predict(simulations)
 
-            if metric_type == "primary_score":
+            if (metric_type == "primary_score" and not make_worst_mix) or (metric_type != "primary_score" and make_worst_mix):
                 best_mask = (objs.max() - objs) < 1e-3
                 print(objs.max())
-            else:
+            elif (metric_type == "primary_score" and make_worst_mix) or (metric_type != "primary_score" and not make_worst_mix):
                 best_mask = (objs - objs.min()) < 1e-3
                 print(objs.min())
             best_weights = simulations[best_mask].mean(0)
@@ -671,7 +672,7 @@ class SimulationProposer(Proposer):
                 free_prior = search_prior[free_indices]
                 free_prior /= np.sum(free_prior)
 
-            predicted_best_performance = sum([pred.predict(best_weights)[0] for pred in predictor])
+            predicted_best_performance = sum([pred.predict([best_weights]) for pred in predictor])
             logger.info(
                 f"Current best weights is: {best_weights} with predicted performance {predicted_best_performance}, and search prior is: {search_prior}"
             )
@@ -955,7 +956,7 @@ def plot_correlation(
     X_train: np.ndarray,
     index: int,
     predictors: list[Regressor],
-    train_split: float,
+    train_split: tuple[float],
     n_test: int,
     split_seed: int,
     n_samples: int,
@@ -981,7 +982,7 @@ def plot_correlation(
 
     corr_results = {}
 
-    if train_split == 1 and n_test == 0:
+    if train_split[0] == 1 and n_test == 0:
         # Only plot train if train and test are the same
         sns.regplot(
             x=y_pred_train,
@@ -1318,7 +1319,6 @@ def mk_run_metrics(
         result = np.mean(
             [df.loc[:, metric_name].tail(samples).mean() for metric_name in group_metrics]
         )
-
         results[group_name] = result
     else:
         if pull_from_dashboard:
@@ -1327,7 +1327,6 @@ def mk_run_metrics(
                 offline_results = get_offline_evals_from_dashboard(display_name, offline_tasks, dashboard=d)
                 results.update(offline_results)
         else:
-
             for metric_name in in_loop_tasks:
                 results[metric_name] = df.loc[:, metric_name].tail(samples).mean()
 
@@ -1404,10 +1403,10 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
                     except json.JSONDecodeError as e:
                         print(f"Error decoding JSON line in {key}: {e}")
 
-    all_available_tasks = [data['task_config'].get('metadata', {}).get('alias')  for data in all_jsonl_data]
-    logger.info(f"Available tasks in JSONL data for {display_name}:")
-    for task in all_available_tasks:
-        print(f'"{task}",')
+    #all_available_tasks = [data['task_config'].get('metadata', {}).get('alias')  for data in all_jsonl_data]
+    #logger.info(f"Available tasks in JSONL data for {display_name}:")
+    #for task in sorted(all_available_tasks):
+    #    print(f'"{task}",')
     #raise ValueError()
 
     offline_results = {}
@@ -1487,20 +1486,25 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
     return offline_results
 
 
-def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
+def mk_weights_from_config(config: dict, priors: tuple, display_name: str) -> dict[str, float]:
     source_configs = {
         source["source_name"]: source
         for source in config.get("dataset", {})
         .get("source_mixture_config", {})
         .get("source_configs", [])
     }
-
+    prefixes = ['dclm', 's2pdf', 'pes2o', 'stack-edu', 'finemath-3plus', 'arxiv', 'wikipedia']
     source_configs = {
-        (name.replace("_", ":", 1) if any(substr in name for substr in [
-            'dclm', 's2pdf', 'pes2o', 'stack-edu', 'finemath-3plus', 'arxiv', 'wikipedia'
-        ]) and "_" in name else name): value
+        (
+            name.replace("_", ":", 1)
+            if any(name.startswith(prefix + "_") for prefix in prefixes)
+            else name
+        ): value
         for name, value in source_configs.items()
     }
+
+    if "62e7dc06" in display_name:
+        source_configs = {f"dclm:{k}" : v for k, v in source_configs.items()}
 
     weights = {}
     for domain in priors[0].keys():
@@ -1512,7 +1516,9 @@ def mk_weights_from_config(config: dict, priors: tuple) -> dict[str, float]:
                 weights[domain] = (
                     source_configs[source_name].get("target_ratio", 0.0) * priors[0][domain]
                 )
-
+            elif ":" in domain and domain.split(":")[-1] in source_configs:
+                domain_name = domain.split(":")[-1]
+                weights[domain] = source_configs[domain_name].get("target_ratio", 0.0)
             elif ":" not in domain:
                 # 2) prior requests a source (i.e. when we condition on a topic-level p* mix) but wandb mixes are specified at the leaf level
                 cfg = {
@@ -1799,7 +1805,7 @@ def mk_output_prefix(
     output_dir: str,
     metric: str,
     regression_type: str,
-    train_split: float,
+    train_split: tuple[float],
     n_test: int,
     split_seed: int,
     n_samples: int,
@@ -1808,11 +1814,12 @@ def mk_output_prefix(
     def sanitize(s: str) -> str:
         return re.sub(r"[^a-zA-Z0-9_\-]", "_", s)
 
+    train_split_str = [str(t) for t in train_split]
     return (
         os.path.join(output_dir, sanitize(metric))
         + (f"_alpha_{str(alpha).replace('.', '_')}" if alpha and alpha != 1.0 else "")
         + (f"_{regression_type}_reg" if regression_type != "lightgbm" else "")
-        + (f"_trainsplit_{train_split}" if train_split != 1.0 else "")
+        + (f"_trainsplit_{'_'.join(train_split_str)}" if train_split[0] != 1.0 else "")
         + (f"_ntest_{n_test}" if n_test != 0 else "")
         + (f"_seed_{split_seed}" if split_seed != 0 else "")
         + (f"_{n_samples}_samples" if n_samples != 10 else "")

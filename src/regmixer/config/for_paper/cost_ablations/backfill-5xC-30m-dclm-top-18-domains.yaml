@@ -11,12 +11,12 @@ allow_repetition: false
 sequence_length: 2048
 seed: 42
 minimum_weight: 0.05
-existing_mix_file: cache/62e7dc06_all_bpb_ratios.pkl
+existing_mix_file: cache/62e7dc06_pretraining_tasks_for_paper_ratios.pkl
 proxy_model_id: "olmo_30m"
 tokenizer: "dolma2"
 weka: false
 dtype: "uint32"
-priority: low 
+priority: normal 
 cluster: ai2/augusta-google-1 
 device_batch_size: 32
 sources:
@@ -47,9 +47,6 @@ sources:
   - name: health
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/health/**/*.npy
-  - name: history_and_geography
-    paths:
-      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
   - name: literature
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/literature/**/*.npy
@@ -65,6 +62,9 @@ sources:
   - name: software
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software/**/*.npy
+  - name: software_development
+    paths:
+      - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software_development/**/*.npy
   - name: sports_and_fitness
     paths:
       - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
