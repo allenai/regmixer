@@ -9,7 +9,7 @@ preemptible: true
 max_tokens: 2_910_233_600
 allow_repetition: false 
 sequence_length: 2048 # we changed this from 4096 to 2048 to maintain batch size (?)
-seed: 42
+seed: 1337 #42
 #mix_temperature: 0.7
 minimum_weight: 0.0001
 min_strength: 1
