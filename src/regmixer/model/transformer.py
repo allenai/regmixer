@@ -287,7 +287,7 @@ class TransformerConfigBuilder:
         mixture_config = MixtureBuilder(
             sources=self.sources,
             max_tokens=self.max_tokens,
-            sequence_length=self.sequence_length,
+            global_batch_size=global_batch_size,
             seed=self.seed,
             processes=min(os.cpu_count() or 1, 16),
             dtype=self.dataset_dtype,

@@ -7,6 +7,7 @@ import s3fs
 from olmo_core.data.source_mixture import (
     SourceMixtureConfig,
     SourceMixtureDatasetConfig,
+    SourceMixtureList
 )
 from olmo_core.data.types import NumpyDatasetDType
 from olmo_core.io import is_url
@@ -18,7 +19,7 @@ from regmixer.aliases import PathType, SourceInstance
 class MixtureBuilder:
     sources: List[SourceInstance]
     max_tokens: int
-    sequence_length: int
+    global_batch_size: int
     seed: int
     dtype: NumpyDatasetDType
     processes: int = 1
@@ -47,11 +48,11 @@ class MixtureBuilder:
         return results
 
     def build(self) -> SourceMixtureDatasetConfig:
-        source_configs: List[SourceMixtureConfig] = []
+        source_configs: SourceMixtureList = SourceMixtureList(sources=[]) # List[SourceMixtureConfig] = []
         for source in self.sources:
             globs = [path for path in source.paths if "*" in path]
             paths = [path for path in source.paths if path not in globs]
-            source_configs.append(
+            source_configs.sources.append(
                 SourceMixtureConfig(
                     source_name=source.name,
                     paths=paths + self.expand_globs(globs),
@@ -61,10 +62,11 @@ class MixtureBuilder:
             )
 
         return SourceMixtureDatasetConfig(
-            source_configs=source_configs,
-            max_tokens=self.max_tokens,
-            sequence_length=self.sequence_length,
+            source_list=source_configs,
+            requested_tokens=self.max_tokens,
+            global_batch_size=self.global_batch_size, #fix? 
+            #sequence_length=self.sequence_length, #fix?
             seed=self.seed,
-            dtype=self.dtype,
+            #dtype=self.dtype,
             processes=self.processes,
         )
