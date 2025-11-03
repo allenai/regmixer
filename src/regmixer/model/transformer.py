@@ -5,10 +5,8 @@ from typing import Dict, List, Optional
 
 from olmo_core.config import DType
 from olmo_core.data import (
-    DataMix,
     NumpyDataLoaderConfig,
-    NumpyDatasetConfig,
-    NumpyDatasetType,
+    NumpyFSLDatasetConfig,
     TokenizerConfig,
 )
 from olmo_core.distributed.parallel import DataParallelType
@@ -295,9 +293,8 @@ class TransformerConfigBuilder:
             dtype=self.dataset_dtype,
         ).build()
 
-        dataset_config = NumpyDatasetConfig(
+        dataset_config = NumpyFSLDatasetConfig(
             source_mixture_config=mixture_config,
-            name=NumpyDatasetType.fsl,
             sequence_length=self.sequence_length,
             tokenizer=tokenizer,
             work_dir=self.dataset_cache,
