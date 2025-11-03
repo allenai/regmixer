@@ -1,13 +1,9 @@
-#!/bin/bash
+#!/bin/bash 
 
-
-for R in 3 4 5
+for R in 4
 do 
-
-    rmc-eval fit -c src/regmixer/config/for_paper/backfill-5xC-30m-dclm-stackedu-flat.yaml \
-        -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
-        -g 2acff647 \
-        -g 62e7dc06 \
+    rmc-eval fit -c  src/regmixer/config/for_paper/backfill-5xC-30m-dclm-64-conditional-s2pdf-seed-2.yaml \
+        -g da3827ec \
         -G pretraining_tasks_for_paper \
         -a 1 \
         -S 100_000 \
@@ -17,7 +13,7 @@ do
         --regression-type log_linear \
         --dashboard mixing-paper \
         --constrain-objective \
-        --manual-token-constraint-path src/regmixer/eval/superswarm_requested_vs_available_tokens.yaml \
+        --manual-token-constraint-path src/regmixer/eval/superswarm_collapse_dclm_requested_vs_available_tokens.yaml \
         --repetition-factor $R \
         --drop-metrics ultrachat_masked_ppl \
         --drop-metrics wildchat_masked_ppl \
@@ -25,7 +21,5 @@ do
         --drop-metrics sciriff_yesno:rc::olmes \
         --drop-metrics lab_bench_dbqa \
         --drop-metrics lab_bench_protocolqa \
-        --drop-metrics medqa_en:rc::none \
-        --train-split 128 \
-        --train-split 125
+        --drop-metrics medqa_en:rc::none
 done 

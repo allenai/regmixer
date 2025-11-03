@@ -70,6 +70,32 @@ done'
 #rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml -g 62e7dc06 -G all_bpb -a 1 -S 100_000 -s 1 --opt-avg-metric --seed 0 --regression-type log_linear 
 #rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml -g 62e7dc06 -G all_bpb -a 1 -S 100_000 -s 1 --opt-avg-metric --seed 0 --regression-type log_linear --temperature 1.0
 
+
+: 'for SEED in 1 2 
+do
+    rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+        -g 62e7dc06 \
+        -G all_bpb \
+        -a 1 \
+        -S 100_000 \
+        -s 1 \
+        --opt-avg-metric \
+        --seed $SEED \
+        --n-test 10 
+
+    rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+    -g 62e7dc06 \
+    -G all_bpb \
+    -a 1 \
+    -S 100_000 \
+    -s 1 \
+    --opt-avg-metric \
+    --seed $SEED \
+    --regression-type log_linear \
+    --n-test 10
+
+done 
+'
 : 'for SEED in 0 1 2 
 do
     for SPLIT in 0.1 #0.4 0.6 0.8
@@ -385,154 +411,162 @@ done '
 
 
 # Get all log linear proposed mixes by varying n/(d+1)
-: 'for size in 50 75 100 125 #25 125
-do 
-    for seed in 0 1 2 
-    do 
-        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
-            -g 62e7dc06 \
-            -G pretraining_tasks_for_paper \
-            -a 1 \
-            -S 100_000 \
-            -s 1 \
-            --opt-avg-metric \
-            --seed $seed \
-            --regression-type log_linear \
-            --dashboard mixing-paper \
-            --constrain-objective \
-            --repetition-factor 4 \
-            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
-            --train-split $size
-    done 
-done
-
-
-
-for size in 19 38 57 76 95
-do 
-    for seed in 0 1 2 
-    do 
-        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
-            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
-            -g 62e7dc06 \
-            -g ee3bf7f7 \
-            -G pretraining_tasks_for_paper \
-            -a 1 \
-            -S 100_000 \
-            -s 1 \
-            --opt-avg-metric \
-            --seed $seed \
-            --regression-type log_linear \
-            --dashboard mixing-paper \
-            --support-domains art_and_design \
-            --support-domains crime_and_law \
-            --support-domains education_and_jobs \
-            --support-domains electronics_and_hardware \
-            --support-domains entertainment \
-            --support-domains finance_and_business \
-            --support-domains games \
-            --support-domains health \
-            --support-domains literature \
-            --support-domains politics \
-            --support-domains religion \
-            --support-domains science_math_and_technology \
-            --support-domains social_life \
-            --support-domains software \
-            --support-domains software_development \
-            --support-domains sports_and_fitness \
-            --support-domains transportation \
-            --support-domains travel_and_tourism \
-            --constrain-objective \
-            --repetition-factor 4 \
-            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
-            --train-split $size
-    done
-done
-
-
-
-for size in 13 26 39 52 65
-do 
-    for seed in 0 1 2
-    do
-        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
-            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-12-domains.yaml \
-            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
-            -g 62e7dc06 \
-            -g 50f03954 \
-            -g ee3bf7f7 \
-            -G pretraining_tasks_for_paper \
-            -a 1 \
-            -S 100_000 \
-            -s 1 \
-            --opt-avg-metric \
-            --seed $seed \
-            --regression-type log_linear \
-            --dashboard mixing-paper \
-            --support-domains crime_and_law \
-            --support-domains education_and_jobs \
-            --support-domains entertainment \
-            --support-domains finance_and_business \
-            --support-domains games \
-            --support-domains health \
-            --support-domains literature \
-            --support-domains politics \
-            --support-domains religion \
-            --support-domains science_math_and_technology \
-            --support-domains software \
-            --support-domains software_development \
-            --constrain-objective \
-            --repetition-factor 4 \
-            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
-            --train-split $size
-        done
-done 
-
-
-for size in 7 14 21 28 35
-do 
-    for seed in 0 1 2 
-    do 
-        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
-            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-6-domains.yaml \
-            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-12-domains.yaml \
-            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
-            -g 62e7dc06 \
-            -g 028dcd8d \
-            -g 50f03954 \
-            -g ee3bf7f7 \
-            -G pretraining_tasks_for_paper \
-            -a 1 \
-            -S 100_000 \
-            -s 1 \
-            --opt-avg-metric \
-            --seed $seed \
-            --regression-type log_linear \
-            --dashboard mixing-paper \
-            --support-domains entertainment \
-            --support-domains finance_and_business \
-            --support-domains games \
-            --support-domains health \
-            --support-domains politics \
-            --support-domains science_math_and_technology \
-            --constrain-objective \
-            --repetition-factor 4 \
-            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
-            --train-split $size
-    done 
-done
-'
-
-
-
-
-
 : 'for size in 25 50 75 100 125
 do 
     for seed in 0 1 2 
     do 
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+            -g 62e7dc06 \
+            -G pretraining_tasks_for_paper \
+            -a 1 \
+            -S 100_000 \
+            -s 1 \
+            --opt-avg-metric \
+            --seed $seed \
+            --regression-type log_linear \
+            --dashboard mixing-paper \
+            --constrain-objective \
+            --repetition-factor 4 \
+            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+            --train-split $size \
+            --proposer-type exact \
+            --kl-reg 0.05
+    done 
+done'
+
+
+
+: 'for size in 19 38 57 76 95 114
+do 
+    for seed in 0 1 2 
+    do 
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
+            -g 62e7dc06 \
+            -g ee3bf7f7 \
+            -G pretraining_tasks_for_paper \
+            -a 1 \
+            -S 100_000 \
+            -s 1 \
+            --opt-avg-metric \
+            --seed $seed \
+            --regression-type log_linear \
+            --dashboard mixing-paper \
+            --support-domains art_and_design \
+            --support-domains crime_and_law \
+            --support-domains education_and_jobs \
+            --support-domains electronics_and_hardware \
+            --support-domains entertainment \
+            --support-domains finance_and_business \
+            --support-domains games \
+            --support-domains health \
+            --support-domains literature \
+            --support-domains politics \
+            --support-domains religion \
+            --support-domains science_math_and_technology \
+            --support-domains social_life \
+            --support-domains software \
+            --support-domains software_development \
+            --support-domains sports_and_fitness \
+            --support-domains transportation \
+            --support-domains travel_and_tourism \
+            --constrain-objective \
+            --repetition-factor 4 \
+            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+            --train-split $size \
+            --proposer-type exact \
+            --kl-reg 0.05
+    done
+done
+
+
+
+for size in 13 26 39 52 65 78 91 104 117 130 #
+do 
+    for seed in 0 1 2
+    do
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-12-domains.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
+            -g 62e7dc06 \
+            -g 50f03954 \
+            -g ee3bf7f7 \
+            -G pretraining_tasks_for_paper \
+            -a 1 \
+            -S 100_000 \
+            -s 1 \
+            --opt-avg-metric \
+            --seed $seed \
+            --regression-type log_linear \
+            --dashboard mixing-paper \
+            --support-domains crime_and_law \
+            --support-domains education_and_jobs \
+            --support-domains entertainment \
+            --support-domains finance_and_business \
+            --support-domains games \
+            --support-domains health \
+            --support-domains literature \
+            --support-domains politics \
+            --support-domains religion \
+            --support-domains science_math_and_technology \
+            --support-domains software \
+            --support-domains software_development \
+            --constrain-objective \
+            --repetition-factor 4 \
+            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+            --train-split $size \
+            --proposer-type exact \
+            --kl-reg 0.05
+    done
+done
+
+
+for size in 7 14 21 28 35 42 49 56 63 70 77 84 91 98 105 112 119 #7 14 21 28 35
+do 
+    for seed in 0 1 2 
+    do 
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-6-domains.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-12-domains.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
+            -g 62e7dc06 \
+            -g 028dcd8d \
+            -g 50f03954 \
+            -g ee3bf7f7 \
+            -G pretraining_tasks_for_paper \
+            -a 1 \
+            -S 100_000 \
+            -s 1 \
+            --opt-avg-metric \
+            --seed $seed \
+            --regression-type log_linear \
+            --dashboard mixing-paper \
+            --support-domains entertainment \
+            --support-domains finance_and_business \
+            --support-domains games \
+            --support-domains health \
+            --support-domains politics \
+            --support-domains science_math_and_technology \
+            --constrain-objective \
+            --repetition-factor 4 \
+            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+            --train-split $size \
+            --proposer-type exact \
+            --kl-reg 0.05
+    done 
+done
+'
+
+
+
+
+# lightgbm baselines
+: 'for size in 100 #25 50 75 100 125
+do 
+    for seed in 0 #1 2 
+    do 
         echo "Running"
-        PYTHONFAULTHANDLER=1 rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
             -g 62e7dc06 \
             -G pretraining_tasks_for_paper \
             -a 1 \
@@ -545,13 +579,13 @@ do
             --constrain-objective \
             --repetition-factor 4 \
             --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
-            --train-split $size
+            --train-split $size \
     done 
 done
+'
 
 
-
-for size in 19 38 57 76 95
+: 'for size in 114 #19 #38 57 76 95 can scale to 129
 do 
     for seed in 0 1 2 
     do 
@@ -591,12 +625,11 @@ do
             --train-split $size
     done
 done
-
-
-
-for size in 13 26 39 52 65
+'
+# NEED TO DO THE LAST 78
+: 'for size in 13 #91 104 117 130  # 78 #26 39 52 65 can scale up to 130
 do 
-    for seed in 0 1 2
+    for seed in 0 #0 1 2
     do
         rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
             -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-12-domains.yaml \
@@ -630,11 +663,11 @@ do
             --train-split $size
         done
 done 
-'
 
-for size in 124 #7 14 21 28 35
+
+for size in 7 35 #42 49 56 63 70 77 84 91 98 105 112 119 #14 21 28 35 can scale up to 125
 do 
-    for seed in 0 # 1 2 
+    for seed in 0 #1 2 
     do 
         rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
             -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-6-domains.yaml \
@@ -664,3 +697,180 @@ do
             --train-split $size
     done 
 done
+'
+
+
+# search baselines
+: 'for size in 25 50 75 100 125
+do 
+    for seed in 0 1 2 
+    do 
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+            -g 62e7dc06 \
+            -G pretraining_tasks_for_paper \
+            -a 1 \
+            -S 100_000 \
+            -s 1 \
+            --opt-avg-metric \
+            --seed $seed \
+            --regression-type search \
+            --proposer-type search \
+            --dashboard mixing-paper \
+            --constrain-objective \
+            --repetition-factor 4 \
+            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+            --train-split $size
+
+    done 
+done
+
+
+
+for size in 19 38 57 76 95 114 # can scale to 129
+do 
+    for seed in 0 1 2 
+    do 
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
+            -g 62e7dc06 \
+            -g ee3bf7f7 \
+            -G pretraining_tasks_for_paper \
+            -a 1 \
+            -S 100_000 \
+            -s 1 \
+            --opt-avg-metric \
+            --seed $seed \
+            --regression-type search \
+            --proposer-type search \
+            --dashboard mixing-paper \
+            --support-domains art_and_design \
+            --support-domains crime_and_law \
+            --support-domains education_and_jobs \
+            --support-domains electronics_and_hardware \
+            --support-domains entertainment \
+            --support-domains finance_and_business \
+            --support-domains games \
+            --support-domains health \
+            --support-domains literature \
+            --support-domains politics \
+            --support-domains religion \
+            --support-domains science_math_and_technology \
+            --support-domains social_life \
+            --support-domains software \
+            --support-domains software_development \
+            --support-domains sports_and_fitness \
+            --support-domains transportation \
+            --support-domains travel_and_tourism \
+            --constrain-objective \
+            --repetition-factor 4 \
+            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+            --train-split $size
+    done
+done
+
+
+for size in 13 26 35 52 65 78 91 104 117 130 #91 104 117 130  # 78 #26 39 52 65 can scale up to 130
+do 
+    for seed in 0 1 2
+    do
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-12-domains.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
+            -g 62e7dc06 \
+            -g 50f03954 \
+            -g ee3bf7f7 \
+            -G pretraining_tasks_for_paper \
+            -a 1 \
+            -S 100_000 \
+            -s 1 \
+            --opt-avg-metric \
+            --seed $seed \
+            --regression-type search \
+            --proposer-type search \
+            --dashboard mixing-paper \
+            --support-domains crime_and_law \
+            --support-domains education_and_jobs \
+            --support-domains entertainment \
+            --support-domains finance_and_business \
+            --support-domains games \
+            --support-domains health \
+            --support-domains literature \
+            --support-domains politics \
+            --support-domains religion \
+            --support-domains science_math_and_technology \
+            --support-domains software \
+            --support-domains software_development \
+            --constrain-objective \
+            --repetition-factor 4 \
+            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+            --train-split $size
+    done
+done 
+
+
+for size in 7 14 21 28 35 42 49 56 63 70 77 84 91 98 105 112 119 # can scale up to 125
+do 
+    for seed in 0 1 2 
+    do 
+        rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-6-domains.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-12-domains.yaml \
+            -c src/regmixer/config/for_paper/cost_ablations/backfill-5xC-30m-dclm-top-18-domains.yaml \
+            -g 62e7dc06 \
+            -g 028dcd8d \
+            -g 50f03954 \
+            -g ee3bf7f7 \
+            -G pretraining_tasks_for_paper \
+            -a 1 \
+            -S 100_000 \
+            -s 1 \
+            --opt-avg-metric \
+            --seed $seed \
+            --regression-type search \
+            --proposer-type search \
+            --dashboard mixing-paper \
+            --support-domains entertainment \
+            --support-domains finance_and_business \
+            --support-domains games \
+            --support-domains health \
+            --support-domains politics \
+            --support-domains science_math_and_technology \
+            --constrain-objective \
+            --repetition-factor 4 \
+            --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+            --train-split $size
+    done 
+done
+'
+
+
+
+# double check random seed for 125 / 24?
+rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+    -g 62e7dc06 \
+    -G pretraining_tasks_for_paper \
+    -a 1 \
+    -S 100_000 \
+    -s 1 \
+    --opt-avg-metric \
+    --seed 0 \
+    --regression-type lightgbm \
+    --dashboard mixing-paper \
+    --constrain-objective \
+    --repetition-factor 4 \
+    --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+
+rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+    -g 62e7dc06 \
+    -G pretraining_tasks_for_paper \
+    -a 1 \
+    -S 100_000 \
+    -s 1 \
+    --opt-avg-metric \
+    --seed 0 \
+    --regression-type search \
+    --proposer-type search \
+    --dashboard mixing-paper \
+    --constrain-objective \
+    --repetition-factor 4 \
+    --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
