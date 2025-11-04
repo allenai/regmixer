@@ -167,21 +167,22 @@ class TransformerConfigBuilder:
 
         self._setup_dirs()
 
-        self.dataset_cache = (
-            f"{self.root_dir}/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
-        )
-
     def _setup_dirs(self) -> None:
         """Setup checkpoint directory based on cluster configuration."""
         if any(substring in self.cluster for substring in ["augusta"]):
             self.root_dir = "gs://ai2-llm"
-        elif any(substring in self.cluster for substring in ["jupiter", "saturn"]) and self.weka:
+            self.checkpoint_dir = f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
+            # NOTE: work_dir must be a local path, not a url
+            self.work_dir = f"/tmp/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
+        elif any(substring in self.cluster for substring in ["jupiter", "saturn", "ceres", "neptune", "titan"]) and self.weka:
             logger.info("Using Weka bucket as root dir")
             self.root_dir = "/weka/oe-training-default/ai2-llm"
+            self.checkpoint_dir = f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
+            self.work_dir = f"{self.root_dir}/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
+        else:
+            self.work_dir = f"{self.root_dir}/{self.beaker_user.lower()}/{self.run_name}/dataset-cache"
 
-        self.checkpoint_dir = (
-            f"{self.root_dir}/checkpoints/{self.beaker_user.lower()}/{self.run_name}"
-        )
+            
 
     def get_tokenizer_config(self, tokenizer) -> TokenizerConfig:
         try:
@@ -296,14 +297,14 @@ class TransformerConfigBuilder:
             source_mixture_config=mixture_config,
             sequence_length=self.sequence_length,
             tokenizer=tokenizer,
-            work_dir=self.dataset_cache,
+            work_dir=self.work_dir,
         )
 
         print(f"sequence length in data loader: {self.sequence_length}")
 
         data_loader_config = NumpyDataLoaderConfig(
             global_batch_size=global_batch_size * self.sequence_length,
-            work_dir=self.dataset_cache,
+            work_dir=self.work_dir,
             seed=self.seed,
             num_workers=16,
         )
