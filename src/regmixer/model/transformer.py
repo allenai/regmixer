@@ -218,7 +218,6 @@ class TransformerConfigBuilder:
         global_batch_size = round(global_batch_size)
         global_batch_size *= self.model_config.batch_divisor
         global_batch_size = self.next_power_of_2(global_batch_size)
-        print(f"Global batch size is: {global_batch_size}")
 
         return global_batch_size
 
@@ -287,7 +286,7 @@ class TransformerConfigBuilder:
         mixture_config = MixtureBuilder(
             sources=self.sources,
             max_tokens=self.max_tokens,
-            global_batch_size=global_batch_size,
+            global_batch_size=global_batch_size * self.sequence_length,
             seed=self.seed,
             processes=min(os.cpu_count() or 1, 16),
             dtype=self.dataset_dtype,
