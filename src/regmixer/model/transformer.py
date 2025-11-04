@@ -300,6 +300,8 @@ class TransformerConfigBuilder:
             work_dir=self.dataset_cache,
         )
 
+        print(f"sequence length in data loader: {self.sequence_length}")
+
         data_loader_config = NumpyDataLoaderConfig(
             global_batch_size=global_batch_size * self.sequence_length,
             work_dir=self.dataset_cache,

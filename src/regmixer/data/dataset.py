@@ -61,6 +61,8 @@ class MixtureBuilder:
                 )
             )
 
+        print(f"Global batch size is: {self.global_batch_size}")
+
         return SourceMixtureDatasetConfig(
             source_list=source_configs,
             requested_tokens=self.max_tokens,
