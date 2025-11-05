@@ -1,10 +1,10 @@
-name: backfill-5xC-30m-dclm-conditional-stackedu-2T
-description: 30M @ 5xC conditional swarm on DCLM p* and StackEdu, where DCLM p* is rep=4 @ 2T (22e537eb131ace0d)
+name: backfill-5xC-30m-dclm-conditional-stackedu-tree-64-1T
+description: 30M @ 5xC swarm on StackEdu + DCLM:software_development, conditional on DCLM-only p* on other DCLM domains; rep=4 @ 1T, seed=0 64 DCLM runs (604ff8978cfe79b7)
 budget: ai2/oe-base
 workspace: ai2/dolma2
 nodes: 1
-gpus: 8
-variants: 128
+gpus: 1
+variants: 64
 preemptible: true
 max_tokens: 2910233600
 allow_repetition: false
@@ -17,7 +17,7 @@ proxy_model_id: olmo_30m
 tokenizer: dolma2
 weka: false
 dtype: uint32
-priority: high
+priority: normal
 cluster: ai2/augusta-google-1
 device_batch_size: 32
 sources:
@@ -26,99 +26,98 @@ sources:
   - name: adult_content
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/adult_content/dolma2-tokenizer/*.npy
-    weight: 0.0022101618135107544
+    weight: 0.0009318043530010219
   - name: art_and_design
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/art_and_design/dolma2-tokenizer/*.npy
-    weight: 0.00025474082534958635
+    weight: 0.07684992316079853
   - name: crime_and_law
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/crime_and_law/dolma2-tokenizer/*.npy
-    weight: 0.0005867983202912547
+    weight: 0.0008488840969866811
   - name: education_and_jobs
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/education_and_jobs/dolma2-tokenizer/*.npy
-    weight: 0.0012119228568620325
+    weight: 0.0010082033960404826
   - name: electronics_and_hardware
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/electronics_and_hardware/dolma2-tokenizer/*.npy
-    weight: 0.00027432135782055336
+    weight: 0.0005483859632411836
   - name: entertainment
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/entertainment/dolma2-tokenizer/*.npy
-    weight: 0.004625474471524826
+    weight: 0.0035118984441374237
   - name: fashion_and_beauty
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/fashion_and_beauty/dolma2-tokenizer/*.npy
-    weight: 0.00015761905335521568
+    weight: 0.00012318016795277598
   - name: finance_and_business
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/finance_and_business/dolma2-tokenizer/*.npy
-    weight: 0.0009500799534426991
+    weight: 0.0013778912778484
   - name: food_and_dining
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/food_and_dining/dolma2-tokenizer/*.npy
-    weight: 0.002782320061531172
+    weight: 0.001305643932450992
   - name: games
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/games/dolma2-tokenizer/*.npy
-    weight: 0.0008452248573837981
+    weight: 0.0016548904739318658
   - name: health
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/health/dolma2-tokenizer/*.npy
-    weight: 0.10951337296361308
+    weight: 0.15439510141760457
   - name: history_and_geography
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/history_and_geography/dolma2-tokenizer/*.npy
-    weight: 0.004814546554969203
+    weight: 0.0034898141309889917
   - name: home_and_hobbies
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/home_and_hobbies/dolma2-tokenizer/*.npy
-    weight: 0.0008634019159886421
+    weight: 0.000928856592531201
   - name: industrial
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/industrial/dolma2-tokenizer/*.npy
-    weight: 0.016721720680979598
+    weight: 0.0023818458739898866
   - name: literature
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/literature/dolma2-tokenizer/*.npy
-    weight: 0.10012299718371792
+    weight: 0.19076648543713745
   - name: politics
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/politics/dolma2-tokenizer/*.npy
-    weight: 0.0010867935478683754
+    weight: 0.0017511619941259582
   - name: religion
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/religion/dolma2-tokenizer/*.npy
-    weight: 0.00057106145130796
+    weight: 0.0007558703041112699
   - name: science_math_and_technology
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/science_math_and_technology/dolma2-tokenizer/*.npy
-    weight: 0.31966223359463825
+    weight: 0.5533933952514268
   - name: social_life
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/social_life/dolma2-tokenizer/*.npy
-    weight: 0.0013119403523431138
+    weight: 0.0016280753598382756
   - name: software
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software/dolma2-tokenizer/*.npy
-    weight: 0.0001849847740686739
-  - name: software_development
-    paths:
-    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software_development/dolma2-tokenizer/*.npy
-    weight: 0.42868667892808454
+    weight: 0.0003546275670426671
   - name: sports_and_fitness
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/sports_and_fitness/dolma2-tokenizer/*.npy
-    weight: 0.0020143114895197108
+    weight: 0.0008184845605553097
   - name: transportation
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/transportation/dolma2-tokenizer/*.npy
-    weight: 0.0003420845109861961
+    weight: 0.0009411636582848731
   - name: travel_and_tourism
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/travel_and_tourism/dolma2-tokenizer/*.npy
-    weight: 0.0002052084808428772
+    weight: 0.00023441258597325205
+- name: software_development
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software_development/dolma2-tokenizer/*.npy
 - name: stack-edu
   topics:
   - name: C
@@ -183,5 +182,6 @@ nonzero_weight:
 - stack-edu:Swift
 - stack-edu:TypeScript
 manual_prior:
-  dclm: 0.75
-  stack-edu: 0.25
+  dclm: 0.6
+  software_development: 0.05
+  stack-edu: 0.35

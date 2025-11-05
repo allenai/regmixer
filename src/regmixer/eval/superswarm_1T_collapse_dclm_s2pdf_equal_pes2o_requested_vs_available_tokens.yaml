@@ -1,0 +1,10 @@
+requested_tokens: 1_000_000_000_000 # 1 trillion
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet 
+  arxiv: 20_000_000_000 # 20 billion
+  dclm: 5_000_000_000_000
+  finemath-3plus: 34_000_000_000 # 34 billion
+  pes2o: 1_034_238_607_178 # we assume that pes2o and s2pdf are "the same"
+  s2pdf: 1_034_238_607_178
+  stack-edu: 136_849_631_296
+  wikipedia: 10_000_000_000 # 10 billion

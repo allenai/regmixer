@@ -1,0 +1,10 @@
+requested_tokens: 2_000_000_000_000 # 6 trillion
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet 
+  arxiv: 20_000_000_000 # 20 billion
+  all_dressed: 5_000_000_000_000 # multiplied natural distribution by 5T guess
+  finemath-3plus: 34_000_000_000 # 34 billion
+  pes2o: 60_000_000_000 # 60 billion
+  s2pdf: 1_034_238_607_178
+  stack-edu: 136_849_631_296
+  wikipedia: 10_000_000_000 # 10 billion

@@ -1,0 +1,115 @@
+name: backfill-5xC-30m-s2pdf-dclm-one-node-conditional-dclmv2-one-node-2T
+description: 30M @ 5xC conditional swarm on (S2PDF p* | DCLM one node) + DCLMv2 one node, where S2PDF p* is rep=4 @ 2T (226b3714ce779ec6)
+budget: ai2/oe-base
+workspace: ai2/dolma2
+nodes: 1
+gpus: 1
+variants: 16
+preemptible: true
+max_tokens: 2910233600
+allow_repetition: false
+sequence_length: 2048
+seed: 42
+minimum_weight: 0.0001
+min_strength: 1
+max_strength: 20
+proxy_model_id: olmo_30m
+tokenizer: dolma2
+weka: false
+dtype: uint32
+priority: high
+cluster: ai2/augusta-google-1
+device_batch_size: 32
+sources:
+- name: dclm_v2
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_ft_lr05_ng2_n3M6_ova_20pct/allenai/dolma2-tokenizer/**/*.npy
+- name: s2pdf
+  topics:
+  - name: adult
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/adult/*.npy
+    weight: 0.0
+  - name: art_design
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/art_design/*.npy
+    weight: 0.0009361846948335758
+  - name: crime_law
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/crime_law/*.npy
+    weight: 0.0015964496497725244
+  - name: education_jobs
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/education_jobs/*.npy
+    weight: 0.010234320860374745
+  - name: entertainment
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/entertainment/*.npy
+    weight: 0.0
+  - name: fashion_beauty
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/fashion_beauty/*.npy
+    weight: 0.0
+  - name: finance_business
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/finance_business/*.npy
+    weight: 0.0032538294189716015
+  - name: food_dining
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/food_dining/*.npy
+    weight: 0.01128572520073032
+  - name: games
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/games/*.npy
+    weight: 0.00042266040239806674
+  - name: health
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/health/*.npy
+    weight: 0.014546837911303132
+  - name: home_hobbies
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/home_hobbies/*.npy
+    weight: 3.56418335948923e-05
+  - name: industrial
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/industrial/*.npy
+    weight: 0.00678898495100661
+  - name: literature
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/literature/*.npy
+    weight: 0.172456038811856
+  - name: politics
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/politics/*.npy
+    weight: 0.21164651430115725
+  - name: religion
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/religion/*.npy
+    weight: 0.00039275674266338784
+  - name: science_tech
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/science_tech/*.npy
+    weight: 0.32119998266390276
+  - name: software_dev
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/software_dev/*.npy
+    weight: 0.24395642825875202
+  - name: software
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/software/*.npy
+    weight: 6.866940647158049e-05
+  - name: sports_fitness
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/sports_fitness/*.npy
+    weight: 0.0001548122349293542
+  - name: transportation
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/transportation/*.npy
+    weight: 0.0007032669469206412
+  - name: travel
+    paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/travel/*.npy
+    weight: 0.0003208957103615593
+manual_prior:
+  dclm_v2: 0.6
+  s2pdf: 0.4

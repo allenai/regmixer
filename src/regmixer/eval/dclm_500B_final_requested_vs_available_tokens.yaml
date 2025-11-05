@@ -1,0 +1,28 @@
+requested_tokens: 500_000_000_000 # 2 trillion
+leaf_level_constraints: true
+available_tokens: # 5 trillion x prior from dclm sample 
+  adult_content: 67_760_078_203
+  art_and_design: 70_659_711_995
+  crime_and_law: 170_130_914_779
+  education_and_jobs: 184_690_792_861
+  electronics_and_hardware: 80_168_541_745
+  entertainment: 441_768_061_760
+  fashion_and_beauty: 37_256_539_512
+  finance_and_business: 310_313_927_581
+  food_and_dining: 105_937_299_687
+  games: 229_992_491_702
+  health: 393_496_227_836
+  history_and_geography: 161_049_719_459
+  home_and_hobbies: 126_910_777_314
+  industrial: 43_572_140_450
+  literature: 364_834_344_848
+  politics: 611_198_130_192
+  religion: 277_776_929_208
+  science_math_and_technology: 427_131_054_341
+  social_life: 218_731_841_124
+  software: 108_039_380_021
+  software_development: 223_384_974_282
+  sports_and_fitness: 196_759_999_355
+  transportation: 90_793_306_202
+  travel_and_tourism: 57_642_815_530
+

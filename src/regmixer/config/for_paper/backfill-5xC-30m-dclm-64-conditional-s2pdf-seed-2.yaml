@@ -1,15 +1,15 @@
-name: backfill-5xC-30m-dclm-conditional-s2pdf-2T
-description: 30M @ 5xC conditional swarm on DCLM p* and S2PDF, where DCLM p* is rep=4 @ 2T (22e537eb131ace0d)
+name: backfill-5xC-30m-dclm-64-conditional-s2pdf-seed-2
+description: 30M @ 5xC conditional swarm on DCLM p* and S2PDF, where DCLM p* is rep=4 @6T on 64 swarm runs, seed 2 (041a27a23c95bfde)
 budget: ai2/oe-base
 workspace: ai2/dolma2
 nodes: 1
 gpus: 1
-variants: 128
+variants: 64
 preemptible: true
 max_tokens: 2910233600
 allow_repetition: false
 sequence_length: 2048
-seed: 1337
+seed: 42
 minimum_weight: 0.0001
 min_strength: 1
 max_strength: 20
@@ -26,99 +26,99 @@ sources:
   - name: adult_content
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/adult_content/dolma2-tokenizer/*.npy
-    weight: 0.0022101618135107544
+    weight: 0.0008814457412143127
   - name: art_and_design
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/art_and_design/dolma2-tokenizer/*.npy
-    weight: 0.00025474082534958635
+    weight: 0.002790332663302812
   - name: crime_and_law
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/crime_and_law/dolma2-tokenizer/*.npy
-    weight: 0.0005867983202912547
+    weight: 0.0014210559863324672
   - name: education_and_jobs
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/education_and_jobs/dolma2-tokenizer/*.npy
-    weight: 0.0012119228568620325
+    weight: 0.07539874952196911
   - name: electronics_and_hardware
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/electronics_and_hardware/dolma2-tokenizer/*.npy
-    weight: 0.00027432135782055336
+    weight: 0.045565288790646453
   - name: entertainment
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/entertainment/dolma2-tokenizer/*.npy
-    weight: 0.004625474471524826
+    weight: 0.08921238848079394
   - name: fashion_and_beauty
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/fashion_and_beauty/dolma2-tokenizer/*.npy
-    weight: 0.00015761905335521568
+    weight: 2.458580389240772e-05
   - name: finance_and_business
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/finance_and_business/dolma2-tokenizer/*.npy
-    weight: 0.0009500799534426991
+    weight: 0.011997114525102335
   - name: food_and_dining
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/food_and_dining/dolma2-tokenizer/*.npy
-    weight: 0.002782320061531172
+    weight: 0.0044427932624583
   - name: games
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/games/dolma2-tokenizer/*.npy
-    weight: 0.0008452248573837981
+    weight: 0.07679004500560349
   - name: health
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/health/dolma2-tokenizer/*.npy
-    weight: 0.10951337296361308
+    weight: 0.07382170467083693
   - name: history_and_geography
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/history_and_geography/dolma2-tokenizer/*.npy
-    weight: 0.004814546554969203
+    weight: 0.0008605211249531091
   - name: home_and_hobbies
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/home_and_hobbies/dolma2-tokenizer/*.npy
-    weight: 0.0008634019159886421
+    weight: 0.08195781498306065
   - name: industrial
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/industrial/dolma2-tokenizer/*.npy
-    weight: 0.016721720680979598
+    weight: 0.0013677118180829312
   - name: literature
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/literature/dolma2-tokenizer/*.npy
-    weight: 0.10012299718371792
+    weight: 0.01483899333602927
   - name: politics
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/politics/dolma2-tokenizer/*.npy
-    weight: 0.0010867935478683754
+    weight: 0.008274277871991096
   - name: religion
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/religion/dolma2-tokenizer/*.npy
-    weight: 0.00057106145130796
+    weight: 0.0053988556958472385
   - name: science_math_and_technology
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/science_math_and_technology/dolma2-tokenizer/*.npy
-    weight: 0.31966223359463825
+    weight: 0.28161316833067135
   - name: social_life
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/social_life/dolma2-tokenizer/*.npy
-    weight: 0.0013119403523431138
+    weight: 0.0015506704920945464
   - name: software
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software/dolma2-tokenizer/*.npy
-    weight: 0.0001849847740686739
+    weight: 0.06926751678353547
   - name: software_development
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software_development/dolma2-tokenizer/*.npy
-    weight: 0.42868667892808454
+    weight: 0.14848200368175832
   - name: sports_and_fitness
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/sports_and_fitness/dolma2-tokenizer/*.npy
-    weight: 0.0020143114895197108
+    weight: 0.0012493056054866626
   - name: transportation
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/transportation/dolma2-tokenizer/*.npy
-    weight: 0.0003420845109861961
+    weight: 0.00017890019365808762
   - name: travel_and_tourism
     paths:
     - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/travel_and_tourism/dolma2-tokenizer/*.npy
-    weight: 0.0002052084808428772
+    weight: 0.002614755630678712
 - name: s2pdf
   topics:
   - name: adult
