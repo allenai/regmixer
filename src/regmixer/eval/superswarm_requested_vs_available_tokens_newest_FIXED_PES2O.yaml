@@ -27,7 +27,7 @@ available_tokens: # from information in spreadsheet
   dclm:transportation: 199951010397
   dclm:travel_and_tourism: 307695033705
   finemath-3plus: 34057973953 # 34 billion
-  pes2o: 142581824388 # 60 billion MISTAKE
+  pes2o: 58552461187 # 60 billion
   s2pdf:adult: 296607398
   s2pdf:art_design: 6702382979
   s2pdf:crime_law: 41593372986

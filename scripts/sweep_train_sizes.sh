@@ -846,7 +846,7 @@ done
 
 
 # double check random seed for 125 / 24?
-rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
+: 'rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
     -g 62e7dc06 \
     -G pretraining_tasks_for_paper \
     -a 1 \
@@ -874,3 +874,5 @@ rmc-eval fit -c src/regmixer/config/dclm-datadelve-5xC-30m-dolma2tok.yaml \
     --constrain-objective \
     --repetition-factor 4 \
     --manual-token-constraint-path src/regmixer/eval/cost_ablation_1B_5xC_dclm_requested_vs_available_tokens.yaml \
+'
+

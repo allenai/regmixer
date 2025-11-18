@@ -9,7 +9,7 @@ preemptible: true
 max_tokens: 2910233600
 allow_repetition: false
 sequence_length: 2048
-seed: 42
+seed: 1337
 minimum_weight: 0.0001
 min_strength: 1
 max_strength: 20

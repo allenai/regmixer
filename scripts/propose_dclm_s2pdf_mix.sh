@@ -100,7 +100,7 @@ do
 
 done'
 
-: 'for R in 4
+for R in 4
 do
     rmc-eval fit -c src/regmixer/config/for_paper/backfill-5xC-30m-dclm-s2pdf.yaml \
         -g 83ea88e1 \
@@ -124,7 +124,7 @@ do
         --drop-metrics medqa_en:rc::none \
         --temperature 0.2
 
-done'
+done
 
 
 # do 128 runs, several random seeds
@@ -159,7 +159,7 @@ done
 
 
 
-for k in 0.01 0.05 
+: 'for k in 0.01 0.05 
 do 
     rmc-eval fit -c src/regmixer/config/for_paper/backfill-5xC-30m-dclm-s2pdf.yaml \
         -g 83ea88e1 \
@@ -208,4 +208,4 @@ do
         --drop-metrics lab_bench_protocolqa \
         --drop-metrics medqa_en:rc::none
 
-done 
+done '

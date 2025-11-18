@@ -360,7 +360,7 @@ def generate_weights_dirichlet(
             ]
 
         if not filtered_candidates:
-            # logger.warning("No candidates left after filtering according to weight bounds and nonzero weights!")
+            logger.warning("No candidates left after filtering according to weight bounds and nonzero weights!")
             continue
 
         candidates = random.choice(filtered_candidates)
