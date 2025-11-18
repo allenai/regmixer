@@ -188,7 +188,7 @@ def cli():
 @click.option(
     "--proposer-type",
     type=str,
-    help="Proposer type: either simulation or search",
+    help="Proposer type: simulation, search, or exact (for log linear only)",
     required=False,
     default="simulation",
 )
@@ -382,6 +382,34 @@ def cli():
     required=False,
     default=False
 )
+@click.option(
+    '--min-weight-per-domain', 
+    type=float,
+    help="if set, we propose a mix where the minimum weight for each domain is above this threshold",
+    required=False,
+    default=0.0
+)
+@click.option(
+    '--use-hardcoded-reference-ratio', 
+    is_flag=True,
+    help="if set, we use a hardcoded reference ratio for the mix",
+    required=False,
+    default=False
+)
+@click.option(
+    '--kl-reg', 
+    type=float,
+    help="the lambda for KL regularization, only used for log-linear regression",
+    required=False,
+    default=None,
+)
+@click.option(
+    '--patched', 
+    is_flag=True,
+    help="if set, we need to patch multiple swarms. We just need this to hardcode an edge case (adding 'dclm:' prefix to the dclm only swarm)",
+    required=False,
+    default=False
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -411,6 +439,7 @@ def fit(
     dashboard: list[str],
     support_domains: tuple[str],
     drop_metrics: tuple[str],
+    interactions: tuple[str],
     early_stopping: float = 0.0,
     dro_reference_model_id: Optional[str] = None,
     use_reference_model_predicted_scores: bool = False,
@@ -422,10 +451,13 @@ def fit(
     use_cookbook: bool = False,
     fit_only: bool = False,
     custom_name: Optional[str] = None,
-    interactions: Optional[list[str]] = None,
     tol: Optional[float] = None,
     fixed_search_weight: Optional[str] = None,
-    make_worst_mix: bool = False
+    make_worst_mix: bool = False,
+    min_weight_per_domain: float = 0.0,
+    use_hardcoded_reference_ratio: bool = False,
+    kl_reg: Optional[float] = None,
+    patched: bool = False,
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -504,6 +536,13 @@ def fit(
         eval_config['drop_metrics'] = drop_metrics
     if make_worst_mix:
         eval_config['make_worst_mix'] = True
+    if min_weight_per_domain > 0.0:
+        eval_config['min_weight_per_domain'] = min_weight_per_domain
+    if use_hardcoded_reference_ratio:
+        eval_config['use_hardcoded_reference_ratio'] = True
+    if kl_reg is not None:
+        assert proposer_type=="exact"
+        eval_config['kl_reg'] = kl_reg
 
 
     # used for caching regression model
@@ -526,7 +565,7 @@ def fit(
         regression_config["fixed_weight"] = fixed_weight
     if metric_type is not None:
         regression_config["metric_type"] = metric_type
-    if interactions is not None:
+    if len(interactions) != 0:
         regression_config["interactions"] = interactions
 
     if len(support_domains) != 0:
@@ -612,7 +651,7 @@ def fit(
         ratios = ratios[ratios['run'].isin(metrics.run)]
     else:
         run_ratios = [
-            {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors, run.display_name)}
+            {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors, run.display_name, patched)}
             for idx, run in enumerate(run_instances)
         ]
         if pull_from_dashboard:
@@ -673,7 +712,7 @@ def fit(
                     history=run.samples,
                     samples=num_samples,
                     metrics=(eval_metric_group_name, eval_metric_group.value),
-                    display_name=run.display_name,
+                    display_name=run.display_name if experiment_groups[0] != "ee22e17f" else run.display_name.replace("all-dressed", "dclmv2"),
                     average=group_average != None,
                     pull_from_dashboard=pull_from_dashboard,
                     dashboard=dashboard,
@@ -689,7 +728,10 @@ def fit(
                 "olmo3_offline_tasks_0630",
                 "midtraining_aggregate_evals",
                 "midtraining_finegrained_evals",
-                "pretraining_tasks_for_paper"
+                "pretraining_tasks_for_paper",
+                "math_tasks",
+                "code_tasks_new",
+                "qa_tasks",
                 ] or len(run.samples) > 0
             ]
 
@@ -785,14 +827,12 @@ def fit(
 
     if not bad_rows.empty:
         logger.warning(f"Found NaNs in the following rows, dropping them! {bad_rows.index.tolist()}")
-        breakpoint()
         metrics = metrics.drop(index=bad_rows.index)
         ratios = ratios.drop(index=bad_rows.index)
 
     """ cols_with_nans = metrics[cols_to_check].columns[metrics[cols_to_check].isna().any()].tolist()
     if len(cols_with_nans) > 0:
         logger.warning(f"Found NaNs in the following columns, dropping them! {cols_with_nans}")
-        breakpoint()
         metrics = metrics.drop(columns=cols_with_nans)
         metrics_to_index = [m for m in metrics_to_index if m not in cols_with_nans] """
 
@@ -805,7 +845,7 @@ def fit(
     X_train = ratios[ratios.columns[3:]].values
     # Y = Metric values 
     Y_train = metrics[metrics.columns[3:]].values
-
+    
     if n_test > 0:
         logger.info(f"Using {n_test} samples for test data")
         X_train, X_test, Y_train, Y_test = train_test_split(X_train, Y_train, test_size=n_test / len(Y_train), random_state=seed)
@@ -837,7 +877,10 @@ def fit(
                 X_train = np.concatenate(all_x)
                 Y_train = np.concatenate(all_y)
             else:
-                X_train, _, Y_train, _ = train_test_split(X_train, Y_train, train_size=train_split[0], random_state=seed)
+                if train_split[0] == len(Y_train):
+                    logger.info(f"Train split is the same as the dataset size, not subsampling...")
+                else:
+                    X_train, _, Y_train, _ = train_test_split(X_train, Y_train, train_size=train_split[0], random_state=seed)
         else:
             assert len(train_split) == 1, "If neighborhood is not set, train_split must be a single float"
             X_train, Y_train = compute_mixture_neighborhood(X_train, Y_train, ratios, neighborhood, train_split[0])
@@ -859,6 +902,18 @@ def fit(
         obj_weights = [obj_weights.value.get(metric, 1) for idx, metric in indexed_metrics]
         logger.info(f"Minimizing weighted average: {obj_weights}")
 
+
+    """ if regression_type=="lightgbm":
+        # debugging - just fit on first metric 
+        drop_indices = np.arange(4, len(metrics.columns))
+        metrics = metrics.drop(columns=metrics.columns[drop_indices])
+        Y_train = np.delete(Y_train, drop_indices-3, axis=1)
+        Y_test = np.delete(Y_test, drop_indices-3, axis=1)
+        metrics_to_index = [m for i, m in indexed_metrics if i not in drop_indices-3]
+        indexed_metrics = list(enumerate(metrics_to_index))
+    """
+
+
     # caching logic for regression model. Note that one regression model can be used for many different proposed mixes,
     # which is why we need to cache based on a separate subconfig, regression_config 
     regression_config_str = json.dumps(regression_config, sort_keys=True)
@@ -866,7 +921,6 @@ def fit(
     regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / "_".join(experiment_groups) / hash_str 
     regression_model_cache_folder.mkdir(parents=True, exist_ok=True)
     regression_model_cache_path = regression_model_cache_folder / f"regression_params.pkl"
-
     if os.path.exists(regression_model_cache_path) and regression_type == "log_linear":
         logger.info(f"Using log-linear regression model at {regression_model_cache_path}")
         with open(regression_model_cache_path, "rb") as f:
@@ -880,6 +934,19 @@ def fit(
         for idx, metric in indexed_metrics:
             reg = LogLinearRegressor(params[metric])
             predictors.append(reg)
+    elif not os.path.exists(regression_model_cache_path) and regression_type == "log_linear" and os.path.exists(os.path.join(output_dir, "path_to_regression_model.txt")):
+        # look in output_dir 
+        with open(os.path.join(output_dir, "path_to_regression_model.txt"), "r") as f:
+            regression_model_cache_path = pathlib.Path(f.read().strip())
+        if os.path.exists(regression_model_cache_path):
+            logger.info(f"Using log-linear regression model at {regression_model_cache_path}")
+            with open(regression_model_cache_path, "rb") as f:
+                params = pickle.load(f)
+
+            # initialize the regression models using the cached parameters 
+            for idx, metric in indexed_metrics:
+                reg = LogLinearRegressor(params[metric])
+                predictors.append(reg)
     else:
         logger.info(f"Will save regression model to {regression_model_cache_path}")
         for idx, metric in indexed_metrics:
@@ -1010,7 +1077,8 @@ def fit(
                 tol=tol,
                 fixed_search_weight=fixed_search_weight,
                 reference_ratio=reference_ratio if use_reference_model_as_search_prior else None,
-                make_worst_mix=make_worst_mix
+                make_worst_mix=make_worst_mix,
+                min_weight_per_domain=min_weight_per_domain
             )
 
             plot_and_log_weights(
@@ -1026,7 +1094,8 @@ def fit(
                 alpha=alpha,
                 df_config=ratios,
                 output_dir=output_dir,
-                fixed_weight=fixed_weight_dict if fixed_weight is not None else None
+                fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
+                kl_reg=kl_reg
             )
 
             results.append((metric, weights))
@@ -1037,6 +1106,16 @@ def fit(
 
     if opt_avg_metric and n_test == 0:
         assert group_metrics is not None and group_average is None # need to have this set
+
+        if experiment_groups[0] in ["5c712b3b", "daf37f03", "f5a3ff58"] and use_hardcoded_reference_ratio:
+            logger.info("Using hardcoded reference ratio for s2pdf + web one node swarms...")
+            reference_ratio = np.array([0.75, 0.00528905, 0.00994264, 0.01429609, 0.01794769, 0.00955301,
+                0.00601014, 0.01521388, 0.00796704, 0.00801173, 0.01751576,
+                0.00872822, 0.01303348, 0.01352303, 0.01408978, 0.0128043 ,
+                0.02283908, 0.01021371, 0.01405873, 0.0094072 , 0.01173855,
+                0.0078169 ])
+
+
         weights = PROPOSER_TYPES[proposer_type]().propose(
             index=-1,
             predictor=predictors,
@@ -1056,8 +1135,10 @@ def fit(
             ratios=ratios,
             tol=tol,
             fixed_search_weight=fixed_search_weight,
-            reference_ratio=reference_ratio if use_reference_model_as_search_prior else None,
-            make_worst_mix=make_worst_mix
+            reference_ratio=reference_ratio if use_reference_model_as_search_prior or reference_ratio is not None else None,
+            make_worst_mix=make_worst_mix,
+            min_weight_per_domain=min_weight_per_domain,
+            kl_reg=kl_reg
         )
         plot_and_log_weights(
             prior=priors[0],

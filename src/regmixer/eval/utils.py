@@ -25,6 +25,7 @@ from collections import defaultdict
 import pydantic_core
 import statsmodels.api as sm
 from matplotlib.colors import TwoSlopeNorm
+import cvxpy as cp
 
 from scipy.stats import norm  # for probit transform
 from matplotlib.cm import ScalarMappable
@@ -334,8 +335,10 @@ class SimulationProposer(Proposer):
         metric_type: Optional[str] = None,
         tol: Optional[float] = None,
         fixed_search_weight: Optional[str] = None,
-        reference_ratio: Optional[str] = None,
-        make_worst_mix: bool = False
+        reference_ratio: Optional[float] = None,
+        make_worst_mix: bool = False,
+        min_weight_per_domain: float = 0.0,
+        **kwargs
     ) -> np.ndarray:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -346,7 +349,6 @@ class SimulationProposer(Proposer):
         max_dirichlet = 100
         search_dirichlet_factor = 2.0
 
-        
         if reference_ratio is not None:
             search_prior = np.array(reference_ratio)
         else:
@@ -616,6 +618,13 @@ class SimulationProposer(Proposer):
                 if len(simulations) == 0:
                     continue
 
+
+            if min_weight_per_domain > 0.0:
+                simulations = simulations[np.all(simulations >= min_weight_per_domain, axis=1)]
+                if len(simulations) == 0:
+                    logger.info(f"No simulations remain after enforcing min weight per domain of {min_weight_per_domain}.")
+                    continue
+
             predictions = np.array([reg.predict(simulations) for reg in predictor])
             if reference_scores is not None:
                 # If reference scores are provided, filter simulations based on them
@@ -719,8 +728,31 @@ class SimulationProposer(Proposer):
 
 class SearchProposer(Proposer):
     def propose(
-        self, index: int, predictor: list[SearchRegressor], opt_avg_metric: bool = False, **kwargs
+        self, index: int, predictor: list[SearchRegressor], prior_distributions: dict,
+        opt_avg_metric: bool = False,
+        constrain_objective: bool = False,
+        manual_token_constraint_path: Optional[Path] = None,
+        repetition_factor: float = 1.0,
+        **kwargs
     ):
+
+
+        if constrain_objective:
+            # just need a desired token count and available token count
+            if manual_token_constraint_path is not None:
+                with open(manual_token_constraint_path, "r") as f:
+                    data = yaml.safe_load(f)
+                desired_tokens = data["requested_tokens"]
+
+
+                # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
+                available_tokens_per_source = {
+                    source: data["available_tokens"][source]
+                    for source, _ in prior_distributions.items()
+                }
+                logger.info(f"Using manual token constraints from {manual_token_constraint_path}")
+
+
         searched_weights = predictor[0].get_searched_weights()
         best_performance = np.inf
         best_weights = np.zeros(len(searched_weights[0]))
@@ -729,16 +761,103 @@ class SearchProposer(Proposer):
                 pred = np.array([reg.predict(weight[None]) for reg in predictor]).mean(axis=0)[0]
             else:
                 pred = predictor[index].predict(weight[None])[0]
-            if pred < best_performance:
-                best_performance = pred
-                best_weights = weight
+
+
+            if constrain_objective:
+                token_usage = weight * desired_tokens
+                token_limits = (
+                    np.array(list(available_tokens_per_source.values())) * repetition_factor
+                )
+
+                if (token_usage <= token_limits).all() and pred < best_performance:
+                    best_performance = pred
+                    best_weights = weight
+            else:
+                if pred < best_performance:
+                    best_performance = pred
+                    best_weights = weight
 
         return best_weights
+
+
+class LogLinearExactProposer(Proposer):
+
+    def propose(self, predictor: list[SearchRegressor], prior_distributions: dict,
+        opt_avg_metric: bool = False,
+        constrain_objective: bool = False,
+        manual_token_constraint_path: Optional[Path] = None,
+        repetition_factor: float = 1.0,
+        kl_reg: Optional[float] = 0.1,
+        obj_weights: Optional[list] = None,
+        **kwargs
+    ):
+        assert opt_avg_metric, "LogLinearExactProposer only supports opt_avg_metric=True"
+        if kl_reg is None:
+            raise ValueError("kl_reg must be provided for LogLinearExactProposer")
+
+        if constrain_objective:
+            # just need a desired token count and available token count
+            if manual_token_constraint_path is not None:
+                with open(manual_token_constraint_path, "r") as f:
+                    data = yaml.safe_load(f)
+                desired_tokens = data["requested_tokens"]
+
+
+                # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
+                available_tokens_per_source = {
+                    source: data["available_tokens"][source]
+                    for source, _ in prior_distributions.items()
+                }
+                logger.info(f"Using manual token constraints from {manual_token_constraint_path}")
+
+
+                caps = np.array(list(available_tokens_per_source.values())) * repetition_factor / desired_tokens
+
+        
+        C = np.array([p.model[0] for p in predictor])                 # (n,)
+        A = np.array([p.model[1:] for p in predictor])                # (n, d)
+        n, d = A.shape
+        weights = np.ones(n) / n if obj_weights is None else np.array(obj_weights)
+
+        x = cp.Variable(d)
+
+        q = np.array(list(prior_distributions.values()))
+        q = np.asarray(q, dtype=float)
+        eps=1e-12
+        q = np.maximum(q, eps)         # ensure strictly positive
+        q = q / q.sum()
+
+
+        # c_i doesn’t affect the argmin, but harmless to include if you want the value
+        # obj = cp.sum(cp.multiply(weights, C) + cp.exp(A @ x))
+        #obj = cp.sum(cp.multiply(weights, cp.exp(A @ x)))       # identical argmin
+        loss = cp.sum(cp.multiply(weights, cp.exp(A @ x)))
+
+        # KL(x || q) = sum x*log(x/q) = sum rel_entr(x, q)
+        kl = cp.sum(cp.rel_entr(x, q))
+
+        obj = loss + kl_reg * kl
+
+        constraints = [
+            x >= 0,      
+            cp.sum(x) == 1
+        ]
+        if constrain_objective:
+            constraints.append(x <= caps)
+
+
+        prob = cp.Problem(cp.Minimize(obj), constraints)
+        prob.solve(solver="ECOS", verbose=True)              # ECOS or SCS are good
+
+        print(prob.value, prob.status)
+
+        return x.value
 
 
 PROPOSER_TYPES = {
     "simulation": SimulationProposer,
     "search": SearchProposer,
+    "exact": LogLinearExactProposer
 }
 
 
@@ -1174,6 +1293,20 @@ def bh_adjust(pvals: np.ndarray) -> np.ndarray:
     out = np.empty_like(q_sorted); out[order] = q_sorted
     return out.reshape(pvals.shape)
 
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
+
+# Define red-white-blue with a white "band"
+colors = ["red", "white", "blue"]
+cmap = LinearSegmentedColormap.from_list("red_white_blue", colors)
+
+# Example boundaries: values between -0.1 and +0.1 stay white
+bounds = [-1.0, -0.9, 0.9, 10]
+norm = BoundaryNorm(bounds, cmap.N, extend="both")
+
+
 def plot_interaction_matrix_signed_evidence(
     output_dir: str,
     predictors: List,
@@ -1254,24 +1387,32 @@ def plot_interaction_matrix_signed_evidence(
         v = 1.0
 
         plt.figure(figsize=(20, 16))
+        #im = plt.imshow(
+        #    signed_score,
+        #    cmap="coolwarm",
+        #    norm=TwoSlopeNorm(vmin=-v, vcenter=0.0, vmax=v),
+        #    aspect="auto",
+        #)
+
         im = plt.imshow(
             signed_score,
-            cmap="coolwarm",
-            norm=TwoSlopeNorm(vmin=-v, vcenter=0.0, vmax=v),
-            aspect="auto",
+            cmap=cmap,
+            norm=norm,
+            aspect="auto"
         )
 
+
         # Dim non-significant cells (gray overlay)
-        mask = (Q if use_fdr else P_safe) > sig_threshold
-        overlay = np.zeros((*signed_score.shape, 4))
-        overlay[mask] = [0.7, 0.7, 0.7, 0.6]
-        plt.imshow(overlay, aspect="auto")
+        #mask = (Q if use_fdr else P_safe) > sig_threshold
+        #overlay = np.zeros((*signed_score.shape, 4))
+        #overlay[mask] = [0.7, 0.7, 0.7, 0.6]
+        #plt.imshow(overlay, aspect="auto")
 
         # Annotate with β and RAW p (as requested)
         for i in range(len(metric_names)):
             for j in range(len(domain_names)):
                 text_str = f"β={B[i, j]:.2f}\np={P[i, j]:.2g}"
-                text_color = "black" if abs(signed_score[i, j]) < 0.5 * v else "white"
+                text_color = "black" #if abs(signed_score[i, j]) < 0.5 * v else "white"
                 plt.text(j, i, text_str, ha="center", va="center",
                          fontsize=8, color=text_color)
 
@@ -1282,7 +1423,7 @@ def plot_interaction_matrix_signed_evidence(
 
     else:
         # No p-values available: show β heatmap only
-        plt.figure(figsize=(20, 16))
+        plt.figure(figsize=(25, 16))
         im = plt.imshow(B, cmap="coolwarm", aspect="auto")
         for i in range(len(metric_names)):
             for j in range(len(domain_names)):
@@ -1334,7 +1475,7 @@ def mk_run_metrics(
                 # need to obtain offline results
                 for d in dashboard:
                     logger.info(f"Getting offline results for {display_name} in {d} dashboard")
-                    offline_results = get_offline_evals(display_name, offline_tasks, dashboard=d, metric_type=metric_type)
+                    offline_results = get_offline_evals(display_name, offline_tasks, group_name, dashboard=d, metric_type=metric_type)
                     results.update(offline_results)
 
     return results
@@ -1368,7 +1509,7 @@ def get_offline_evals_from_dashboard(display_name, tasks, dashboard):
     return df.to_dict()
 
 
-def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=None):#"olmo-3-evals"):# "regmixer"):
+def get_offline_evals(display_name, tasks, group_name, dashboard="regmixer", metric_type=None):#"olmo-3-evals"):# "regmixer"):
     bucket = "ai2-llm"
     prefix = f"evaluation/{dashboard}/{display_name}"
 
@@ -1441,8 +1582,13 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
                 ]
                 if len(task_data) == 0:
                     all_available_tasks = [data['task_config'].get('metadata', {}).get('alias')  for data in all_jsonl_data]
-                    logger.warning(f"Task {task} not found in JSONL data for {display_name}. Available tasks: {all_available_tasks}")
-                    continue
+
+                    if task.replace(":full", "") in ["ultrachat_masked_ppl", "wildchat_masked_ppl", "qasper_yesno:rc::olmes",
+                        "sciriff_yesno:rc::olmes", "lab_bench_dbqa", "lab_bench_protocolqa", "medqa_en:rc::none"] and group_name == "pretraining_tasks_for_paper":
+                        continue
+                    else:
+                        logger.warning(f"Task {task} not found in JSONL data for {display_name}. Available tasks: {all_available_tasks}")
+                        continue
                 else:
                     logger.info(
                         f"Task {task} found in JSONL data for {display_name} with alias {task_data[0]['task_config'].get('metadata', {}).get('alias')}"
@@ -1463,21 +1609,21 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
             if "bits_per_byte_corr" in data["metrics"]:
                 name = data["task_config"]["metadata"]["alias"].replace("bpb:", "").replace(":full", "")
                 offline_results[name] = data["metrics"]["bits_per_byte_corr"]
-                logger.info(
-                    f"Task {name} found in JSONL data for {display_name} with bits_per_byte_corr {data['metrics']['bits_per_byte_corr']}"
-                )
+                #logger.info(
+                #    f"Task {name} found in JSONL data for {display_name} with bits_per_byte_corr {data['metrics']['bits_per_byte_corr']}"
+                #)
             elif "bits_per_byte_corr_macro" in data["metrics"]:
                 name = data["task_config"]["metadata"]["alias"].replace("bpb:", "").replace(":full", "")
                 offline_results[name] = data["metrics"]["bits_per_byte_corr_macro"]
-                logger.info(
-                    f"Task {name} found in JSONL data for {display_name} with bits_per_byte_corr_macro {data['metrics']['bits_per_byte_corr_macro']}"
-                )
+                #logger.info(
+                #    f"Task {name} found in JSONL data for {display_name} with bits_per_byte_corr_macro {data['metrics']['bits_per_byte_corr_macro']}"
+                #)
             elif "bits_per_byte" in data["metrics"]:
                 name = data["task_name"].replace("bpb:", "").replace(":full", "")
                 offline_results[name] = data["metrics"]["bits_per_byte"]
-                logger.info(
-                    f"Task {name} found in JSONL data for {display_name} with bits_per_byte {data['metrics']['bits_per_byte']}"
-                )
+                #logger.info(
+                #    f"Task {name} found in JSONL data for {display_name} with bits_per_byte {data['metrics']['bits_per_byte']}"
+                #)
             else:
                 logger.warning(
                     f"{data['task_name']} does not have bits_per_byte_corr or bits_per_byte_corr_macro in metrics {data['metrics'].keys()}"
@@ -1486,24 +1632,31 @@ def get_offline_evals(display_name, tasks, dashboard="regmixer", metric_type=Non
     return offline_results
 
 
-def mk_weights_from_config(config: dict, priors: tuple, display_name: str) -> dict[str, float]:
+def mk_weights_from_config(config: dict, priors: tuple, display_name: str, patched: bool = False) -> dict[str, float]:
+    source_mixture_config = (
+        config.get("dataset", {})
+        .get("source_mixture_config", {})
+    )
+
+    sources = source_mixture_config.get("source_configs") or source_mixture_config.get("source_list").get("sources") or []
+
     source_configs = {
         source["source_name"]: source
-        for source in config.get("dataset", {})
-        .get("source_mixture_config", {})
-        .get("source_configs", [])
+        for source in sources
     }
+
     prefixes = ['dclm', 's2pdf', 'pes2o', 'stack-edu', 'finemath-3plus', 'arxiv', 'wikipedia']
     source_configs = {
         (
             name.replace("_", ":", 1)
-            if any(name.startswith(prefix + "_") for prefix in prefixes)
+            if any(name.startswith(prefix + "_") and not name.startswith("dclm_v2") for prefix in prefixes)
             else name
         ): value
         for name, value in source_configs.items()
     }
 
-    if "62e7dc06" in display_name:
+    if "62e7dc06" in display_name and patched:
+        # need this when patching to align up all the domain names
         source_configs = {f"dclm:{k}" : v for k, v in source_configs.items()}
 
     weights = {}
