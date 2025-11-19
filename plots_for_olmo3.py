@@ -35,7 +35,7 @@ def plot_weights(
         columns=columns,
     )
     df = pd.melt(df)
-    df["type"] = (["Corpus"] + ["Optimal"]) * len(columns)
+    df["type"] = (["Natural"] + ["Ours"]) * len(columns)
 
     plt.rc("axes", unicode_minus=False)
     plt.rcParams.update(
@@ -53,11 +53,11 @@ def plot_weights(
     ax.tick_params(axis="x", labelrotation=90)
 
     pallette = {
-        "Corpus": "#105257",
-        "Optimal": "#F0529C",
+        "Natural": "#105257",
+        "Ours": "#F0529C",
     }
 
-    df_sorted = df[df["type"] == "Corpus"].sort_values(by="value", ascending=False)
+    df_sorted = df[df["type"] == "Natural"].sort_values(by="value", ascending=False)
     df["variable"] = pd.Categorical(df["variable"], categories=df_sorted["variable"], ordered=True)
     sns.barplot(data=df, x="variable", y="value", hue="type", palette=pallette, ax=ax)
 
@@ -96,12 +96,13 @@ def plot_weights(
 
 
 def plot_pareto(diff: dict[str, float], save_name: str):
+    diff = {k.split("/")[-1].split(" ")[0].split("::")[0] : v for k, v in diff.items()}
     diff = pd.Series(diff)
     colors = ['green' if val > 0 else 'red' for val in diff]
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 8))
     diff.plot(kind='bar', color=colors)
-    plt.title(f'Pareto Improvement over natural distribution')
-    plt.ylabel('Difference (BPB v2, 1B)')
+    plt.title(f'Per-task improvement over natural distribution')
+    plt.ylabel('BPB Difference (higher is better)')
     plt.axhline(0, color='black', linewidth=0.8)
     plt.xticks(rotation=90)
     plt.tight_layout()
@@ -197,6 +198,9 @@ dclm_pstar_pareto_diff = {'eval/downstream/mmlu_social_sciences_test_rc_5shot (B
  'coqa:rc::gen2mc': -0.03518194033581967,
  'ultrachat_masked_ppl': -0.002778840844915753,
  'wildchat_masked_ppl': 0.0011769254131349105}
+
+
+breakpoint()
 
 
 stackedu_natural = {'stack-edu:C': 0.03460056269174911,
