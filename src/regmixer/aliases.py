@@ -82,6 +82,7 @@ class ExperimentConfig(BaseModel):
     device_batch_size: int = 4
     global_batch_size: Optional[int] = None
     manual_prior: Optional[dict[str, float]] = None
+    manual_topic_prior: Optional[dict[str, float]] = None
     sample_multiplier: Optional[int] = None
     wandb_debug: bool = False
     existing_mix_file: Optional[str] = None 

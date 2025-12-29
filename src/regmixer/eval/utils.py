@@ -26,6 +26,11 @@ import pydantic_core
 import statsmodels.api as sm
 from matplotlib.colors import TwoSlopeNorm
 import cvxpy as cp
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel, WhiteKernel
+
+from scipy.optimize import least_squares
+
 
 from scipy.stats import norm  # for probit transform
 from matplotlib.cm import ScalarMappable
@@ -41,6 +46,8 @@ from regmixer.synthesize_mixture import calculate_priors
 from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics
 from regmixer.eval.law import ScalingLaw
 from regmixer.aliases import SourceConfig, ExperimentConfig
+
+from olmo_core.data.source_mixture import SourceMixtureConfig
 
 logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -60,11 +67,11 @@ LGBM_HPS = {
     "objective": "regression",
     "metric": ["l1", "l2"],
     "seed": 42,
-    "num_iterations": 10000,
+    "num_iterations": 1000, # 10000
     "learning_rate": 1e-2,
     "verbosity": -1,
-    "early_stopping_round": 3,
 }
+
 
 
 class Regressor:
@@ -81,15 +88,62 @@ class LightGBMRegressor(Regressor):
     def __init__(self, **kwargs):
         self.model = lgb.LGBMRegressor(**LGBM_HPS)
 
+    def fit(self, x, y, idx, early_stopping=0.0, X_val=None, Y_val=None, **kwargs):
+        target = y[:, idx]
+
+        if early_stopping > 0:
+            val_target = Y_val[:, idx]
+            self.model = self.model.fit(
+                x,
+                target,
+                eval_set=[(X_val, val_target)],
+                eval_metric="l2",
+                callbacks=[
+                    lgb.early_stopping(stopping_rounds=int(early_stopping), verbose=False),]
+            )
+        else:
+            self.model = self.model.fit(
+                x,
+                target,
+            )
+
+
+
+
+class GPRegressor(Regressor):
+    def __init__(self, **kwargs):
+        # Default hyperparameters (can be overridden via kwargs)
+        length_scale = kwargs.get('length_scale', 1.0)
+        length_scale_bounds = kwargs.get('length_scale_bounds', (1e-2, 1e2))
+        constant_value = kwargs.get('constant_value', 1.0)
+        constant_value_bounds = kwargs.get('constant_value_bounds', (1e-3, 1e3))
+        noise_level = kwargs.get('noise_level', 0.1)
+        noise_level_bounds = kwargs.get('noise_level_bounds', (1e-5, 1e1))
+        n_restarts = kwargs.get('n_restarts_optimizer', 10)
+        normalize_y = kwargs.get('normalize_y', True)
+        
+        # Build kernel: λ * RBF(σ) + WhiteKernel(σ_ε)
+        kernel = (
+            ConstantKernel(constant_value, constant_value_bounds=constant_value_bounds) *
+            RBF(length_scale=length_scale, length_scale_bounds=length_scale_bounds) +
+            WhiteKernel(noise_level=noise_level, noise_level_bounds=noise_level_bounds)
+        )
+        
+        self.model = GaussianProcessRegressor(
+            kernel=kernel,
+            n_restarts_optimizer=n_restarts,
+            normalize_y=normalize_y,
+            random_state=kwargs.get('random_state', None)
+        )
+    
     def fit(self, x, y, idx, **kwargs):
         target = y[:, idx]
-        self.model = self.model.fit(
-            x,
-            target,
-            eval_set=[(x, target)],
-            eval_metric="l2",
-        )
-
+        self.model.fit(x, target)
+        
+        # Optionally print optimized hyperparameters
+        if kwargs.get('verbose', False):
+            print(f"Task {idx} - Optimized kernel: {self.model.kernel_}")
+            print(f"Task {idx} - Log marginal likelihood: {self.model.log_marginal_likelihood_value_:.3f}")
 
 class LinearRegressor(Regressor):
     #def __init__(self, **kwargs):
@@ -149,7 +203,7 @@ class LogLinearRegressor(Regressor):
         else:
             self.model = params
 
-    def fit(self, x, y, idx, early_stopping=0.0, max_step=100, delta=0.02):
+    def fit(self, x, y, idx, early_stopping=0.0, max_step=100, delta=0.02, **kwargs):
         target = y[:, idx]
         self.model = self.model.fit(
             x,
@@ -164,6 +218,10 @@ class LogLinearRegressor(Regressor):
         return mixing_law(
             torch.tensor(x, dtype=torch.float), torch.tensor(self.model, dtype=torch.float)
         ).numpy()
+
+
+    def get_params(self):
+        return self.model
 
 
 class LogNonLinearRegressor(Regressor):
@@ -230,6 +288,194 @@ class SearchRegressor(Regressor):
     def get_searched_weights(self):
         return [np.array(weight) for weight, _ in self.model.items()]
 
+
+
+
+class AutoscaleRegressor(Regressor):
+    """
+    Fits y(p) = sum_i (N0_i + N * p_i)^(-gamma_i) + L. This equation is taken from the Autoscale paper.
+
+    The autoscale paper is a bit unclear about how it actually fits to OOD domains; its notebook only shows fitting domain i's mix to an aggregated validation loss, for each i.
+    But, we took the main equation of the paper and directly fit it, as a good-faith effort to implement their method for OOD evaluation.
+
+    x: (n_samples, m) probability vectors p (rows typically sum to 1)
+    y: (n_samples, n_targets) or (n_samples,)
+    idx: column index of y to fit when y is 2D
+    """
+
+    def __init__(self, requested_tokens, max_nfev=50000, verbose=False, params=None, **kwargs):
+        if requested_tokens is None:
+            raise ValueError("requested_tokens must be provided for AutoscaleRegressor.")
+        self.N = float(requested_tokens)
+        self.max_nfev = int(max_nfev)
+        self.verbose = bool(verbose)
+
+
+        if params is not None:
+            self.alpha_ = params.get("alpha", None)
+            self.N0_ = self.alpha_ * self.N if self.alpha_ is not None else None
+            self.gamma_ = params.get("gamma", None)
+            self.L_ = params.get("L", None)
+        else:
+            self.alpha_ = None   # learned N0/N, shape (m,)
+            self.N0_ = None      # learned N0, shape (m,)
+            self.gamma_ = None   # learned gamma, shape (m,)
+            self.L_ = None       # learned L, scalar
+        self.result_ = None  # scipy result
+
+    def _predict_given_params(self, X, alpha, gamma, L):
+        # base = N0 + N p = N(alpha + p)
+        base = self.N * (alpha[None, :] + X)
+        base = np.maximum(base, 1e-30)
+        return np.sum(base ** (-gamma[None, :]), axis=1) + L
+
+    def fit(self, x, y, idx, **kwargs):
+        X = np.asarray(x, dtype=float)
+        Y = np.asarray(y, dtype=float)
+
+        if X.ndim != 2:
+            raise ValueError(f"x must be 2D (n_samples, m). Got shape {X.shape}")
+
+        y_target = Y if Y.ndim == 1 else Y[:, idx]
+
+        n, m = X.shape
+        if y_target.shape[0] != n:
+            raise ValueError("x and y have inconsistent number of rows")
+
+        # --- init: alpha ~ 1/m, gamma positive, L free ---
+        alpha_init = np.full(m, 1.0 / m)
+        gamma_init = np.full(m, 0.5)
+        L_init = float(np.min(y_target) * 0.1)
+        p0 = np.concatenate([alpha_init, gamma_init, [L_init]])
+
+        # --- bounds: alpha>0, gamma>0, L unrestricted ---
+        lb = np.concatenate([np.full(m, 1e-12), np.full(m, 1e-12), [-np.inf]])
+        ub = np.concatenate([np.full(m, np.inf),  np.full(m, np.inf),  [ np.inf]])
+
+        L_ub = float(np.min(y_target))
+        lb[-1] = 0.0
+        ub[-1] = L_ub
+
+        def resid(params):
+            alpha = params[:m]
+            gamma = params[m:2*m]
+            L = params[-1]
+            return self._predict_given_params(X, alpha, gamma, L) - y_target
+
+        res = least_squares(resid, p0, bounds=(lb, ub), max_nfev=self.max_nfev)
+
+        params_hat = res.x
+        self.alpha_ = params_hat[:m]
+        self.gamma_ = params_hat[m:2*m]
+        self.L_ = float(params_hat[-1])
+        self.N0_ = self.alpha_ * self.N
+        self.result_ = res
+
+        if True: #self.verbose or kwargs.get("verbose", False):
+            yhat = self._predict_given_params(X, self.alpha_, self.gamma_, self.L_)
+            rmse = float(np.sqrt(np.mean((yhat - y_target) ** 2)))
+            print(f"[AutoscaleRegressor] idx={idx} success={res.success} rmse={rmse:.6g}")
+            print("  alpha (N0/N):", self.alpha_)
+            print("  N0:", self.N0_)
+            print("  gamma:", self.gamma_)
+            print("  L:", self.L_)
+
+        return self
+
+    def predict(self, x, **kwargs):
+        if self.alpha_ is None:
+            raise RuntimeError("Model is not fit yet.")
+        X = np.asarray(x, dtype=float)
+        if X.ndim != 2:
+            raise ValueError(f"x must be 2D (n_samples, m). Got shape {X.shape}")
+        return self._predict_given_params(X, self.alpha_, self.gamma_, self.L_)
+
+    def get_params(self):
+        return {
+            "alpha": self.alpha_,
+            "gamma": self.gamma_,
+            "L": self.L_,
+        }
+
+
+class BimixRegressor(Regressor):
+    """
+    Fits f(x) = sum_i F_i * x_i^(-alpha_i) --- this is derived from the BiMix paper. 
+    However, the bimix paper only fits validation loss of domain i vs mixture weight on domain i, so we add a summation to extend it to OOD evaluation.
+    Also, bimix models the number of steps. For our setup, we don't need to model this, so the equation collapses into a classical power law.
+
+    x: (n_samples, m) probability vectors (rows should sum to 1; all entries should be > 0)
+    y: (n_samples, n_targets) or (n_samples,)
+    idx: which column of y to fit when y is 2D
+    """
+
+    def __init__(self, eps=1e-12, max_nfev=50000, verbose=False, **kwargs):
+        self.eps = float(eps)
+        self.max_nfev = int(max_nfev)
+        self.verbose = bool(verbose)
+
+        self.F_ = None        # shape (m,)
+        self.alpha_ = None    # shape (m,)
+        self.result_ = None   # scipy result
+
+    def _predict_given_params(self, X, F, alpha):
+        X = np.asarray(X, dtype=float)
+        Xc = np.clip(X, self.eps, 1.0)  # avoid 0^(-alpha)
+        return np.sum(F[None, :] * (Xc ** (-alpha[None, :])), axis=1)
+
+    def fit(self, x, y, idx, **kwargs):
+        X = np.asarray(x, dtype=float)
+        Y = np.asarray(y, dtype=float)
+
+        if X.ndim != 2:
+            raise ValueError(f"x must be 2D (n_samples, m). Got shape {X.shape}")
+
+        y_target = Y if Y.ndim == 1 else Y[:, idx]
+
+        n, m = X.shape
+        if y_target.shape[0] != n:
+            raise ValueError("x and y have inconsistent number of rows")
+
+        # ---- init ----
+        # Simple, robust-ish defaults: F around mean(y)/m, alpha around 1
+        F_init = np.full(m, max(np.mean(y_target), self.eps) / m)
+        alpha_init = np.full(m, 1.0)
+        p0 = np.concatenate([F_init, alpha_init])
+
+        # ---- bounds ----
+        # F_i >= 0, alpha_i >= 0
+        lb = np.concatenate([np.zeros(m), np.zeros(m)])
+        ub = np.concatenate([np.full(m, np.inf), np.full(m, np.inf)])
+
+        def resid(params):
+            F = params[:m]
+            alpha = params[m:2*m]
+            yhat = self._predict_given_params(X, F, alpha)
+            return yhat - y_target
+
+        res = least_squares(resid, p0, bounds=(lb, ub), max_nfev=self.max_nfev)
+
+        params_hat = res.x
+        self.F_ = params_hat[:m]
+        self.alpha_ = params_hat[m:2*m]
+        self.result_ = res
+
+        if self.verbose or kwargs.get("verbose", False):
+            yhat = self._predict_given_params(X, self.F_, self.alpha_)
+            rmse = float(np.sqrt(np.mean((yhat - y_target) ** 2)))
+            print(f"[BimixRegressor] idx={idx} success={res.success} rmse={rmse:.6g}")
+            print("  F:", self.F_)
+            print("  alpha:", self.alpha_)
+
+        return self
+
+    def predict(self, x, **kwargs):
+        if self.F_ is None or self.alpha_ is None:
+            raise RuntimeError("Model is not fit yet.")
+        X = np.asarray(x, dtype=float)
+        if X.ndim != 2:
+            raise ValueError(f"x must be 2D (n_samples, m). Got shape {X.shape}")
+        return self._predict_given_params(X, self.F_, self.alpha_)
 
 
 def nonlinear_mixing_law(x, param, B_mask=None):
@@ -301,6 +547,9 @@ REGRESSION_TYPES = {
     "log_nonlinear": LogNonLinearRegressor,
     "search": SearchRegressor,
     "quadratic": QuadraticRegressor,
+    "gp": GPRegressor,
+    "autoscale": AutoscaleRegressor,
+    "bimix": BimixRegressor,
 }
 
 
@@ -338,6 +587,8 @@ class SimulationProposer(Proposer):
         reference_ratio: Optional[float] = None,
         make_worst_mix: bool = False,
         min_weight_per_domain: float = 0.0,
+        requested_tokens: Optional[int] = None,
+        no_extrapolation: bool = False,
         **kwargs
     ) -> np.ndarray:
         np.random.seed(seed)
@@ -395,7 +646,7 @@ class SimulationProposer(Proposer):
             elif manual_token_constraint_path is not None:
                 with open(manual_token_constraint_path, "r") as f:
                     data = yaml.safe_load(f)
-                desired_tokens = data["requested_tokens"]
+                desired_tokens = data["requested_tokens"] if requested_tokens is None else requested_tokens
                 group_ids = data.get("group_ids", None)
 
 
@@ -493,13 +744,14 @@ class SimulationProposer(Proposer):
                 ]
 
             # only search over mixes that are within bounds of the swarm ratios. We don't want the regression model to extrapolate.
-            """ratios_max = ratios[ratios.columns[3:]].max().values
-            simulations = simulations[
-                np.all(
-                    simulations < ratios_max,
-                    axis=1,
-                )  
-            ]"""
+            if no_extrapolation:
+                ratios_max = ratios[ratios.columns[3:]].max().values
+                simulations = simulations[
+                    np.all(
+                        simulations < ratios_max,
+                        axis=1,
+                    )  
+                ]
 
             if constrain_objective:
                 original_simulation_size = len(simulations)
@@ -782,25 +1034,29 @@ class SearchProposer(Proposer):
 
 class LogLinearExactProposer(Proposer):
 
-    def propose(self, predictor: list[SearchRegressor], prior_distributions: dict,
+    def propose(self, predictor: list[LogLinearRegressor], prior_distributions: dict,
+        ratios: pd.DataFrame,
         opt_avg_metric: bool = False,
         constrain_objective: bool = False,
         manual_token_constraint_path: Optional[Path] = None,
         repetition_factor: float = 1.0,
         kl_reg: Optional[float] = 0.1,
         obj_weights: Optional[list] = None,
+        requested_tokens: Optional[int] = None,
+        no_extrapolation: bool = False,
         **kwargs
     ):
         assert opt_avg_metric, "LogLinearExactProposer only supports opt_avg_metric=True"
         if kl_reg is None:
             raise ValueError("kl_reg must be provided for LogLinearExactProposer")
 
+        caps = None
         if constrain_objective:
             # just need a desired token count and available token count
             if manual_token_constraint_path is not None:
                 with open(manual_token_constraint_path, "r") as f:
                     data = yaml.safe_load(f)
-                desired_tokens = data["requested_tokens"]
+                desired_tokens = data["requested_tokens"] if requested_tokens is None else requested_tokens
 
 
                 # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
@@ -813,7 +1069,14 @@ class LogLinearExactProposer(Proposer):
 
                 caps = np.array(list(available_tokens_per_source.values())) * repetition_factor / desired_tokens
 
-        
+        if no_extrapolation:
+            ratios_max = ratios[ratios.columns[3:]].max().values
+            if caps is None:
+                caps = ratios_max
+            else:
+                caps = np.minimum(caps, ratios_max)
+
+
         C = np.array([p.model[0] for p in predictor])                 # (n,)
         A = np.array([p.model[1:] for p in predictor])                # (n, d)
         n, d = A.shape
@@ -853,11 +1116,224 @@ class LogLinearExactProposer(Proposer):
 
         return x.value
 
+class AutoscaleExactProposer(Proposer):
+    """
+    Solves:
+        minimize_p  sum_i f_i(p) + kl_reg * KL(p || p0)
+        s.t.         p in simplex, and p_j <= u_j (optional)
+
+    where each f_i is given by a fitted AutoscaleRegressor:
+        f_i(p) = sum_j (N_i * (alpha_{i,j} + p_j))^(-gamma_{i,j}) + L_i
+    """
+
+    def propose(
+        self,
+        predictor: list[AutoscaleRegressor],
+        prior_distributions: dict,
+        ratios: pd.DataFrame,
+        opt_avg_metric: bool = False,
+        constrain_objective: bool = False,
+        manual_token_constraint_path: Optional[Path] = None,
+        repetition_factor: float = 1.0,
+        kl_reg: Optional[float] = 0.1,
+        obj_weights: Optional[list] = None,
+        requested_tokens: Optional[int] = None,
+        no_extrapolation: bool = False,
+        **kwargs
+    ):
+        # keep behavior consistent with LogLinearExactProposer
+        assert opt_avg_metric, "AutoscaleExactProposer only supports opt_avg_metric=True"
+        if kl_reg is None:
+            raise ValueError("kl_reg must be provided for AutoscaleExactProposer")
+
+        caps = None
+        if constrain_objective:
+            if manual_token_constraint_path is not None:
+                with open(manual_token_constraint_path, "r") as f:
+                    data = yaml.safe_load(f)
+
+                desired_tokens = data["requested_tokens"] if requested_tokens is None else requested_tokens
+
+                available_tokens_per_source = {
+                    source: data["available_tokens"][source]
+                    for source, _ in prior_distributions.items()
+                }
+                logger.info(f"Using manual token constraints from {manual_token_constraint_path}")
+
+                caps = np.array(list(available_tokens_per_source.values()), dtype=float)
+                caps = caps * repetition_factor / float(desired_tokens)
+
+        if no_extrapolation:
+            ratios_max = ratios[ratios.columns[3:]].max().values.astype(float)
+            if caps is None:
+                caps = ratios_max
+            else:
+                caps = np.minimum(caps, ratios_max)
+
+        n = len(predictor)  # number of tasks/targets being aggregated
+        if n == 0:
+            raise ValueError("predictor list is empty")
+
+        d = len(prior_distributions)
+        weights = np.ones(n, dtype=float) / float(n) if obj_weights is None else np.asarray(obj_weights, dtype=float)
+        if weights.shape != (n,):
+            raise ValueError(f"obj_weights must have shape ({n},), got {weights.shape}")
+
+        # prior distribution q (= p0)
+        q = np.array(list(prior_distributions.values()), dtype=float)
+        eps = 1e-12
+        q = np.maximum(q, eps)  # strictly positive for KL
+        q = q / q.sum()
+
+        # decision variable on simplex
+        x = cp.Variable(d)
+        constraints = [
+            x >= 0,
+            cp.sum(x) == 1, 
+        ]
+        if constrain_objective and caps is not None:
+            constraints.append(x <= caps)
+
+        # build autoscale loss: weighted sum over tasks
+        # f_i(x) = sum_j (N_i*(alpha_i_j + x_j))^(-gamma_i_j) + L_i
+        f_terms = []
+        for i, reg in enumerate(predictor):
+            if reg.alpha_ is None or reg.gamma_ is None or reg.L_ is None:
+                raise RuntimeError(f"Autoscale regressor at index {i} is not fit yet.")
+            if len(reg.alpha_) != d or len(reg.gamma_) != d:
+                raise ValueError(
+                    f"Autoscale regressor {i} expects d={len(reg.alpha_)} dims, "
+                    f"but prior_distributions has d={d}."
+                )
+
+            N_i = float(getattr(reg, "N", requested_tokens if requested_tokens is not None else 0.0))
+            if N_i <= 0:
+                raise ValueError(
+                    f"Autoscale regressor {i} has non-positive N={N_i}. "
+                    f"Ensure requested_tokens was provided when fitting."
+                )
+
+            alpha_i = np.asarray(reg.alpha_, dtype=float)
+            gamma_i = np.asarray(reg.gamma_, dtype=float)
+            L_i = float(reg.L_)
+
+            base = N_i * (alpha_i + x)          # elementwise affine in x
+
+            # power with negative exponent is convex for positive base
+            term_i = cp.sum(cp.exp(cp.multiply(-gamma_i, cp.log(base)))) + L_i
+            f_terms.append(term_i)
+
+        f_vec = cp.hstack(f_terms)  # shape (n,)
+        loss = cp.sum(cp.multiply(weights, f_vec))
+
+        # KL(x || q) = sum_j x_j * log(x_j / q_j) = sum rel_entr(x, q)
+        kl = cp.sum(cp.rel_entr(x, q))
+
+        obj = loss + float(kl_reg) * kl
+
+        prob = cp.Problem(cp.Minimize(obj), constraints)
+
+        prob.solve(
+            solver="ECOS",
+            verbose=True,
+        )
+        print(prob.value, prob.status)
+        breakpoint()
+        return x.value
+
+
+class BimixExactProposer(Proposer):
+
+    def propose(self, predictor: list[BimixRegressor], prior_distributions: dict,
+        ratios: pd.DataFrame,
+        opt_avg_metric: bool = False,
+        constrain_objective: bool = False,
+        manual_token_constraint_path: Optional[Path] = None,
+        repetition_factor: float = 1.0,
+        kl_reg: Optional[float] = 0.1,
+        obj_weights: Optional[list] = None,
+        requested_tokens: Optional[int] = None,
+        no_extrapolation: bool = False,
+        **kwargs
+    ):
+        assert opt_avg_metric, "LogLinearExactProposer only supports opt_avg_metric=True"
+        if kl_reg is None:
+            raise ValueError("kl_reg must be provided for LogLinearExactProposer")
+
+        caps = None
+        if constrain_objective:
+            # just need a desired token count and available token count
+            if manual_token_constraint_path is not None:
+                with open(manual_token_constraint_path, "r") as f:
+                    data = yaml.safe_load(f)
+                desired_tokens = data["requested_tokens"] if requested_tokens is None else requested_tokens
+
+
+                # if the manual constraints are at the same granularity as the prior distributions, we can use them directly
+                available_tokens_per_source = {
+                    source: data["available_tokens"][source]
+                    for source, _ in prior_distributions.items()
+                }
+                logger.info(f"Using manual token constraints from {manual_token_constraint_path}")
+
+
+                caps = np.array(list(available_tokens_per_source.values())) * repetition_factor / desired_tokens
+
+        if no_extrapolation:
+            ratios_max = ratios[ratios.columns[3:]].max().values
+
+            if caps is None:
+                caps = ratios_max
+            else:
+                caps = np.minimum(caps, ratios_max)
+
+        F_list = [np.asarray(p.F_, dtype=float) for p in predictor] # get list of F vectors
+        A_list = [np.asarray(p.alpha_, dtype=float) for p in predictor]  # get list of alpha vectors
+        n = len(F_list)
+        d = len(F_list[0])
+        weights = np.ones(n) / n if obj_weights is None else np.array(obj_weights)
+
+        x = cp.Variable(d)
+
+        q = np.array(list(prior_distributions.values()))
+        q = np.asarray(q, dtype=float)
+        eps=1e-12
+        q = np.maximum(q, eps)         # ensure strictly positive
+        q = q / q.sum()
+
+        terms = []
+        for w, Fk, ak in zip(weights, F_list, A_list):
+            term = cp.sum(cp.multiply(Fk, cp.exp(cp.multiply(-ak, cp.log(x)))))
+            terms.append(w * term)
+
+        loss = cp.sum(terms)
+
+        # KL(x || q) = sum x*log(x/q) = sum rel_entr(x, q)
+        kl = cp.sum(cp.rel_entr(x, q))
+
+        obj = loss + kl_reg * kl
+
+        constraints = [
+            x >= 0, # x cannot be 0, but strict inequality not allowed
+            cp.sum(x) == 1
+        ]
+        if constrain_objective:
+            constraints.append(x <= caps)
+
+        prob = cp.Problem(cp.Minimize(obj), constraints)
+        prob.solve(solver="ECOS", verbose=True)              # ECOS or SCS are good
+
+        print(prob.value, prob.status)
+
+        return x.value
+
 
 PROPOSER_TYPES = {
     "simulation": SimulationProposer,
     "search": SearchProposer,
-    "exact": LogLinearExactProposer
+    "exact": LogLinearExactProposer,
+    "bimix_exact": BimixExactProposer,
+    "autoscale_exact": AutoscaleExactProposer,
 }
 
 
@@ -890,10 +1366,13 @@ def build_regression(
     regression_type: str,
     early_stopping: float,
     interactions: Optional[List[str]] = None,
+    requested_tokens: Optional[int] = None,
+    X_val: Optional[np.ndarray] = None,
+    Y_val: Optional[np.ndarray] = None,
 ) -> Regressor:
     logger.info(f"Building regression model, index: {idx}")
-    reg = REGRESSION_TYPES[regression_type](interactions=interactions)
-    reg.fit(X_train, Y_train, idx, early_stopping=early_stopping)
+    reg = REGRESSION_TYPES[regression_type](interactions=interactions, requested_tokens=requested_tokens)
+    reg.fit(X_train, Y_train, idx, early_stopping=early_stopping, X_val=X_val, Y_val=Y_val)
     return reg
 
 
@@ -1659,6 +2138,22 @@ def mk_weights_from_config(config: dict, priors: tuple, display_name: str, patch
         # need this when patching to align up all the domain names
         source_configs = {f"dclm:{k}" : v for k, v in source_configs.items()}
 
+
+    if "914e1003" in display_name and patched:
+        s2pdfv1_ratio = source_configs['s2pdfv1']['target_ratio']
+        s2pdf_prior = {k: v for k, v in priors[0].items() if "s2pdf" in k}
+        total = sum(s2pdf_prior.values())
+        s2pdf_prior = {k: v / total for k, v in s2pdf_prior.items()}
+        for topic, prior in s2pdf_prior.items():
+            paths = [path for path in source_configs['s2pdfv1']['paths'] if topic.split(":")[-1] in path]
+            source_configs[topic] = {
+                "source_name": topic, 
+                "target_ratio": prior * s2pdfv1_ratio,
+                "paths": paths
+            }
+  
+
+
     weights = {}
     for domain in priors[0].keys():
         if domain not in source_configs:
@@ -1683,6 +2178,7 @@ def mk_weights_from_config(config: dict, priors: tuple, display_name: str, patch
                 weights[domain] = 0.0
         else:
             weights[domain] = source_configs.get(domain, {}).get("target_ratio", 0.0)
+
 
     return weights
 
@@ -2055,6 +2551,7 @@ def calculate_priors_with_manual(
     dtype,
     use_cache: bool,
     manual_prior: Optional[dict[str, float]] = None,
+    manual_topic_prior: Optional[dict[str, float]] = None,
     fixed_source_weights: Optional[dict[str, float]] = None,
 ):
     priors = calculate_priors(
@@ -2069,12 +2566,25 @@ def calculate_priors_with_manual(
             if source_config.topics:
                 # adjust each topic weight by the manual prior
                 try:
-                    weights = np.array(
-                        [
-                            priors[0][f"{source_config.name}:{topic.name}"]
-                            for topic in source_config.topics
-                        ]
-                    )
+
+                    if manual_topic_prior is not None and all([
+                        topic.name in manual_topic_prior
+                        for topic in source_config.topics
+                    ]):
+                        # use the manual topic prior to set the weights
+                        weights = np.array(
+                            [
+                                manual_topic_prior[f"{source_config.name}:{topic.name}"]
+                                for topic in source_config.topics
+                            ]
+                        )
+                    else:
+                        weights = np.array(
+                            [
+                                priors[0][f"{source_config.name}:{topic.name}"]
+                                for topic in source_config.topics
+                            ]
+                        )
                 except KeyError:
                     print(priors[0].keys())
                     print(f"Source config: {source_config.name}")

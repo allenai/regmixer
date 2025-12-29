@@ -184,6 +184,7 @@ def generate_weights_dirichlet(
     available_tokens: int,
     allow_repetition: bool,
     manual_prior: Optional[dict[str, float]],
+    manual_topic_prior: Optional[dict[str, float]],
     sample_multiplier: Optional[int],
     enable_bound: bool = True,
     nonzero_weight: Optional[list[str]] = None,
@@ -222,12 +223,56 @@ def generate_weights_dirichlet(
     # split prior distribution into source and topic distributions and tweak it according to the manual prior
     topic_distributions = {}
     source_distribution = []
+
+
+    if manual_topic_prior is not None:
+        manual_sources_from_topics = set(key.split(":")[0]for key in manual_topic_prior.keys())
+        if len(manual_sources_from_topics) > 1:
+            # preserve the relative ratios between the manual topic domains
+            manual_source_ratios_from_topics = {}
+            for domain in manual_sources_from_topics:
+                domain_total = sum(value for key, value in manual_topic_prior.items() if key.startswith(f"{domain}:"))
+                manual_source_ratios_from_topics[domain] = domain_total
+        
+            manual_source_ratios_from_topics = {domain: ratio / sum(manual_source_ratios_from_topics.values()) for domain, ratio in manual_source_ratios_from_topics.items()} # normalize the ratios (e.g., DCLM vs StackEdu)
+            
+            remaining_sources = set(source_names).difference(manual_sources_from_topics)
+            remaining_ratios = {}
+            for domain in remaining_sources:
+                if manual_prior is not None and domain in manual_prior:
+                    remaining_ratios[domain] = manual_prior[domain]
+                else:
+                    remaining_ratios[domain] = sum(value for key, value in leaf_dist.items() if key.startswith(f"{domain}:"))
+
+            total_remaining = sum(remaining_ratios.values())
+            total_for_manual_domains = 1 - total_remaining
+            manual_source_ratios_from_topics = {domain: ratio * total_for_manual_domains for domain, ratio in manual_source_ratios_from_topics.items()}
+
+            remaining_ratios.update(manual_source_ratios_from_topics)
+            breakpoint()
+            manual_prior = remaining_ratios
+
+
     for source_config in sorted(sources, key=lambda x: x.name):
         if source_config.topics:
             # this source has topics 
-            weights = np.array([leaf_dist[f"{source_config.name}:{topic.name}"] for topic in sorted(source_config.topics, key=lambda x: x.name)])
-            normalized_weights = weights / weights.sum()
-            topic_distributions[source_config.name] = normalized_weights 
+            if manual_topic_prior is not None and all(f"{source_config.name}:{topic.name}" in manual_topic_prior for topic in source_config.topics):
+                # if we have a manual prior for all topics, we use that
+                normalized_weights = np.array([manual_topic_prior[f"{source_config.name}:{topic.name}"] for topic in sorted(source_config.topics, key=lambda x: x.name)])
+                topic_distributions[source_config.name] = normalized_weights/sum(normalized_weights) # just for precision issues and in case we pass in non normalized weights
+
+                # compute total mass for the source from natural distribution or manual prior
+                if manual_prior is not None and source_config.name in manual_prior:
+                    total = manual_prior[source_config.name]
+                else:
+                    total =  sum([leaf_dist[f"{source_config.name}:{topic.name}"] for topic in sorted(source_config.topics, key=lambda x: x.name)])
+
+
+                weights = normalized_weights * total
+            else:
+                weights = np.array([leaf_dist[f"{source_config.name}:{topic.name}"] for topic in sorted(source_config.topics, key=lambda x: x.name)])
+                normalized_weights = weights / weights.sum()
+                topic_distributions[source_config.name] = normalized_weights 
 
             if manual_prior is not None and source_config.name in manual_prior:
                 source_distribution.append(manual_prior[source_config.name])
@@ -512,6 +557,7 @@ def mk_mixtures(
         nonzero_weight=config.nonzero_weight,
         fixed_source_weights=config.fixed_source_weights,
         manual_prior=config.manual_prior,
+        manual_topic_prior=config.manual_topic_prior,
         sample_multiplier=config.sample_multiplier,
         existing_mix_file=config.existing_mix_file
     )

@@ -48,7 +48,9 @@ from regmixer.eval.utils import (
     calculate_priors_with_manual,
     aggregate_mmlu,
     PROPOSER_TYPES, 
+    REGRESSION_TYPES,
     LogLinearRegressor,
+    AutoscaleRegressor,
     swarm_config_from_cookbook_or_regmixer_path, 
     plot_interaction_matrix_signed_evidence
 )
@@ -410,6 +412,28 @@ def cli():
     required=False,
     default=False
 )
+@click.option(
+    '--requested-tokens', 
+    type=int,
+    help="if --constrain-objective and --manual-token-constraint-path are set, this overrides the number of requested tokens to use in the constraint",
+    required=False,
+    default=None
+)
+@click.option(
+    '--lightgbm-fit-on-test', 
+    is_flag=True,
+    help="if set to true, we will use the test set as the evaluation set for lightgbm and do early stopping based on it.",
+    required=False,
+    default=False
+)
+@click.option(
+    '--no-extrapolation', 
+    is_flag=True,
+    help="if set to true, we enforce a cap on the ratio to be the largest from the swarm.",
+    required=False,
+    default=False
+)
+
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -458,10 +482,17 @@ def fit(
     use_hardcoded_reference_ratio: bool = False,
     kl_reg: Optional[float] = None,
     patched: bool = False,
+    requested_tokens: Optional[int] = None,
+    lightgbm_fit_on_test: bool = False,
+    no_extrapolation: bool = False,
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
     pathlib.Path(BASE_CACHE_DIR).mkdir(parents=True, exist_ok=True)
+
+
+    logger.warning("PLEASE make sure your token constraints are correct.")
+    #breakpoint()
 
     if group_average and group_metrics:
         raise ValueError("Cannot provide both group-average and group-metrics")
@@ -541,8 +572,14 @@ def fit(
     if use_hardcoded_reference_ratio:
         eval_config['use_hardcoded_reference_ratio'] = True
     if kl_reg is not None:
-        assert proposer_type=="exact"
+        assert proposer_type in ["exact", "bimix_exact", "autoscale_exact"]
         eval_config['kl_reg'] = kl_reg
+    if requested_tokens is not None:
+        eval_config['requested_tokens'] = requested_tokens
+    if lightgbm_fit_on_test:
+        eval_config['lightgbm_fit_on_test'] = True
+    if no_extrapolation:
+        eval_config['no_extrapolation'] = True
 
 
     # used for caching regression model
@@ -650,10 +687,12 @@ def fit(
             metrics = pd.read_pickle(f)
         ratios = ratios[ratios['run'].isin(metrics.run)]
     else:
+        mk_weights_from_config(run_instances[0].config, priors, run_instances[0].display_name, patched)  # test call
         run_ratios = [
             {"run": run.id, "name": run.display_name, "index": idx, **mk_weights_from_config(run.config, priors, run.display_name, patched)}
             for idx, run in enumerate(run_instances)
         ]
+
         if pull_from_dashboard:
             all_dashboard_results = pd.DataFrame()
             for d in dashboard:
@@ -744,6 +783,9 @@ def fit(
         numerical_cols = metrics.columns[3:]
         metrics[numerical_cols] = metrics[numerical_cols].apply(pd.to_numeric, errors='coerce')
         ratios = ratios[ratios['run'].isin(metrics.run)]
+
+        print(metrics.isna().sum().sum())
+        print(ratios[ratios.columns[3:]].sum(axis=1).max(), ratios[ratios.columns[3:]].sum(axis=1).min())
 
         breakpoint()
         if len(support_domains) == 0 and len(train_split) == 1:
@@ -889,6 +931,22 @@ def fit(
         X_test = deepcopy(X_train)
         Y_test = deepcopy(Y_train)
 
+
+    if regression_type == "lightgbm":
+        if early_stopping > 0.0:
+            # we are using some held-out set 
+            if lightgbm_fit_on_test:
+                if Y_test.shape == Y_train.shape:
+                    raise ValueError("lightgbm_fit_on_test is set to true, but test set is equal to train set---this is not any different from no early stopping I think")
+                X_val = X_test
+                Y_val = Y_test
+            else:
+                X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.1, random_state=seed)
+        else:
+            X_val = None
+            Y_val = None
+
+
     logger.info(f"Number of train samples: {len(Y_train)}. Number of test samples: {len(Y_test)}.")
 
     predictors = []
@@ -921,8 +979,8 @@ def fit(
     regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / "_".join(experiment_groups) / hash_str 
     regression_model_cache_folder.mkdir(parents=True, exist_ok=True)
     regression_model_cache_path = regression_model_cache_folder / f"regression_params.pkl"
-    if os.path.exists(regression_model_cache_path) and regression_type == "log_linear":
-        logger.info(f"Using log-linear regression model at {regression_model_cache_path}")
+    if os.path.exists(regression_model_cache_path) and regression_type in ["log_linear", "autoscale"]:
+        logger.info(f"Using {regression_type} regression model at {regression_model_cache_path}")
         with open(regression_model_cache_path, "rb") as f:
             params = pickle.load(f)
 
@@ -932,25 +990,33 @@ def fit(
 
         # initialize the regression models using the cached parameters 
         for idx, metric in indexed_metrics:
-            reg = LogLinearRegressor(params[metric])
+            reg = REGRESSION_TYPES[regression_type](params=params[metric], requested_tokens=requested_tokens if regression_type=="autoscale" else None)
             predictors.append(reg)
-    elif not os.path.exists(regression_model_cache_path) and regression_type == "log_linear" and os.path.exists(os.path.join(output_dir, "path_to_regression_model.txt")):
+    elif not os.path.exists(regression_model_cache_path) and regression_type in ["log_linear", "autoscale"] and os.path.exists(os.path.join(output_dir, "path_to_regression_model.txt")):
         # look in output_dir 
         with open(os.path.join(output_dir, "path_to_regression_model.txt"), "r") as f:
             regression_model_cache_path = pathlib.Path(f.read().strip())
         if os.path.exists(regression_model_cache_path):
-            logger.info(f"Using log-linear regression model at {regression_model_cache_path}")
+            logger.info(f"Using {regression_type} regression model at {regression_model_cache_path}")
             with open(regression_model_cache_path, "rb") as f:
                 params = pickle.load(f)
 
             # initialize the regression models using the cached parameters 
             for idx, metric in indexed_metrics:
-                reg = LogLinearRegressor(params[metric])
+                reg = REGRESSION_TYPES[regression_type](params=params[metric], requested_tokens=requested_tokens if regression_type=="autoscale" else None)
                 predictors.append(reg)
     else:
         logger.info(f"Will save regression model to {regression_model_cache_path}")
         for idx, metric in indexed_metrics:
-            predictors.append(build_regression(idx, Y_train, X_train, regression_type, early_stopping, interactions))
+            predictors.append(build_regression(idx, 
+                Y_train, 
+                X_train, 
+                regression_type, 
+                early_stopping, 
+                interactions, 
+                requested_tokens if regression_type=="autoscale" else None,
+                X_val=X_val if regression_type=="lightgbm" else None, 
+                Y_val=Y_val if regression_type=="lightgbm" else None))
             # save intermediate progress after each regression model
             if regression_type == "log_linear":
                 parameters = {indexed_metrics[i][-1]: predictors[i].model for i in range(len(predictors))}
@@ -960,14 +1026,13 @@ def fit(
                 with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
                     f.write(str(regression_model_cache_path))
 
-        if regression_type == "log_linear":
-            parameters = {metric: predictors[idx].model for idx, metric in indexed_metrics}
+        if regression_type in ["log_linear", "autoscale"]:
+            parameters = {metric: predictors[idx].get_params() for idx, metric in indexed_metrics}
             with open(regression_model_cache_path, "wb") as f:
                 pickle.dump(parameters, f)
-            logger.info(f"Log linear regression model saved to {regression_model_cache_path}")
+            logger.info(f"{regression_type} regression model saved to {regression_model_cache_path}")
             with open(os.path.join(output_dir, "path_to_regression_model.txt"), "w") as f:
                 f.write(str(regression_model_cache_path))
-
 
     if len(drop_metrics) != 0:
         drop_indices = [metrics.columns.get_loc(m) - 3   # shift because metrics start at col 3
@@ -1078,7 +1143,9 @@ def fit(
                 fixed_search_weight=fixed_search_weight,
                 reference_ratio=reference_ratio if use_reference_model_as_search_prior else None,
                 make_worst_mix=make_worst_mix,
-                min_weight_per_domain=min_weight_per_domain
+                min_weight_per_domain=min_weight_per_domain,
+                requested_tokens=requested_tokens,
+                no_extrapolation=no_extrapolation,
             )
 
             plot_and_log_weights(
@@ -1138,7 +1205,9 @@ def fit(
             reference_ratio=reference_ratio if use_reference_model_as_search_prior or reference_ratio is not None else None,
             make_worst_mix=make_worst_mix,
             min_weight_per_domain=min_weight_per_domain,
-            kl_reg=kl_reg
+            kl_reg=kl_reg,
+            requested_tokens=requested_tokens,
+            no_extrapolation=no_extrapolation,
         )
         plot_and_log_weights(
             prior=priors[0],
