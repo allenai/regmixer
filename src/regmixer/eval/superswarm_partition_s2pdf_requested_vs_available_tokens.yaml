@@ -1,0 +1,29 @@
+requested_tokens: 6_000_000_000_000 # 6 trillion
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet 
+  existing: 8_398_855_713_983 # need to remove algebraic stack: this should be dclm, stackedu, pes2o, arxiv, finemath, wiki
+  s2pdfv1:adult: 296607398
+  s2pdfv1:art_design: 6702382979
+  s2pdfv1:crime_law: 41593372986
+  s2pdfv1:education_jobs: 133654650973
+  s2pdfv1:entertainment: 5860419324
+  s2pdfv1:fashion_beauty: 544134104
+  s2pdfv1:finance_business: 59186842622
+  s2pdfv1:food_dining: 2250816991
+  s2pdfv1:games: 2411316603
+  s2pdfv1:hardware: 7019809907
+  s2pdfv1:health: 105244728743
+  s2pdfv1:history: 25524270297
+  s2pdfv1:home_hobbies: 3794651731
+  s2pdfv1:industrial: 28249539947
+  s2pdfv1:literature: 31355456089
+  s2pdfv1:politics: 38456608923
+  s2pdfv1:religion: 24320136191
+  s2pdfv1:science_tech: 414211508476
+  s2pdfv1:social_life: 3107126417
+  s2pdfv1:software: 8806038770
+  s2pdfv1:software_dev: 40247700036
+  s2pdfv1:sports_fitness: 5277596436
+  s2pdfv1:transportation: 16522939888
+  s2pdfv1:travel: 2043468025
+

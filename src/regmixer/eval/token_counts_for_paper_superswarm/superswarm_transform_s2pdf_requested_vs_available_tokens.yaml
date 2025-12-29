@@ -1,0 +1,5 @@
+requested_tokens: 6_000_000_000_000 # 6 trillion
+leaf_level_constraints: true
+available_tokens: # from information in spreadsheet 
+  existing: 5_272_120_626_684 # DCLM + StackEdu + pes2o + arxiv + finemath + wiki + algebraicstack
+  s2pdfv1: 1_034_238_607_178 # 1 trillion

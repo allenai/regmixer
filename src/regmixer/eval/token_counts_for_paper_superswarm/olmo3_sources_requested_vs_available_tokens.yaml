@@ -3,8 +3,9 @@ leaf_level_constraints: true
 available_tokens: # from information in spreadsheet 
   algebraicstack: 11818955329 # 11 billion
   arxiv: 20773846846 # 20 billion
-  existing: 8_275_403_673_924
+  dclm: 5_000_000_000_000 # 5 trillion
+  stack-edu: 136_849_631_296 # 137 billion
   finemath-3plus: 34057973953 # 34 billion
   pes2o: 58552461187 # 60 billion
-  s2pdfv2: 1034238607178 # 1 trillion # this is from the v2 counts, which are inaccurate. This is wrong! 
+  s2pdfv1: 1034238607178 # 1 trillion # this is from the v2 counts, which we DECIDED TO KEEP (and v1 will just be adjusted to match v2)
   wikipedia: 10067758073 # 10 billion
