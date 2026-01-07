@@ -203,7 +203,7 @@ class TransformerConfigBuilder:
 
     def get_batch_size(self, parameters: int) -> int:
         """
-        Taken directly from https://github.com/allenai/OLMo-core/blob/main/src/olmo_core/model_ladder.py#L276
+        Taken directly from https://github.com/allenai/OLMo-core/blob/c7d9950ac5600b44c4086a0d236c74a3987f8b1c/src/olmo_core/model_ladder.py#L277 
         Args:
         - parameters: number of non-embedding parameters
         """
@@ -227,7 +227,7 @@ class TransformerConfigBuilder:
 
     def get_lr(self, model: TransformerConfig, tokenizer: TokenizerConfig) -> float:
         """
-        Taken from https://github.com/allenai/OLMo-core/blob/main/src/scripts/train/OLMo2-ladder.py#L54
+        Taken from https://github.com/allenai/OLMo-core/blob/206d25ef36077aa6a7301d86061f427ea0b48d0e/src/scripts/train/OLMo2-ladder.py#L54
         """
         if self.train_type == TrainType.anneal:
             return 6.1852e-5  # Magic number pulled from OLMo-core examples
@@ -300,7 +300,7 @@ class TransformerConfigBuilder:
             work_dir=self.work_dir,
         )
 
-        print(f"sequence length in data loader: {self.sequence_length}")
+        print(f"Number of params: {model.num_params}. Number of non-embedding params: {model.num_non_embedding_params}")
 
         data_loader_config = NumpyDataLoaderConfig(
             global_batch_size=global_batch_size * self.sequence_length,

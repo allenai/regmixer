@@ -55,7 +55,18 @@ class ModelConfig:
             rope_theta=500_000,
             flash_attention=True,
             max_sequence_length=4096,
-            #device_batch_size=4
+        )
+
+    @classmethod
+    def olmo_60m(cls) -> "ModelConfig":
+        return ModelConfig(
+            compile=True,
+            d_model=384,
+            n_heads=12,
+            n_layers=16,
+            rope_theta=500_000,
+            flash_attention=True,
+            max_sequence_length=4096,
         )
 
     @classmethod
