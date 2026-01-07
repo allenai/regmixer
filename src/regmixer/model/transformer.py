@@ -300,8 +300,6 @@ class TransformerConfigBuilder:
             work_dir=self.work_dir,
         )
 
-        print(f"Number of params: {model.num_params}. Number of non-embedding params: {model.num_non_embedding_params}")
-
         data_loader_config = NumpyDataLoaderConfig(
             global_batch_size=global_batch_size * self.sequence_length,
             work_dir=self.work_dir,

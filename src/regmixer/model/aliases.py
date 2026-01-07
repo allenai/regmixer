@@ -59,6 +59,9 @@ class ModelConfig:
 
     @classmethod
     def olmo_60m(cls) -> "ModelConfig":
+        """
+        105,406,848 total params, 66,871,680 non-embedding params
+        """
         return ModelConfig(
             compile=True,
             d_model=384,
@@ -68,6 +71,19 @@ class ModelConfig:
             flash_attention=True,
             max_sequence_length=4096,
         )
+    
+    @classmethod
+    def olmo_1m(cls) -> "ModelConfig":
+        return ModelConfig(
+            compile=True,
+            d_model=64,
+            n_heads=8,
+            n_layers=2,
+            rope_theta=500_000,
+            flash_attention=True,
+            max_sequence_length=4096,
+        )
+
 
     @classmethod
     def olmo_190m(cls) -> "ModelConfig":
@@ -117,6 +133,7 @@ class SupportedModels(Enum):
     olmo_190m = ModelConfig.olmo_190m()
     olmo_30m = ModelConfig.olmo_30m()
     olmo_60m = ModelConfig.olmo_60m()
+    olmo_1m = ModelConfig.olmo_1m()
     olmo_1b = ModelConfig.olmo_1b()
     olmo_7b = ModelConfig.olmo_7b()
 
