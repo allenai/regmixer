@@ -116,6 +116,7 @@ class ModelConfig:
 class SupportedModels(Enum):
     olmo_190m = ModelConfig.olmo_190m()
     olmo_30m = ModelConfig.olmo_30m()
+    olmo_60m = ModelConfig.olmo_60m()
     olmo_1b = ModelConfig.olmo_1b()
     olmo_7b = ModelConfig.olmo_7b()
 
