@@ -200,9 +200,6 @@ dclm_pstar_pareto_diff = {'eval/downstream/mmlu_social_sciences_test_rc_5shot (B
  'wildchat_masked_ppl': 0.0011769254131349105}
 
 
-breakpoint()
-
-
 stackedu_natural = {'stack-edu:C': 0.03460056269174911,
  'stack-edu:CSharp': 0.05264555903272339,
  'stack-edu:Cpp': 0.09156360629059475,

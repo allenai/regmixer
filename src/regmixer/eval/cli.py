@@ -582,6 +582,7 @@ def fit(
         eval_config['no_extrapolation'] = True
 
 
+
     # used for caching regression model
     regression_config = {
         "group_average": group_average,
@@ -595,7 +596,7 @@ def fit(
         "keep_sources": keep_sources,
         "early_stopping": early_stopping,
     }
-    if select_top_k_runs < 1.0:
+    if select_top_k_runs != 1.0:
         eval_config["select_top_k_runs"] = select_top_k_runs
         regression_config["select_top_k_runs"] = select_top_k_runs
     if fixed_weight is not None:
@@ -626,7 +627,7 @@ def fit(
 
         
 
-    cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name}_runs_cache.json"
+    cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name.replace('avg_', '')}_runs_cache.json"
     launch_configs = [swarm_config_from_cookbook_or_regmixer_path(c, use_cookbook) for c in config]
     full_group_names = [f"{launch_config.name}-{group}" for group, launch_config in zip(experiment_groups, launch_configs)]
     if no_cache:
@@ -768,6 +769,7 @@ def fit(
                 "midtraining_aggregate_evals",
                 "midtraining_finegrained_evals",
                 "pretraining_tasks_for_paper",
+                "avg_pretraining_tasks_for_paper",
                 "math_tasks",
                 "code_tasks_new",
                 "qa_tasks",
@@ -850,9 +852,16 @@ def fit(
         ratios = ratios.drop(index=[11, 12, 25, 27, 30, 35, 55])
         metrics = metrics.drop(index=[11, 12, 25, 27, 30, 35, 55])
 
-    if select_top_k_runs < 1.0:
+    if select_top_k_runs != 1.0:
+        if select_top_k_runs < 1.0:
+            num_to_keep = int(len(metrics) * select_top_k_runs)
+        elif select_top_k_runs > 1.0 and select_top_k_runs < len(metrics):
+            num_to_keep = int(select_top_k_runs)
+        else:
+            raise ValueError("select_top_k_runs must be either a float in (0, 1) or an integer less than the number of runs")
+        logger.info(f"Selecting top {num_to_keep} runs based on average BPB across all tasks for regression fitting...")
         metrics['all_bpb'] = metrics[metrics.columns[3:]].mean(axis=1)
-        keep_runs = metrics.sort_values(by="all_bpb").run.values[: int(len(metrics) * select_top_k_runs)]
+        keep_runs = metrics.sort_values(by="all_bpb").run.values[: num_to_keep]
         metrics = metrics[metrics.run.isin(keep_runs)]
         ratios = ratios[ratios.run.isin(keep_runs)]
 
@@ -1162,10 +1171,29 @@ def fit(
                 df_config=ratios,
                 output_dir=output_dir,
                 fixed_weight=fixed_weight_dict if fixed_weight is not None else None,
-                kl_reg=kl_reg
             )
 
             results.append((metric, weights))
+
+    # plot correlation for average BPB as well
+    plot_correlation(
+        Y_test,
+        X_test,
+        Y_train,
+        X_train,
+        idx,
+        predictors=predictors,
+        train_split=train_split,
+        metric_name=metric,
+        regression_type=regression_type,
+        n_test=n_test,
+        split_seed=seed,
+        n_samples=num_samples,
+        alpha=alpha,
+        output_dir=output_dir,
+        average_bpb=True
+    )
+
 
     if fit_only:
         logger.info("Fit only mode, not proposing a mix.")

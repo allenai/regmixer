@@ -1008,12 +1008,12 @@ class SearchProposer(Proposer):
         searched_weights = predictor[0].get_searched_weights()
         best_performance = np.inf
         best_weights = np.zeros(len(searched_weights[0]))
-        for weight in searched_weights:
+        best_idx = None
+        for i, weight in enumerate(searched_weights):
             if opt_avg_metric:
                 pred = np.array([reg.predict(weight[None]) for reg in predictor]).mean(axis=0)[0]
             else:
                 pred = predictor[index].predict(weight[None])[0]
-
 
             if constrain_objective:
                 token_usage = weight * desired_tokens
@@ -1024,10 +1024,14 @@ class SearchProposer(Proposer):
                 if (token_usage <= token_limits).all() and pred < best_performance:
                     best_performance = pred
                     best_weights = weight
+                    best_idx = i
             else:
                 if pred < best_performance:
                     best_performance = pred
                     best_weights = weight
+                    best_idx = i
+
+        logger.info(f"Best search index is {best_idx} with performance {best_performance} and weights {best_weights}")
 
         return best_weights
 
@@ -1046,7 +1050,7 @@ class LogLinearExactProposer(Proposer):
         no_extrapolation: bool = False,
         **kwargs
     ):
-        assert opt_avg_metric, "LogLinearExactProposer only supports opt_avg_metric=True"
+        #assert opt_avg_metric, "LogLinearExactProposer only supports opt_avg_metric=True"
         if kl_reg is None:
             raise ValueError("kl_reg must be provided for LogLinearExactProposer")
 
@@ -1562,6 +1566,7 @@ def plot_correlation(
     regression_type: str,
     alpha: Optional[float] = None,
     output_dir: str = BASE_OUTPUT_DIR,
+    average_bpb: bool = False,
 ):
     plt.close()
 
@@ -1574,9 +1579,14 @@ def plot_correlation(
         }
     )
 
-
-    y_pred_train = predictors[index].predict(X_train)
-    y_true_train = Y_train[:, index]
+    if average_bpb:
+        num_tasks = len(predictors)
+        y_pred_train = np.mean([predictors[i].predict(X_train) for i in range(num_tasks)], axis=0)
+        y_true_train = Y_train.mean(axis=1)
+        metric_name = "average_bpb"
+    else:
+        y_pred_train = predictors[index].predict(X_train)
+        y_true_train = Y_train[:, index]
 
     corr_results = {}
 
@@ -1601,8 +1611,14 @@ def plot_correlation(
         corr_results["train"] = corr_train
     else:
         # Predict test
-        y_pred_test = predictors[index].predict(X_test)
-        y_true_test = Y_test[:, index]
+
+        if average_bpb:
+            y_pred_test = np.mean([predictors[i].predict(X_test) for i in range(num_tasks)], axis=0)
+            y_true_test = Y_test.mean(axis=1)
+            metric_name = "average_bpb"
+        else:
+            y_pred_test = predictors[index].predict(X_test)
+            y_true_test = Y_test[:, index]
 
         # Plot test
         sns.regplot(
@@ -1934,28 +1950,31 @@ def mk_run_metrics(
     group_name, group_metrics = metrics
     in_loop_tasks = [task for task in df.columns if task in group_metrics]
     offline_tasks = [task for task in group_metrics if task not in in_loop_tasks]
-    if average:
-        raise NotImplementedError("Averaging the task is implemented but out of date!")
-        result = np.mean(
-            [df.loc[:, metric_name].tail(samples).mean() for metric_name in group_metrics]
-        )
-        results[group_name] = result
+    if pull_from_dashboard:
+        assert metric_type=="primary_score", "Only primary_score metric type is supported for dashboard evaluation"
+        assert not average, "Averaging not supported for dashboard evaluation"
+        for d in dashboard:
+            offline_results = get_offline_evals_from_dashboard(display_name, offline_tasks, dashboard=d)
+            results.update(offline_results)
     else:
-        if pull_from_dashboard:
-            assert metric_type=="primary_score", "Only primary_score metric type is supported for dashboard evaluation"
-            for d in dashboard:
-                offline_results = get_offline_evals_from_dashboard(display_name, offline_tasks, dashboard=d)
-                results.update(offline_results)
-        else:
-            for metric_name in in_loop_tasks:
-                results[metric_name] = df.loc[:, metric_name].tail(samples).mean()
+        assert (average and len(in_loop_tasks) != 0) == False, "Averaging with in-loop tasks is not supported"
+        for metric_name in in_loop_tasks:
+            results[metric_name] = df.loc[:, metric_name].tail(samples).mean()
 
-            if len(offline_tasks) > 0:
-                # need to obtain offline results
-                for d in dashboard:
-                    logger.info(f"Getting offline results for {display_name} in {d} dashboard")
-                    offline_results = get_offline_evals(display_name, offline_tasks, group_name, dashboard=d, metric_type=metric_type)
-                    results.update(offline_results)
+        if len(offline_tasks) > 0:
+            # need to obtain offline results
+            for d in dashboard:
+                logger.info(f"Getting offline results for {display_name} in {d} dashboard")
+                offline_results = get_offline_evals(display_name, offline_tasks, group_name, dashboard=d, metric_type=metric_type)
+                results.update(offline_results)
+
+            if average:
+                tasks_from_dashboard = list(offline_results.keys())
+                avg_result = np.mean(np.array(list(results.values())))
+                results[group_name] = avg_result
+                # remove individual tasks
+                for task in tasks_from_dashboard:
+                    del results[task]
 
     return results
 
