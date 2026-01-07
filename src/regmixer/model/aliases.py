@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from typing import Union
+
 from olmo_core.config import Config
 from olmo_core.data import NumpyDataLoaderConfig, TokenizerConfig, NumpyFSLDatasetConfig
 from olmo_core.distributed.parallel import DataParallelType
@@ -28,6 +30,7 @@ class ModelConfig:
     rope_theta: int
     flash_attention: bool
     max_sequence_length: int
+    hidden_size_multiplier: Union[float, None] = None
     layer_norm_eps: float = 1e-6
     save_interval: int = 1000
     eval_interval: int = 200
@@ -65,23 +68,25 @@ class ModelConfig:
         return ModelConfig(
             compile=True,
             d_model=384,
-            n_heads=12,
-            n_layers=16,
+            n_heads=8,
+            n_layers=8,
             rope_theta=500_000,
             flash_attention=True,
             max_sequence_length=4096,
+            hidden_size_multiplier=1.5
         )
     
     @classmethod
     def olmo_1m(cls) -> "ModelConfig":
         return ModelConfig(
             compile=True,
-            d_model=64,
-            n_heads=8,
-            n_layers=2,
+            d_model=12,
+            n_heads=4,
+            n_layers=4,
             rope_theta=500_000,
             flash_attention=True,
             max_sequence_length=4096,
+            hidden_size_multiplier=1.0,
         )
 
 
