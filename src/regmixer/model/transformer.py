@@ -275,6 +275,7 @@ class TransformerConfigBuilder:
             layer_norm_eps=self.model_config.layer_norm_eps,
             qk_norm=self.model_config.qk_norm,
             block_name=self.model_config.block_type,
+            hidden_size_multiplier=self.model_config.hidden_size_multiplier,
         )
 
         global_batch_size = (
