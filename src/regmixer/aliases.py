@@ -86,6 +86,8 @@ class ExperimentConfig(BaseModel):
     sample_multiplier: Optional[int] = None
     wandb_debug: bool = False
     existing_mix_file: Optional[str] = None 
+    repetition_constraint_path: Optional[str] = None
+    repetition_factor: Optional[int] = None
     # TODO(undfined): Add field validation for weka/cluster/train_type here
 
 
