@@ -266,6 +266,10 @@ class TransformerConfigBuilder:
 
     def build(self) -> ModelTrainConfig:
         tokenizer = self.tokenizer
+        extra_kwargs = {}
+        if self.model_config.head_dim is not None:
+            extra_kwargs["head_dim"] = self.model_config.head_dim
+
         model = TransformerConfig.llama_like(
             d_model=self.model_config.d_model,
             n_layers=self.model_config.n_layers,
@@ -276,6 +280,7 @@ class TransformerConfigBuilder:
             qk_norm=self.model_config.qk_norm,
             block_name=self.model_config.block_type,
             hidden_size_multiplier=self.model_config.hidden_size_multiplier,
+            **extra_kwargs
         )
 
         global_batch_size = (

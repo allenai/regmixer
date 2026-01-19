@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from typing import Union
+from typing import Optional, Union
 
 from olmo_core.config import Config
 from olmo_core.data import NumpyDataLoaderConfig, TokenizerConfig, NumpyFSLDatasetConfig
@@ -44,6 +44,7 @@ class ModelConfig:
     qk_norm: bool = True
     dp_type: DataParallelType = DataParallelType.fsdp
     block_type: TransformerBlockType = TransformerBlockType.reordered_norm
+    head_dim: Optional[int]= None
 
     @classmethod
     def olmo_30m(cls) -> "ModelConfig":
@@ -87,6 +88,7 @@ class ModelConfig:
             flash_attention=True,
             max_sequence_length=4096,
             hidden_size_multiplier=1.0,
+            head_dim=4
         )
 
     @classmethod
