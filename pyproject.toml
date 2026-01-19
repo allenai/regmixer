@@ -32,7 +32,8 @@ dev = [
     "pytest",
 ]
 beaker = [
-    "beaker-py>=1,<2",
+    "beaker-py>=2.5.4,<3.0", 
+    "beaker-gantry>=3.4.3,<4.0",
     "GitPython>=3.0,<4.0",
     "google-cloud-compute"
 ]
