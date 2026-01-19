@@ -79,6 +79,9 @@ class ModelConfig:
     
     @classmethod
     def olmo_1m(cls) -> "ModelConfig":
+        """
+        3,264,784 total params, 1,659,152 non-embedding params
+        """
         return ModelConfig(
             compile=True,
             d_model=16,
