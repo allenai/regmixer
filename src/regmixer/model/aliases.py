@@ -81,7 +81,7 @@ class ModelConfig:
     def olmo_1m(cls) -> "ModelConfig":
         return ModelConfig(
             compile=True,
-            d_model=12,
+            d_model=16,
             n_heads=4,
             n_layers=4,
             rope_theta=500_000,
