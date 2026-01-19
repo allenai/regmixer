@@ -13,7 +13,7 @@ authors = [
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dependencies = [
-    "ai2-olmo-core @ git+https://github.com/allenai/OLMo-core.git@c150062e9f704cd8cf57de6a67345888ea70394a",
+    "ai2-olmo-core @ git+https://github.com/allenai/OLMo-core.git@db48fe751a18c291d8ddc60d4b6d69445d4de55e",
     "boto3",
     "click",
     "pydantic",
@@ -32,8 +32,7 @@ dev = [
     "pytest",
 ]
 beaker = [
-    "beaker-py>=2.5.4,<3.0", 
-    "beaker-gantry>=3.4.3,<4.0",
+    "beaker-py>=1,<2",
     "GitPython>=3.0,<4.0",
     "google-cloud-compute"
 ]
