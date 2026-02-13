@@ -9,6 +9,7 @@ from copy import deepcopy
 from pathlib import Path
 import re
 import matplotlib.pyplot as plt 
+import yaml
 
 import numpy as np
 import gcsfs
@@ -189,7 +190,9 @@ def generate_weights_dirichlet(
     enable_bound: bool = True,
     nonzero_weight: Optional[list[str]] = None,
     fixed_source_weights: Optional[dict[str, float]] = None,
-    existing_mix_file: Optional[str] = None
+    existing_mix_file: Optional[str] = None,
+    repetition_constraint_path: Optional[str] = None,
+    repetition_factor: Optional[int] = None
 ):
     """
     Generate weights for each domain group using a dirichlet distribution.
@@ -211,8 +214,17 @@ def generate_weights_dirichlet(
 
     if enable_bound:
         # weight bounds are at the leaf level and computed using the number of available tokens per source/topic.
+        if repetition_constraint_path is not None:
+            assert repetition_factor is not None
+            with open(repetition_constraint_path, "r") as f:
+                repetition_constraints_file = yaml.safe_load(f)
+            available_tokens = np.array([repetition_constraints_file['available_tokens'][k] for k in leaf_dist])
+            caps = np.minimum(available_tokens * repetition_factor / repetition_constraints_file['requested_tokens'], 1.0)
+        else:
+            caps = np.minimum(prior_dist * token_scale, 1.0)
+
         weight_bounds = [
-            (0.0, min(prior_dist[idx] * token_scale, 1.0)) for idx in range(len(prior_dist))
+            (0.0, caps[idx]) for idx in range(len(prior_dist))
         ]
         #raise ValueError("WARNING: need to make sure keys are aligned here and with other places. In cookbook implementation, just removed sorted() everywhere, and seems to be fine?")
         grouped_bounds = {domain: weight_bounds[idx] for idx, domain in enumerate(domains)}
@@ -249,7 +261,6 @@ def generate_weights_dirichlet(
             manual_source_ratios_from_topics = {domain: ratio * total_for_manual_domains for domain, ratio in manual_source_ratios_from_topics.items()}
 
             remaining_ratios.update(manual_source_ratios_from_topics)
-            breakpoint()
             manual_prior = remaining_ratios
 
 
@@ -324,7 +335,6 @@ def generate_weights_dirichlet(
 
     if fixed_source_weights is not None:
         fixed_source_weights = [fixed_source_weights[source_config.name] for source_config in sorted(sources, key=lambda x: x.name)]
-
 
     if existing_mix_file is not None:
         ratios = pd.read_pickle(existing_mix_file)
@@ -559,7 +569,9 @@ def mk_mixtures(
         manual_prior=config.manual_prior,
         manual_topic_prior=config.manual_topic_prior,
         sample_multiplier=config.sample_multiplier,
-        existing_mix_file=config.existing_mix_file
+        existing_mix_file=config.existing_mix_file,
+        repetition_constraint_path=config.repetition_constraint_path,
+        repetition_factor=config.repetition_factor
     )
 
     weight_maps = []
