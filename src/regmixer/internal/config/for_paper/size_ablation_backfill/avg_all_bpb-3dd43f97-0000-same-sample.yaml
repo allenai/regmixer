@@ -1,0 +1,97 @@
+sources:
+- domain: adult_content
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/adult_content/dolma2-tokenizer/**/*.npy
+  weight: 0.00768785225596226
+- domain: art_and_design
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/art_and_design/dolma2-tokenizer/**/*.npy
+  weight: 0.012459364400638022
+- domain: crime_and_law
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/crime_and_law/dolma2-tokenizer/**/*.npy
+  weight: 0.02912764081552167
+- domain: education_and_jobs
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/education_and_jobs/dolma2-tokenizer/**/*.npy
+  weight: 0.0284381078277345
+- domain: electronics_and_hardware
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/electronics_and_hardware/dolma2-tokenizer/**/*.npy
+  weight: 0.016954787799577542
+- domain: entertainment
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/entertainment/dolma2-tokenizer/**/*.npy
+  weight: 0.08815630198703106
+- domain: fashion_and_beauty
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/fashion_and_beauty/dolma2-tokenizer/**/*.npy
+  weight: 0.006328824077841102
+- domain: finance_and_business
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/finance_and_business/dolma2-tokenizer/**/*.npy
+  weight: 0.11530693425529916
+- domain: food_and_dining
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/food_and_dining/dolma2-tokenizer/**/*.npy
+  weight: 0.013766730805425408
+- domain: games
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/games/dolma2-tokenizer/**/*.npy
+  weight: 0.03838651852992781
+- domain: health
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/health/dolma2-tokenizer/**/*.npy
+  weight: 0.21903106157988247
+- domain: history_and_geography
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/history_and_geography/dolma2-tokenizer/**/*.npy
+  weight: 0.0233581744693159
+- domain: home_and_hobbies
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/home_and_hobbies/dolma2-tokenizer/**/*.npy
+  weight: 0.02770382939029768
+- domain: industrial
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/industrial/dolma2-tokenizer/**/*.npy
+  weight: 0.008047516872719925
+- domain: literature
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/literature/dolma2-tokenizer/**/*.npy
+  weight: 0.03342277834088258
+- domain: politics
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/politics/dolma2-tokenizer/**/*.npy
+  weight: 0.03230709995171736
+- domain: religion
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/religion/dolma2-tokenizer/**/*.npy
+  weight: 0.032435719097135454
+- domain: science_math_and_technology
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/science_math_and_technology/dolma2-tokenizer/**/*.npy
+  weight: 0.11611024669656826
+- domain: social_life
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/social_life/dolma2-tokenizer/**/*.npy
+  weight: 0.03102805270198776
+- domain: software
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software/dolma2-tokenizer/**/*.npy
+  weight: 0.019326462861641223
+- domain: software_development
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software_development/dolma2-tokenizer/**/*.npy
+  weight: 0.04196442628817589
+- domain: sports_and_fitness
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/sports_and_fitness/dolma2-tokenizer/**/*.npy
+  weight: 0.026135722273278154
+- domain: transportation
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/transportation/dolma2-tokenizer/**/*.npy
+  weight: 0.019765428274974593
+- domain: travel_and_tourism
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/travel_and_tourism/dolma2-tokenizer/**/*.npy
+  weight: 0.012750418446464191

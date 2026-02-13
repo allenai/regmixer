@@ -1,0 +1,120 @@
+name: 30m-5xC-dclm-centered-0.05-exact-6T-test-optimum-centered
+description: 30M 5xC swarm of DCLM runs, with manual prior set to be the optimal mix from 1f734674/0e09e50a2be1d447, test set
+budget: ai2/oe-base
+workspace: ai2/dolma2
+nodes: 1
+gpus: 1
+variants: 15
+preemptible: true
+max_tokens: 2910233600
+allow_repetition: false
+sequence_length: 2048
+seed: 42
+minimum_weight: 0.00001
+min_strength: 10
+max_strength: 20
+proxy_model_id: olmo_30m
+tokenizer: dolma2
+dtype: uint32
+weka: true
+priority: high
+cluster: ai2/jupiter
+device_batch_size: 32
+sources:
+- name: adult_content
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/adult_content/**/*.npy
+- name: art_and_design
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/art_and_design/**/*.npy
+- name: software_development
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software_development/**/*.npy
+- name: education_and_jobs
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/education_and_jobs/**/*.npy
+- name: electronics_and_hardware
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/electronics_and_hardware/**/*.npy
+- name: entertainment
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/entertainment/**/*.npy
+- name: crime_and_law
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/crime_and_law/**/*.npy
+- name: social_life
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/social_life/**/*.npy
+- name: fashion_and_beauty
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/fashion_and_beauty/**/*.npy
+- name: finance_and_business
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/finance_and_business/**/*.npy
+- name: food_and_dining
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/food_and_dining/**/*.npy
+- name: games
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/games/**/*.npy
+- name: health
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/health/**/*.npy
+- name: history_and_geography
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/history_and_geography/**/*.npy
+- name: home_and_hobbies
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/home_and_hobbies/**/*.npy
+- name: industrial
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/industrial/**/*.npy
+- name: literature
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/literature/**/*.npy
+- name: politics
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/politics/**/*.npy
+- name: religion
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/religion/**/*.npy
+- name: science_math_and_technology
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/science_math_and_technology/**/*.npy
+- name: software
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/software/**/*.npy
+- name: sports_and_fitness
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/sports_and_fitness/**/*.npy
+- name: transportation
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/transportation/**/*.npy
+- name: travel_and_tourism
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/regmixer/v0-sample/allenai/dolma2-tokenizer/travel_and_tourism/**/*.npy
+manual_prior:
+  adult_content: 0.0013858057303885556
+  art_and_design: 0.016156102420285416
+  crime_and_law: 0.006839493741168328
+  education_and_jobs: 0.023929809843526186
+  electronics_and_hardware: 0.015257358384836234
+  entertainment: 0.05210216371852677
+  fashion_and_beauty: 0.004282118279422008
+  finance_and_business: 0.025926530539948214
+  food_and_dining: 0.009249502969285372
+  games: 0.030397734226729343
+  health: 0.07737111906210828
+  history_and_geography: 0.020283907827227225
+  home_and_hobbies: 0.02172953690814621
+  industrial: 0.004714093642902102
+  literature: 0.05681874509873065
+  politics: 0.02908140626992154
+  religion: 0.055097129804185116
+  science_math_and_technology: 0.2847540362025651
+  social_life: 0.01875117174194437
+  software: 0.07202625327666301
+  software_development: 0.14892331618797416
+  sports_and_fitness: 0.012643962356133827
+  transportation: 0.006063193622008454
+  travel_and_tourism: 0.0062155081427913575

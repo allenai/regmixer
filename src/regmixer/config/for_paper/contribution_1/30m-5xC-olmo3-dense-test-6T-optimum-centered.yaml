@@ -1,0 +1,62 @@
+name: 30m-5xC-olmo3-dense-test-6T-optimum-centered
+description: 30M @ 5xC swarm on Olmo 3 sources, dense distribution test set centered on optimal (KL 0.05 4x 6T, 1950089b41f916ef)
+budget: ai2/oe-base
+workspace: ai2/dolma2
+nodes: 1
+gpus: 1
+variants: 15
+preemptible: true
+max_tokens: 2910233600
+allow_repetition: false
+sequence_length: 2048
+seed: 42
+minimum_weight: 0.0001
+mix_temperature: 0.7
+#min_strength: 10
+max_strength: 20
+proxy_model_id: olmo_30m
+tokenizer: dolma2
+weka: true
+dtype: uint32
+priority: high
+cluster: ai2/jupiter
+device_batch_size: 32
+#sample_multplier: 100
+sources:
+- name: arxiv
+  paths:
+  - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/dolma2-tokenizer/*.npy
+- name: dclm
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/*/dolma2-tokenizer/*.npy
+- name: finemath-3plus
+  paths:
+  - s3://ai2-llm/preprocessed/finemath/finemath-3plus/allenai/dolma2-tokenizer/*.npy
+- name: pes2o
+  paths:
+  - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+- name: stack-edu
+  paths:
+  - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/**/*.npy
+- name: wikipedia
+  paths:
+  - s3://ai2-llm/preprocessed/structured-wikipedia/concat_with_links/allenai/dolma2-tokenizer/*.npy
+- name: s2pdfv1
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/**/*.npy
+nonzero_weight:
+- arxiv
+- dclm
+- finemath-3plus
+- pes2o
+- stack-edu
+- wikipedia
+- s2pdfv1
+manual_prior:
+  arxiv: 0.013849231221586383
+  dclm: 0.7616013827486613
+  finemath-3plus: 0.02270531596494045
+  pes2o: 0.007898302475935908
+  s2pdfv1: 0.10257584845529259
+  stack-edu: 0.09123308752910964
+  wikipedia: 0.0001368315975191971

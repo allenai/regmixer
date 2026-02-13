@@ -1,0 +1,61 @@
+name: olmo3-5xC-30m-dense-fixed
+description: 30M @ 5xC swarm on Olmo 3 sources, dense distribution with natural prior
+budget: ai2/oe-base
+workspace: ai2/dolma2
+nodes: 1
+gpus: 1
+variants: 64
+preemptible: true
+max_tokens: 2910233600
+allow_repetition: false
+sequence_length: 2048
+seed: 42
+minimum_weight: 0.0001
+mix_temperature: 0.5
+#min_strength: 1
+max_strength: 20
+proxy_model_id: olmo_30m
+tokenizer: dolma2
+weka: true
+dtype: uint32
+priority: normal
+cluster: ai2/jupiter
+device_batch_size: 32
+sources:
+- name: arxiv
+  paths:
+    - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/dolma2-tokenizer/*.npy
+- name: dclm
+  paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/*/dolma2-tokenizer/*.npy
+- name: finemath-3plus
+  paths:
+    - s3://ai2-llm/preprocessed/finemath/finemath-3plus/allenai/dolma2-tokenizer/*.npy
+- name: pes2o
+  paths:
+    - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+- name: stack-edu
+  paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/**/*.npy
+- name: wikipedia
+  paths:
+    - s3://ai2-llm/preprocessed/structured-wikipedia/concat_with_links/allenai/dolma2-tokenizer/*.npy
+- name: s2pdfv1
+  paths:
+    - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/**/*.npy
+nonzero_weight:
+- arxiv
+- dclm
+- finemath-3plus
+- pes2o
+- stack-edu
+- wikipedia
+- s2pdfv1
+manual_prior:
+  arxiv: 0.0022846790214074153
+  dclm: 0.8690321137502972
+  finemath-3plus: 0.003640539935980975
+  pes2o: 0.006251101856341627
+  stack-edu: 0.014626216165084855
+  wikipedia: 0.00039394699013987677
+  s2pdfv1: 0.10377140228074802

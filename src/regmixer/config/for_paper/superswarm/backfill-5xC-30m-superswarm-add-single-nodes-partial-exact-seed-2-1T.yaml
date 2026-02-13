@@ -1,0 +1,219 @@
+name: backfill-5xC-30m-superswarm-add-single-nodes-partial-exact-seed-2-1T
+description: 30M @ 5xC swarm on all sources | [DCLM, StackEdu, Software] p* (rep=4 @ 1T) exact seed 2 (0980a86c/5542b149b6b13b46)
+budget: ai2/oe-base
+workspace: ai2/dolma2
+nodes: 1
+gpus: 1
+variants: 32
+preemptible: true
+max_tokens: 2910233600
+allow_repetition: false
+sequence_length: 2048
+seed: 2
+minimum_weight: 0.0001
+min_strength: 1
+max_strength: 20
+proxy_model_id: olmo_30m
+tokenizer: dolma2
+weka: true
+dtype: uint32
+priority: high
+cluster: ai2/titan
+device_batch_size: 32
+sources:
+- name: algebraicstack
+  paths:
+  - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/algebraic-stack/train/allenai/dolma2-tokenizer/**/*.npy
+- name: arxiv
+  paths:
+  - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/dolma2-tokenizer/*.npy
+- name: dclm
+  topics:
+  - name: adult_content
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/adult_content/dolma2-tokenizer/*.npy
+    weight: 0.008706715615800335
+  - name: art_and_design
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/art_and_design/dolma2-tokenizer/*.npy
+    weight: 0.01361111037165317
+  - name: crime_and_law
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/crime_and_law/dolma2-tokenizer/*.npy
+    weight: 0.012617608239347081
+  - name: education_and_jobs
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/education_and_jobs/dolma2-tokenizer/*.npy
+    weight: 0.028183402450868925
+  - name: electronics_and_hardware
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/electronics_and_hardware/dolma2-tokenizer/*.npy
+    weight: 0.015241248851996268
+  - name: entertainment
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/entertainment/dolma2-tokenizer/*.npy
+    weight: 0.06867928256770062
+  - name: fashion_and_beauty
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/fashion_and_beauty/dolma2-tokenizer/*.npy
+    weight: 0.003342196835951649
+  - name: finance_and_business
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/finance_and_business/dolma2-tokenizer/*.npy
+    weight: 0.02696109378343074
+  - name: food_and_dining
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/food_and_dining/dolma2-tokenizer/*.npy
+    weight: 0.012266516233676849
+  - name: games
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/games/dolma2-tokenizer/*.npy
+    weight: 0.025421392577399782
+  - name: health
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/health/dolma2-tokenizer/*.npy
+    weight: 0.13804940168013052
+  - name: history_and_geography
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/history_and_geography/dolma2-tokenizer/*.npy
+    weight: 0.027250151180153052
+  - name: home_and_hobbies
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/home_and_hobbies/dolma2-tokenizer/*.npy
+    weight: 0.08665072013385496
+  - name: industrial
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/industrial/dolma2-tokenizer/*.npy
+    weight: 0.008563510955964328
+  - name: literature
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/literature/dolma2-tokenizer/*.npy
+    weight: 0.06687942583627682
+  - name: politics
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/politics/dolma2-tokenizer/*.npy
+    weight: 0.030513866984113548
+  - name: religion
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/religion/dolma2-tokenizer/*.npy
+    weight: 0.013228441291267684
+  - name: science_math_and_technology
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/science_math_and_technology/dolma2-tokenizer/*.npy
+    weight: 0.25867702482340055
+  - name: social_life
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/social_life/dolma2-tokenizer/*.npy
+    weight: 0.018626391244618998
+  - name: software
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software/dolma2-tokenizer/*.npy
+    weight: 0.009402713812886257
+  - name: software_development
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/software_development/dolma2-tokenizer/*.npy
+    weight: 0.0961084350816243
+  - name: sports_and_fitness
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/sports_and_fitness/dolma2-tokenizer/*.npy
+    weight: 0.02018880178501433
+  - name: transportation
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/transportation/dolma2-tokenizer/*.npy
+    weight: 0.006205373378318669
+  - name: travel_and_tourism
+    paths:
+    - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/travel_and_tourism/dolma2-tokenizer/*.npy
+    weight: 0.004625174284550668
+- name: stack-edu
+  topics:
+  - name: C
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/C/**/*.npy
+    weight: 0.02039734831927264
+  - name: CSharp
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/CSharp/**/*.npy
+    weight: 0.02161941858146933
+  - name: Cpp
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Cpp/**/*.npy
+    weight: 0.14568651141001687
+  - name: Go
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Go/**/*.npy
+    weight: 0.016260909381981242
+  - name: Java
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Java/**/*.npy
+    weight: 0.037459274880614166
+  - name: JavaScript
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/JavaScript/**/*.npy
+    weight: 0.08061843586406418
+  - name: Markdown
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Markdown/**/*.npy
+    weight: 0.336198558777357
+  - name: PHP
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/PHP/**/*.npy
+    weight: 0.020412907277352923
+  - name: Python
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Python/**/*.npy
+    weight: 0.20948617628472518
+  - name: Ruby
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Ruby/**/*.npy
+    weight: 0.01612349094570596
+  - name: Rust
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Rust/**/*.npy
+    weight: 0.016491720670965913
+  - name: Shell
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Shell/**/*.npy
+    weight: 0.02956223934344553
+  - name: SQL
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/SQL/**/*.npy
+    weight: 0.0031094802624867697
+  - name: Swift
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/Swift/**/*.npy
+    weight: 0.01755639088509873
+  - name: TypeScript
+    paths:
+    - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/TypeScript/**/*.npy
+    weight: 0.029017137115443587
+- name: finemath-3plus
+  paths:
+  - s3://ai2-llm/preprocessed/finemath/finemath-3plus/allenai/dolma2-tokenizer/*.npy
+- name: pes2o
+  paths:
+  - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+- name: s2pdfv2
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve_norefs_mdtables_v2/**/*.npy
+- name: wikipedia
+  paths:
+  - s3://ai2-llm/preprocessed/structured-wikipedia/concat_with_links/allenai/dolma2-tokenizer/*.npy
+nonzero_weight:
+- algebraicstack
+- arxiv
+- dclm
+- finemath-3plus
+- pes2o
+- s2pdfv2
+- stack-edu
+- wikipedia
+manual_prior:
+  algebraicstack: 0.02
+  arxiv: 0.04
+  dclm: 0.525
+  stack-edu: 0.175
+  finemath-3plus: 0.1
+  pes2o: 0.02
+  s2pdfv2: 0.1
+  wikipedia: 0.02

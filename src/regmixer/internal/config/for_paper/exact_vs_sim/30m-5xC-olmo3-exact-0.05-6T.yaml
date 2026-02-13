@@ -1,0 +1,29 @@
+sources:
+- domain: finemath-3plus
+  paths:
+  - s3://ai2-llm/preprocessed/finemath/finemath-3plus/allenai/dolma2-tokenizer/*.npy
+  weight: 0.02270531596494045
+- domain: arxiv
+  paths:
+  - s3://ai2-llm/preprocessed/proof-pile-2/v0_decontaminated/arxiv/train/allenai/dolma2-tokenizer/*.npy
+  weight: 0.013849231221586385
+- domain: pes2o
+  paths:
+  - s3://ai2-llm/preprocessed/pes2o/allenai/dolma2-tokenizer/*.npy
+  weight: 0.007898302475935908
+- domain: wikipedia
+  paths:
+  - s3://ai2-llm/preprocessed/structured-wikipedia/concat_with_links/allenai/dolma2-tokenizer/*.npy
+  weight: 0.0001368315975191971
+- domain: dclm
+  paths:
+  - s3://ai2-llm/preprocessed/dclm/baseline_topic_classified_sample/*/dolma2-tokenizer/*.npy
+  weight: 0.7616013827486613
+- domain: s2pdf
+  paths:
+  - s3://ai2-llm/preprocessed/s2pdf_dedupe_minhash_v1_with_no_pii_basic_quality_datadelve/*/*.npy
+  weight: 0.1025758484552926
+- domain: stack-edu
+  paths:
+  - s3://ai2-llm/preprocessed/stack-edu/allenai/dolma2-tokenizer/*/*.npy
+  weight: 0.09123308752910964
