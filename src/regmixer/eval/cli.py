@@ -29,7 +29,7 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-from regmixer.eval.constants import GroupedWandbMetrics, ObjectiveWeights
+from regmixer.eval.constants import GroupedWandbMetrics, ObjectiveWeights, ALL_TASK_FAMILIES
 from regmixer.utils import config_from_path
 from regmixer.eval.utils import (
     build_regression,
@@ -433,7 +433,36 @@ def cli():
     required=False,
     default=False
 )
-
+@click.option(
+    '--natural-kl', 
+    is_flag=True,
+    help="if set to true and we use an exact solver, the reference distribution for the KL penalty will be the natural distribution, not the prior (which could be manually set).",
+    required=False,
+    default=False
+)
+@click.option(
+    '--test-ratios-path', 
+    type=str,
+    multiple=True,
+    help="paths to ratios of held out mixtures to evaluate fit on.",
+    required=False,
+    default=[]
+)
+@click.option(
+    '--test-metrics-path', 
+    type=str,
+    multiple=True,
+    help="paths to metrics of held out mixtures to evaluate fit on.",
+    required=False,
+    default=[]
+)
+@click.option(
+    '--aggregate-task-families', 
+    is_flag=True,
+    help="if set to true, we fit one model per task family (math, code, qa)",
+    required=False,
+    default=False
+)
 def fit(
     experiment_groups: list[str],
     config: list[pathlib.Path],
@@ -485,6 +514,10 @@ def fit(
     requested_tokens: Optional[int] = None,
     lightgbm_fit_on_test: bool = False,
     no_extrapolation: bool = False,
+    natural_kl: bool = False,
+    test_ratios_path: tuple[str] = tuple(),
+    test_metrics_path: tuple[str] = tuple(),
+    aggregate_task_families: bool = False,
 ):
     output_dir = get_output_dir(experiment_groups)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -580,8 +613,14 @@ def fit(
         eval_config['lightgbm_fit_on_test'] = True
     if no_extrapolation:
         eval_config['no_extrapolation'] = True
-
-
+    if natural_kl:
+        eval_config['natural_kl'] = True
+    if len(test_ratios_path) != 0 and len(test_metrics_path) != 0:
+        paths = "_".join([tr.split("/")[-1].split("_")[0] for tr in test_ratios_path])
+        eval_config['test_paths'] = paths
+    if aggregate_task_families:
+        assert group_metrics == "pretraining_tasks_for_paper"
+        eval_config['aggregate_task_families'] = True
 
     # used for caching regression model
     regression_config = {
@@ -609,6 +648,10 @@ def fit(
     if len(support_domains) != 0:
         regression_config["support_domains"] = support_domains
 
+    if aggregate_task_families:
+        regression_config['aggregate_task_families'] = True
+
+
     output_dir = save_eval_config(eval_config, output_dir, custom_name)
 
     api = wandb.Api()
@@ -623,8 +666,6 @@ def fit(
     if group_metrics:
         eval_metric_group = GroupedWandbMetrics[group_metrics]
         eval_metric_group_name = group_metrics
-
-
         
 
     cache_path = pathlib.Path(BASE_CACHE_DIR) / f"{'_'.join(experiment_groups)}_{eval_metric_group_name.replace('avg_', '')}_runs_cache.json"
@@ -664,7 +705,17 @@ def fit(
         manual_prior=launch_configs[0].manual_prior if hasattr(launch_configs[0], "manual_prior") else None,
         fixed_source_weights= launch_configs[0].fixed_source_weights if hasattr(launch_configs[0], "fixed_source_weights") else None,
     )
-
+    breakpoint()
+    if natural_kl and proposer_type in ["exact", "bimix_exact", "autoscale_exact"] and kl_reg is not None:
+        logger.info(f"Calculating natural source weights for KL regularization...")
+        natural_distribution, _ = calculate_priors_with_manual(
+            source_configs=launch_configs[0].dataset.sources if use_cookbook else launch_configs[0].sources,
+            dtype=launch_configs[0].dataset.dtype if use_cookbook else launch_configs[0].dtype,
+            use_cache=(no_cache == False),
+            manual_prior=None,
+            fixed_source_weights= launch_configs[0].fixed_source_weights if hasattr(launch_configs[0], "fixed_source_weights") else None,
+        )
+    
     if fixed_weight is not None:
         # remove the fixed weight domains from the priors, and renormalize the remaining domains to add to 1
         new_priors = {k: v for k, v in priors[0].items() if k not in fixed_weight_dict}
@@ -756,7 +807,7 @@ def fit(
                     average=group_average != None,
                     pull_from_dashboard=pull_from_dashboard,
                     dashboard=dashboard,
-                    metric_type=metric_type
+                    metric_type=metric_type,
                 ),
             }
             for idx, run in tqdm(enumerate(run_instances) ) if eval_metric_group_name in [
@@ -802,6 +853,7 @@ def fit(
         logger.info(f"Saved ratios to {ratios_cache_path} and metrics to {metrics_cache_path}")
 
     metrics_to_index = eval_metric_group.value
+    old_metrics_to_index = deepcopy(metrics_to_index)
     if len(support_domains) != 0:
         # only keep ratios/
         keep_idxs = np.where(np.isclose(ratios[list(support_domains)].sum(axis=1), 1))[0]
@@ -892,12 +944,65 @@ def fit(
             logger.info("Log-linear regression requires non-negative metrics, shifting metrics to be non-negative.")
             metrics[metrics.columns[3:]] = metrics[metrics.columns[3:]].subtract(metrics[metrics.columns[3:]].min())
 
+
+    if aggregate_task_families:
+        meta_cols = metrics.columns[:3]
+        task_cols = metrics.columns[3:]
+        metrics_new = metrics.loc[:, meta_cols].copy()
+
+        for family, tasks in ALL_TASK_FAMILIES.items():
+            # Only keep tasks that actually exist in the dataframe
+            existing = [t for t in tasks if t in task_cols]
+
+            if not existing:
+                raise ValueError(f"No columns found for task family '{family}'")
+
+            # Row-wise mean across the family
+            metrics_new[family] = metrics[existing].mean(axis=1)
+        metrics = metrics_new
+        metrics_to_index = list(ALL_TASK_FAMILIES.keys())
+
     # X = Domain weights
     X_train = ratios[ratios.columns[3:]].values
     # Y = Metric values 
     Y_train = metrics[metrics.columns[3:]].values
+
+
+    if len(test_ratios_path) != 0 and len(test_metrics_path) != 0:
+        test_ratios = [pd.read_pickle(ratios_path) for ratios_path in test_ratios_path]
+        test_metrics = []
+        for metrics_path in test_metrics_path:
+            tm = pd.read_pickle(metrics_path)
+            if all("mmlu_stem" not in s for s in tm.columns) and any("mmlu" in s for s in tm.columns):
+                tm, _ = aggregate_mmlu(
+                    tm, old_metrics_to_index
+                )
+
+            if aggregate_task_families:
+                # we need to aggregate the test set metrics as well
+                meta_cols = tm.columns[:3]
+                task_cols = tm.columns[3:]
+                metrics_new = tm.loc[:, meta_cols].copy()
+
+                for family, tasks in ALL_TASK_FAMILIES.items():
+                    # Only keep tasks that actually exist in the dataframe
+                    existing = [t for t in tasks if t in task_cols]
+
+                    if not existing:
+                        raise ValueError(f"No columns found for task family '{family}'")
+
+                    # Row-wise mean across the family
+                    metrics_new[family] = tm[existing].mean(axis=1)
+                tm = metrics_new
+
+            test_metrics.append(tm)
+
+
+        X_test = np.concatenate([tr[tr.columns[3:]].values for tr in test_ratios])
+        Y_test = np.concatenate([tm[tm.columns[3:]].values for tm in test_metrics])
+
     
-    if n_test > 0:
+    if n_test > 0 and (len(test_ratios_path) == 0 or len(test_metrics_path) == 0):
         logger.info(f"Using {n_test} samples for test data")
         X_train, X_test, Y_train, Y_test = train_test_split(X_train, Y_train, test_size=n_test / len(Y_train), random_state=seed)
 
@@ -936,7 +1041,7 @@ def fit(
             assert len(train_split) == 1, "If neighborhood is not set, train_split must be a single float"
             X_train, Y_train = compute_mixture_neighborhood(X_train, Y_train, ratios, neighborhood, train_split[0])
 
-    if n_test == 0:
+    if n_test == 0 and (len(test_ratios_path) == 0 or len(test_metrics_path) == 0):
         X_test = deepcopy(X_train)
         Y_test = deepcopy(Y_train)
 
@@ -1127,6 +1232,7 @@ def fit(
             n_samples=num_samples,
             alpha=alpha,
             output_dir=output_dir,
+            test_ratios_path=test_ratios_path
         )
 
         if not opt_avg_metric and n_test == 0:
@@ -1155,6 +1261,7 @@ def fit(
                 min_weight_per_domain=min_weight_per_domain,
                 requested_tokens=requested_tokens,
                 no_extrapolation=no_extrapolation,
+                manual_kl=natural_distribution[0] if natural_kl else None 
             )
 
             plot_and_log_weights(
@@ -1191,7 +1298,8 @@ def fit(
         n_samples=num_samples,
         alpha=alpha,
         output_dir=output_dir,
-        average_bpb=True
+        average_bpb=True,
+        test_ratios_path=test_ratios_path
     )
 
 
@@ -1236,6 +1344,7 @@ def fit(
             kl_reg=kl_reg,
             requested_tokens=requested_tokens,
             no_extrapolation=no_extrapolation,
+            manual_kl=natural_distribution[0] if natural_kl else None 
         )
         plot_and_log_weights(
             prior=priors[0],

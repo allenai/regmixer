@@ -43,7 +43,7 @@ from cookbook.aliases import SwarmConfig as CookbookExperimentConfig
 from cookbook.utils.data import get_token_counts_and_ratios
 
 from regmixer.synthesize_mixture import calculate_priors
-from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics
+from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics, ALL_TASK_FAMILIES
 from regmixer.eval.law import ScalingLaw
 from regmixer.aliases import SourceConfig, ExperimentConfig
 
@@ -1048,6 +1048,7 @@ class LogLinearExactProposer(Proposer):
         obj_weights: Optional[list] = None,
         requested_tokens: Optional[int] = None,
         no_extrapolation: bool = False,
+        manual_kl: Optional[dict] = None,
         **kwargs
     ):
         #assert opt_avg_metric, "LogLinearExactProposer only supports opt_avg_metric=True"
@@ -1088,7 +1089,12 @@ class LogLinearExactProposer(Proposer):
 
         x = cp.Variable(d)
 
-        q = np.array(list(prior_distributions.values()))
+        if manual_kl is not None:
+            logger.info(f"Using manual KL prior distribution: {manual_kl}")
+            q = np.array(list(manual_kl.values()))
+        else:
+            logger.info(f"Using prior distribution for KL: {prior_distributions}")
+            q = np.array(list(prior_distributions.values()))
         q = np.asarray(q, dtype=float)
         eps=1e-12
         q = np.maximum(q, eps)         # ensure strictly positive
@@ -1112,7 +1118,7 @@ class LogLinearExactProposer(Proposer):
         if constrain_objective:
             constraints.append(x <= caps)
 
-
+        breakpoint()
         prob = cp.Problem(cp.Minimize(obj), constraints)
         prob.solve(solver="ECOS", verbose=True)              # ECOS or SCS are good
 
@@ -1198,6 +1204,8 @@ class AutoscaleExactProposer(Proposer):
         if constrain_objective and caps is not None:
             constraints.append(x <= caps)
 
+
+
         # build autoscale loss: weighted sum over tasks
         # f_i(x) = sum_j (N_i*(alpha_i_j + x_j))^(-gamma_i_j) + L_i
         f_terms = []
@@ -1221,11 +1229,19 @@ class AutoscaleExactProposer(Proposer):
             gamma_i = np.asarray(reg.gamma_, dtype=float)
             L_i = float(reg.L_)
 
-            base = N_i * (alpha_i + x)          # elementwise affine in x
+            #base = N_i * (alpha_i + x)          # elementwise affine in x
 
             # power with negative exponent is convex for positive base
-            term_i = cp.sum(cp.exp(cp.multiply(-gamma_i, cp.log(base)))) + L_i
+            #term_i = cp.sum(cp.exp(cp.multiply(-gamma_i, cp.log(base)))) + L_i
+
+            base2 = alpha_i + x
+            term_i = cp.sum(cp.exp(cp.multiply(-gamma_i, cp.log(base2) + np.log(N_i)))) + L_i
+
             f_terms.append(term_i)
+
+            eps_base = 1e-9
+            constraints.append(alpha_i + x >= eps_base)
+
 
         f_vec = cp.hstack(f_terms)  # shape (n,)
         loss = cp.sum(cp.multiply(weights, f_vec))
@@ -1237,10 +1253,23 @@ class AutoscaleExactProposer(Proposer):
 
         prob = cp.Problem(cp.Minimize(obj), constraints)
 
+        #prob.solve(
+        #    solver="ECOS",
+        #    verbose=True,
+        #)
+
         prob.solve(
-            solver="ECOS",
+            solver=cp.SCS,
             verbose=True,
+            eps=1e-6,         # try 1e-5 or 1e-6
+            max_iters=200000
         )
+
+        print("status:", prob.status)
+        print("x min:", x.value.min(), "x max:", x.value.max(), "sum:", x.value.sum())
+        print("min(alpha+x) across all i:", min((np.min(reg.alpha_ + x.value) for reg in predictor)))
+
+
         print(prob.value, prob.status)
         breakpoint()
         return x.value
@@ -1567,6 +1596,7 @@ def plot_correlation(
     alpha: Optional[float] = None,
     output_dir: str = BASE_OUTPUT_DIR,
     average_bpb: bool = False,
+    test_ratios_path: Optional[List[str]] = None,
 ):
     plt.close()
 
@@ -1590,7 +1620,7 @@ def plot_correlation(
 
     corr_results = {}
 
-    if train_split[0] == 1 and n_test == 0:
+    if train_split[0] == 1 and n_test == 0 and len(test_ratios_path) == 0:
         # Only plot train if train and test are the same
         sns.regplot(
             x=y_pred_train,
@@ -1611,7 +1641,6 @@ def plot_correlation(
         corr_results["train"] = corr_train
     else:
         # Predict test
-
         if average_bpb:
             y_pred_test = np.mean([predictors[i].predict(X_test) for i in range(num_tasks)], axis=0)
             y_true_test = Y_test.mean(axis=1)
@@ -1935,6 +1964,56 @@ def plot_interaction_matrix_signed_evidence(
 
 
 
+def get_latest_checkpoint(display_name: str, dashboard: list[str]) -> Optional[str]:
+    """
+    Find the latest checkpoint directory for a given display_name.
+
+    Args:
+        display_name: The base run name (e.g., "my-run")
+        dashboard: List of dashboard names to search
+
+    Returns:
+        The full checkpoint name (e.g., "my-run_step61000-hf") or None if no checkpoints found
+    """
+    bucket = "ai2-llm"
+    s3 = boto3.client("s3")
+
+    for d in dashboard:
+        prefix = f"evaluation/{d}/"
+
+        try:
+            paginator = s3.get_paginator("list_objects_v2")
+            pages = paginator.paginate(Bucket=bucket, Prefix=prefix, Delimiter='/')
+
+            checkpoints = []
+            for page in pages:
+                for common_prefix in page.get("CommonPrefixes", []):
+                    dir_path = common_prefix["Prefix"]
+                    dir_name = dir_path.rstrip('/').split('/')[-1]
+
+                    # Check if this directory matches our run with a checkpoint suffix
+                    # Pattern: {display_name}_step{number}
+                    if dir_name.startswith(display_name + "_step"):
+                        checkpoint_part = dir_name[len(display_name)+1:]  # Remove "display_name_" prefix
+                        # Extract step number
+                        match = re.search(r'step(\d+)', checkpoint_part)
+                        if match:
+                            step_num = int(match.group(1))
+                            checkpoints.append((dir_name, step_num))
+
+            if checkpoints:
+                # Sort by step number and return the latest
+                checkpoints.sort(key=lambda x: x[1])
+                latest = checkpoints[-1][0]
+                logger.info(f"Found latest checkpoint for {display_name}: {latest}")
+                return latest
+        except Exception as e:
+            logger.warning(f"Error searching for checkpoints in dashboard {d}: {e}")
+            continue
+
+    return None
+
+
 def mk_run_metrics(
     history,
     samples: int,
@@ -1943,18 +2022,31 @@ def mk_run_metrics(
     average: bool = False,
     dashboard: list[str] = ["regmixer"],  # ["olmo-3-evals"]
     metric_type: Optional[str] = None,
-    pull_from_dashboard: bool=False
+    pull_from_dashboard: bool=False,
+    use_latest_checkpoint: bool = True,
 ) -> dict[str, float]:
     df = pd.DataFrame(history)
     results = {}
     group_name, group_metrics = metrics
     in_loop_tasks = [task for task in df.columns if task in group_metrics]
     offline_tasks = [task for task in group_metrics if task not in in_loop_tasks]
+
+    # Determine which display_name to use for offline evaluations
+    eval_display_name = display_name
+    # Only search for latest checkpoint if:
+    # 1. use_latest_checkpoint is True
+    # 2. There are offline tasks to fetch
+    # 3. The display_name doesn't already contain "_step" (meaning it's not already a checkpoint path)
+    if use_latest_checkpoint and len(offline_tasks) > 0 and "_step" not in display_name:
+        latest_checkpoint = get_latest_checkpoint(display_name, dashboard)
+        if latest_checkpoint is not None:
+            eval_display_name = latest_checkpoint
+
     if pull_from_dashboard:
         assert metric_type=="primary_score", "Only primary_score metric type is supported for dashboard evaluation"
         assert not average, "Averaging not supported for dashboard evaluation"
         for d in dashboard:
-            offline_results = get_offline_evals_from_dashboard(display_name, offline_tasks, dashboard=d)
+            offline_results = get_offline_evals_from_dashboard(eval_display_name, offline_tasks, dashboard=d)
             results.update(offline_results)
     else:
         assert (average and len(in_loop_tasks) != 0) == False, "Averaging with in-loop tasks is not supported"
@@ -1964,12 +2056,12 @@ def mk_run_metrics(
         if len(offline_tasks) > 0:
             # need to obtain offline results
             for d in dashboard:
-                logger.info(f"Getting offline results for {display_name} in {d} dashboard")
-                offline_results = get_offline_evals(display_name, offline_tasks, group_name, dashboard=d, metric_type=metric_type)
+                logger.info(f"Getting offline results for {eval_display_name} in {d} dashboard")
+                offline_results = get_offline_evals(eval_display_name, offline_tasks, group_name, dashboard=d, metric_type=metric_type)
                 results.update(offline_results)
 
             if average:
-                tasks_from_dashboard = list(offline_results.keys())
+                tasks_from_dashboard = list(results.keys())
                 avg_result = np.mean(np.array(list(results.values())))
                 results[group_name] = avg_result
                 # remove individual tasks
