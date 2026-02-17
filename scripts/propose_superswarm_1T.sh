@@ -171,7 +171,7 @@ done
 
 
 
-: 'for SEED in 0 1 2 
+for SEED in 0 #1 2 
 do 
     rmc-eval fit -c src/regmixer/config/superswarm-with-strong-manual-prior.yaml \
         -g ee28fc9c \
@@ -197,10 +197,10 @@ do
         --drop-metrics lab_bench_protocolqa \
         --drop-metrics medqa_en:rc::none \
         --train-split 256
-done '
+done
 
 
-for SEED in 0 1 2 
+: 'for SEED in 0 1 2 
 do 
     rmc-eval fit -c src/regmixer/config/superswarm-with-strong-manual-prior.yaml \
         -g ee28fc9c \
@@ -257,5 +257,5 @@ do
         --train-split 65
 
 done 
-
+'
 

@@ -44,7 +44,6 @@ from regmixer.eval.utils import (
     solve_log_linear,
     plot_interaction_matrix,
     compute_mixture_neighborhood,
-    filter_constrained_swarm,
     calculate_priors_with_manual,
     aggregate_mmlu,
     PROPOSER_TYPES, 
@@ -525,7 +524,6 @@ def fit(
 
 
     logger.warning("PLEASE make sure your token constraints are correct.")
-    #breakpoint()
 
     if group_average and group_metrics:
         raise ValueError("Cannot provide both group-average and group-metrics")
@@ -705,7 +703,7 @@ def fit(
         manual_prior=launch_configs[0].manual_prior if hasattr(launch_configs[0], "manual_prior") else None,
         fixed_source_weights= launch_configs[0].fixed_source_weights if hasattr(launch_configs[0], "fixed_source_weights") else None,
     )
-    breakpoint()
+
     if natural_kl and proposer_type in ["exact", "bimix_exact", "autoscale_exact"] and kl_reg is not None:
         logger.info(f"Calculating natural source weights for KL regularization...")
         natural_distribution, _ = calculate_priors_with_manual(
@@ -829,7 +827,6 @@ def fit(
 
         if constrain_swarm:
             raise NotImplementedError("Constrained swarm is implemented but out of date. We concluded that this is not the right way to enforce token repetition constraints.")
-            run_ratios, run_metrics = filter_constrained_swarm(final_cookbook_path, run_ratios, run_metrics)
 
         ratios = pd.DataFrame(run_ratios)
         metrics = pd.DataFrame(run_metrics)
@@ -840,7 +837,6 @@ def fit(
         print(metrics.isna().sum().sum())
         print(ratios[ratios.columns[3:]].sum(axis=1).max(), ratios[ratios.columns[3:]].sum(axis=1).min())
 
-        breakpoint()
         if len(support_domains) == 0 and len(train_split) == 1:
             assert np.isclose(ratios[ratios.columns[3:]].sum(axis=1).sum(), len(ratios)), "Ratios do not add up to 1!"
         if fixed_weight is not None:
@@ -1084,13 +1080,11 @@ def fit(
         metrics_to_index = [m for i, m in indexed_metrics if i not in drop_indices-3]
         indexed_metrics = list(enumerate(metrics_to_index))
     """
-
-
     # caching logic for regression model. Note that one regression model can be used for many different proposed mixes,
     # which is why we need to cache based on a separate subconfig, regression_config 
     regression_config_str = json.dumps(regression_config, sort_keys=True)
     hash_str = hashlib.sha256(regression_config_str.encode("utf-8")).hexdigest()[:16]
-    regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / "_".join(experiment_groups) / hash_str 
+    regression_model_cache_folder = pathlib.Path(BASE_CACHE_DIR) / "_".join(experiment_groups) / hash_str
     regression_model_cache_folder.mkdir(parents=True, exist_ok=True)
     regression_model_cache_path = regression_model_cache_folder / f"regression_params.pkl"
     if os.path.exists(regression_model_cache_path) and regression_type in ["log_linear", "autoscale"]:
@@ -1110,15 +1104,20 @@ def fit(
         # look in output_dir 
         with open(os.path.join(output_dir, "path_to_regression_model.txt"), "r") as f:
             regression_model_cache_path = pathlib.Path(f.read().strip())
-        if os.path.exists(regression_model_cache_path):
-            logger.info(f"Using {regression_type} regression model at {regression_model_cache_path}")
-            with open(regression_model_cache_path, "rb") as f:
-                params = pickle.load(f)
 
-            # initialize the regression models using the cached parameters 
-            for idx, metric in indexed_metrics:
-                reg = REGRESSION_TYPES[regression_type](params=params[metric], requested_tokens=requested_tokens if regression_type=="autoscale" else None)
-                predictors.append(reg)
+        if not os.path.exists(regression_model_cache_path):
+            raise ValueError(f"You may have deleted the cached regression model since the last run, but the output directory still links to it. Please delete {os.path.join(output_dir, 'path_to_regression_model.txt')}.")
+
+        logger.info(f"Using log-linear regression model at {regression_model_cache_path}")
+        with open(regression_model_cache_path, "rb") as f:
+            params = pickle.load(f)
+
+        # initialize the regression models using the cached parameters
+        for idx, metric in indexed_metrics:
+            reg = REGRESSION_TYPES[regression_type](
+                params=params[metric], requested_tokens=requested_tokens if regression_type == "autoscale" else None
+            )
+            predictors.append(reg)
     else:
         logger.info(f"Will save regression model to {regression_model_cache_path}")
         for idx, metric in indexed_metrics:

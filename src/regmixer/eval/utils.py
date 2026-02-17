@@ -39,9 +39,6 @@ from matplotlib.cm import ScalarMappable
 import subprocess
 from io import StringIO
 
-from cookbook.aliases import SwarmConfig as CookbookExperimentConfig
-from cookbook.utils.data import get_token_counts_and_ratios
-
 from regmixer.synthesize_mixture import calculate_priors
 from regmixer.eval.constants import WandbMetrics, GroupedWandbMetrics, ALL_TASK_FAMILIES
 from regmixer.eval.law import ScalingLaw
@@ -625,24 +622,7 @@ class SimulationProposer(Proposer):
             # just need a desired token count and available token count
             assert final_cookbook_path is not None or manual_token_constraint_path is not None
             if final_cookbook_path is not None:
-                with open(final_cookbook_path, "r") as f:
-                    data = yaml.safe_load(f)
-
-                final_config = CookbookExperimentConfig(**data, path=final_cookbook_path)
-                desired_tokens = final_config.max_tokens
-
-                token_universe = get_token_counts_and_ratios(
-                    final_config.dataset.sources, final_config.dataset.dtype, True
-                )
-                available_tokens_per_source = {
-                    path: relative_size * token_universe[1]
-                    for path, relative_size in token_universe[0].items()
-                }
-                # ensures that order of sources in simulations and in the constraint dictionary are aligned
-                available_tokens_per_source = {
-                    source: available_tokens_per_source[source]
-                    for source, _ in prior_distributions.items()
-                }
+                raise ValueError(f"Does not support using --final-cookbook-path")
             elif manual_token_constraint_path is not None:
                 with open(manual_token_constraint_path, "r") as f:
                     data = yaml.safe_load(f)
@@ -1118,7 +1098,6 @@ class LogLinearExactProposer(Proposer):
         if constrain_objective:
             constraints.append(x <= caps)
 
-        breakpoint()
         prob = cp.Problem(cp.Minimize(obj), constraints)
         prob.solve(solver="ECOS", verbose=True)              # ECOS or SCS are good
 
@@ -1271,7 +1250,6 @@ class AutoscaleExactProposer(Proposer):
 
 
         print(prob.value, prob.status)
-        breakpoint()
         return x.value
 
 
@@ -1494,7 +1472,6 @@ def mk_run_history(run: Run, samples: int, eval_metric_group: GroupedWandbMetric
             print(run.id)
             print(run.summary.keys())
 
-            breakpoint()
         return mk_run_instance(run, summary, samples)
     else:
         return mk_run_instance(run, run.scan_history(keys=eval_metric_group.value), samples)
@@ -2389,9 +2366,9 @@ def expand_collapsed_weights(
     topics_to_expand = list(
         set(list(original_prior.keys())).difference(set(list(collapsed_prior.keys())))
     )
-    collapsed_sources = list(
+    collapsed_sources = sorted(list(
         set(list(collapsed_prior.keys())).difference(set(list(original_prior.keys())))
-    )
+    ))
 
     for source in collapsed_sources:
         topics_per_source = sorted([t for t in topics_to_expand if source in t])
@@ -2462,6 +2439,8 @@ def plot_and_log_weights(
 ):
     logger.info(f":::::::::{metric_name}:::::::::")
     logger.info("Predicted optimal weights:")
+
+    breakpoint()
 
     if set(list(original_prior.keys())) != set(list(prior.keys())):
         # expand weights
@@ -2608,53 +2587,6 @@ def save_eval_config(eval_config: dict, output_dir: str, custom_name: Optional[s
 
     print(f"[INFO] Saved config to {config_path}")
     return folder_path
-
-
-def filter_constrained_swarm(
-    final_cookbook_path: Path, run_ratios: List, run_metrics: List
-) -> Tuple[List, List]:
-    assert (
-        final_cookbook_path is not None
-    ), "final_cookbook_path must be set to determine how to construct swarm to be unconstrained."
-
-    with open(final_cookbook_path, "r") as f:
-        data = yaml.safe_load(f)
-
-    final_config = CookbookExperimentConfig(**data, path=final_cookbook_path)
-    desired_tokens = final_config.max_tokens
-
-    # logger.warning(f"Using hardcoded token counts!")
-    # with open("cache/priors_cache_217af510306ab626a507634c64ca7ca8.json", "r") as f:
-    #    available_tokens_per_source = json.load(f)['token_counts']
-
-    token_universe = get_token_counts_and_ratios(
-        final_config.dataset.sources, final_config.dataset.dtype, True
-    )
-    available_tokens_per_source = {
-        path: relative_size * token_universe[1] for path, relative_size in token_universe[0].items()
-    }
-
-    original_swarm_size = len(run_ratios)
-
-    valid_runs = [
-        run["run"]
-        for run in run_ratios
-        if all(
-            [
-                run[source] * desired_tokens <= num_available_tokens
-                for source, num_available_tokens in available_tokens_per_source.items()
-            ]
-        )
-    ]
-
-    run_ratios = [run for run in run_ratios if run["run"] in valid_runs]
-    run_metrics = [run for run in run_metrics if run["run"] in valid_runs]
-
-    logger.info(
-        f"Removed {original_swarm_size - len(run_ratios)} swarm runs that would repeat tokens at the final run scale."
-    )
-
-    return run_ratios, run_metrics
 
 
 def calculate_priors_with_manual(
@@ -2850,13 +2782,13 @@ def aggregate_mmlu(metrics: pd.DataFrame, metrics_to_index: list):
 
 
 
-def swarm_config_from_cookbook_or_regmixer_path(config: Path, use_cookbook: bool) -> Union[ExperimentConfig, CookbookExperimentConfig]:
+def swarm_config_from_cookbook_or_regmixer_path(config: Path, use_cookbook: bool) -> ExperimentConfig:
     """
     Load configuration from a cookbook or regmixer path.
     """
     with open(config, "r") as f:
         data = yaml.safe_load(f)
     if use_cookbook:
-        return CookbookExperimentConfig(**data, path=config)
+        raise ValueError("cookbook configs no longer supported")
     else:
         return ExperimentConfig(**data)

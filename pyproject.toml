@@ -40,11 +40,17 @@ wandb = [
     "wandb",
 ]
 eval = [
+    "cvxpy",
+    "ecos",
     "lightgbm",
-    "pandas",
+    "matplotlib",
+    "numpy",
+    "pandas<3",
+    "scikit-learn",
     "scipy",
     "seaborn",
-    "statsmodels"
+    "statsmodels",
+    "tqdm"
 ]
 all = [
     "regmixer[dev,beaker,wandb,eval]",
